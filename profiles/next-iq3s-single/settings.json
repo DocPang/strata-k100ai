@@ -1,0 +1,11 @@
+{
+  "prefill": 20480,
+  "max_context": 262144,
+  "expert_cache": 24576,
+  "kv_resident": 32768,
+  "spec": 4,
+  "spec_min_p": 0.70,
+  "vram_reserve_mib": 2048,
+  "conversation_cache_mib": 16384,
+  "conversation_cache_slots": 4
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "engine": "strata/c4",
+  "engine_sha256": "c4be512a7d257d9b56bc325136431e5feffd2b6d76f52378051829bfe73fc903",
+  "runtime_origin": "Pinned upstream serve/tools/data; every copied file compared against frozen c4 source inventory",
+  "runtime_files_verified": 174,
+  "strata_base_commit": "fb58e0dbc8399662c0e47c76578c6e878b14f6cf",
+  "llama_base_commit": "3cf03257f219afbe7334045ff7c6a06ac68c627d",
+  "binary_kind": "frozen historical binary; not a clean rebuild",
+  "clean_rebuild_verified": false,
+  "models_included": false,
+  "vendor_libraries_included": false,
+  "artifact": "strata-c4-linux-amd64.tar.gz",
+  "artifact_sha256": "156bc194f9388c6aed127ba28c69fdff89743eaa8efd7755cdac8bc6f0e94059",
+  "artifact_bytes": 8504874
+}

@@ -1,0 +1,38 @@
+{
+  "configure_success": true,
+  "compile_commands": 185,
+  "gemm_contract_checks": {
+    "--offload-arch=gfx928": true,
+    "STRATA_GFX928_DOT4=1": true,
+    "STRATA_HIP_GFX906=1": true,
+    "STRATA_HIPBLASLT_AVAILABLE=1": true,
+    "-amdgpu-early-inline-all=true": true,
+    "-amdgpu-function-calls=false": true
+  },
+  "full_compile_link_verified": false,
+  "gpu_runtime_equivalence_verified": false,
+  "observed_at": "2026-10-15T19:16:31.214754+08:00",
+  "source_replay": {
+    "status": "source_replay_verified",
+    "target": "kgupad-lz-20261014",
+    "manifest_sha256": "1c78df65268b6ba163595d5828a9b76f99c1451cd44efafed79cb57ecde2a8da",
+    "results": {
+      "strata": {
+        "verified_files": 2426,
+        "patched_files": 25
+      },
+      "llama": {
+        "verified_files": 3609,
+        "patched_files": 3
+      }
+    },
+    "clean_build_verified": false,
+    "runtime_equivalence_verified": false
+  },
+  "execution": {
+    "network": "none",
+    "gpu_devices_mounted": false,
+    "cpus": 2,
+    "memory_gib": 12
+  }
+}

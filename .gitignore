@@ -1,0 +1,12 @@
+/local-artifacts/
+/.cache/
+/deployment.env
+/extras/*
+!/extras/.gitkeep
+__pycache__/
+*.pyc
+*.gguf
+*.safetensors
+*.log
+*.tar.gz
+.env

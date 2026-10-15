@@ -1,0 +1,57 @@
+services:
+  inference:
+    image: k100ai/strata-c4:v0.1.0-rc.1
+    pull_policy: never
+    restart: "no"
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:${PORT:-8080}:8080"
+    environment:
+      STRATA_API_KEY: ${STRATA_API_KEY:?Set STRATA_API_KEY in deployment.env}
+      SHARD1: ${SHARD1:?Set SHARD1}
+      SHARD2: ${SHARD2:?Set SHARD2}
+      CONTROL_VECTOR: ${CONTROL_VECTOR:-}
+    devices:
+      - /dev/kfd:/dev/kfd
+      - ${RENDER_DEVICE:?Set one render device}:/dev/dri/renderD128
+    volumes:
+      - type: bind
+        source: ${MODEL_DIR:?Set MODEL_DIR}
+        target: /models
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${PACK_DIR:?Set PACK_DIR}
+        target: /pack
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MTP_DIR:?Set MTP_DIR}
+        target: /mtp
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${HYHAL_DIR:-/opt/hyhal}
+        target: /opt/hyhal
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./profiles/next-iq3s-single/settings.json
+        target: /config/settings.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${EXTRAS_DIR:-./extras}
+        target: /extras
+        read_only: true
+        bind: {create_host_path: false}
+    shm_size: 2gb
+    ulimits:
+      memlock: {soft: -1, hard: -1}
+    security_opt:
+      - seccomp=unconfined
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=10)"]
+      interval: 30s
+      timeout: 15s
+      start_period: 20m
+      retries: 3
