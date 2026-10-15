@@ -1,6 +1,6 @@
 # 参数参考
 
-原生启动使用各 profile 下的 `strata.json`。编辑 `args` 中的参数及对应值后，停止并重建目标容器。优化环境通过 `engines/strata/c4/environment.env` 传入；配置文件的 `env` 可覆盖指定变量。
+当前推荐使用 `profiles/next-iq3xxs-single/strata.json`；IQ3_S 列为历史参考。编辑 `args` 中的参数及对应值后，停止并重建目标容器。优化环境通过 `engines/strata/xxs-exact-sel/environment.env` 传入；配置文件的 `env` 可覆盖指定变量。
 
 ## 模型与设备
 
@@ -26,7 +26,7 @@
 | --prefill | 20480 | 20480 | prefill 分块上限，与临时工作区和 TTFT 有关 |
 | --max-context | 262144 | 262144 | 会话总上下文容量 |
 | --kv | int8 | int8 | KV 存储格式 |
-| --kv-resident | 32768 | 32768 | KV 显存缓存容量；0 为完整驻留，c4 的非零有效下限为 20480 |
+| --kv-resident | 32768（历史） | 省略 | KV 显存缓存容量；0 为完整驻留，c4 的非零有效下限为 20480 |
 | --vram-reserve-mib | 2048 | 2048 | GPU 内存规划预留，单位 MiB |
 | --pool-workers | 12 | 12 | CPU 专家工作线程数量 |
 | --no-prefill-borrow | 开启 | 开启 | 禁止 prefill 借用专家区域，保留参考配置的驻留策略 |
@@ -52,11 +52,19 @@
 | --conversation-cache-slots | 4 | 会话缓存条目数 |
 | --conversation-cache-min-free-mib | 8192 | 会话缓存保留的主存余量阈值 |
 
-这些参数用于前缀/会话复用，不等同于并发解码配置。本版本未启用 `--batch` 或 `--batch-mtp`。
+这些参数用于前缀/会话复用，不等同于并发解码配置。推荐配置省略 `--batch` 和 `--batch-mtp`，保持单槽 FIFO。
 
 ## 优化环境
 
-两种量化配置共用 c4 环境文件。
+XXS 使用新引擎环境文件，IQ3_S 历史配方使用 c4 环境。新增推荐变量：
+
+| 变量 | 设置与作用 |
+| --- | --- |
+| STRATA_PF_FUSED | 1，启用 fused native 路径 |
+| STRATA_PF_FUSED_NATIVE_EXACT_SKIP | 1，29 层保持 exact，19 层 IQ2 走 fused |
+| STRATA_SEL_BATCH | 1024，selection 的 query 批次；不是 decoder 会话 batch |
+
+HCU0 父版不识别 SEL_BATCH，本版发布的回移植引擎同时支持上述变量。其余环境沿用父版：
 
 | 范围 | 主要变量 |
 | --- | --- |

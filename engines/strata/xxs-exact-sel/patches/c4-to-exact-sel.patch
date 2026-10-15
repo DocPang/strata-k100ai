@@ -1,0 +1,37 @@
+--- a/src/prefill/prefill.cpp
++++ b/src/prefill/prefill.cpp
+@@ -754,7 +754,7 @@
+     std::vector<int32_t> steps_host;
+     int32_t* sel_ids = nullptr;
+     float* sel_scores = nullptr;          // [sel_batch, max_blocks]
+-    int64_t sel_batch = 256, max_blocks = 0;
++    int64_t sel_batch = [] { const char* e = std::getenv("STRATA_SEL_BATCH"); const int64_t n = e ? std::atoll(e) : (int64_t) 256; return (n >= 32 && n <= 8192) ? n : (int64_t) 256; }(), max_blocks = 0;
+     float* attn_scratch = nullptr;
+     int64_t attn_batch = 32, cap = 0;
+     // MoE
+@@ -1904,9 +1904,9 @@
+     s.idx_dim = g.idx_key_dim;
+     const int64_t cap = strata::kernels::qsa_selection_width(strata::kernels::kTopkMaxCells, s);
+     const int64_t max_blocks = ss.qsa_states[ss.qsa_primary()].max_cells / s.idx_block + 2;
+-    o.take<uint8_t>((size_t) std::max({gdn_set_bytes(T), qsa_set_bytes(T, cap, max_blocks, 256, 32, s),
++    o.take<uint8_t>((size_t) std::max({gdn_set_bytes(T), qsa_set_bytes(T, cap, max_blocks, [] { const char* e = std::getenv("STRATA_SEL_BATCH"); const int64_t n = e ? std::atoll(e) : (int64_t) 256; return (n >= 32 && n <= 8192) ? n : (int64_t) 256; }(), 32, s),
+                                        moe_set_bytes(T, g.n_expert, fused_layout(T, true))}), ok);
+-    if (need_report_on()) pf_need_report("need", T, cap, max_blocks, 256, 32, s, fused_layout(T, true), g.n_expert);
++    if (need_report_on()) pf_need_report("need", T, cap, max_blocks, [] { const char* e = std::getenv("STRATA_SEL_BATCH"); const int64_t n = e ? std::atoll(e) : (int64_t) 256; return (n >= 32 && n <= 8192) ? n : (int64_t) 256; }(), 32, s, fused_layout(T, true), g.n_expert);
+     for (int i = 0; i < DQ; ++i) { o.take<uint16_t>(1280 * 2560, ok); o.take<uint16_t>(2560 * 640, ok); }
+     if (mmq_plan().any) {
+         const MmqPlan& mp = mmq_plan();
+@@ -3010,7 +3010,12 @@
+                     // fused_ring() sized the ring and the buffers for it
+                     const bool no_peer = !core::peer_portable();
+                     const bool fused_only = mmq_plan().any && mmq_plan().fo[(size_t) l];
+-                    const bool fused_nat = (use_mmq || fused_only) && stream_all && no_peer && lay.native && fused::native_supported(mmq_gt, mmq_dt);
++                    // xxsexact-20261015: keep the types the exact gate/up path covers (IQ3_XXS/IQ2_S/IQ3_S/IQ4_XS)
++                    // on MMQ (which dispatches into the exact expand+MMAC kernels) and give only the types it
++                    // does not cover (IQ2_XS/IQ2_XXS) to the fused native kernels. Opt-in; off by default.
++                    static const bool xxs_exact_skip = [] { const char* v = std::getenv("STRATA_PF_FUSED_NATIVE_EXACT_SKIP"); return v != nullptr && v[0] == (char) 49; }();
++                    const bool gu_exact_covered = (mmq_gt == 18 || mmq_gt == 22 || mmq_gt == 21 || mmq_gt == 23);
++                    const bool fused_nat = (use_mmq || fused_only) && stream_all && no_peer && lay.native && fused::native_supported(mmq_gt, mmq_dt) && !(xxs_exact_skip && gu_exact_covered);
+                     const bool fused_l = (use_mmq && stream_all && no_peer && !lay.native && fused::enabled()) || fused_nat;
+                     // #583 / #954: the fused layout's GU/H/Xq hold the grouping tables and the int8 rows, sized for
+                     // stream_all_min() - 1 tokens of MMQ's rows, so a layer that takes MMQ or the FP16 path at the FULL

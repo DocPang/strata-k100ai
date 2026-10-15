@@ -26,8 +26,6 @@
     "262144",
     "--kv",
     "int8",
-    "--kv-resident",
-    "32768",
     "--pool-workers",
     "12",
     "--eos-ids",

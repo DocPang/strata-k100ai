@@ -2,7 +2,7 @@
 
 ## 权重
 
-本版本提供 Qwen3.8-Flash-Next GSQ-RCO 原版的 IQ3_S、IQ3_XXS 配置。模型来源及量化说明见 [固定版本上游模型文档](https://github.com/Niko1221/Strata/blob/fb58e0dbc8399662c0e47c76578c6e878b14f6cf/docs/MODELS.md)。两个分片、tokenizer、pack 和 MTP 必须保持匹配。
+本版本推荐 Qwen3.8-Flash-Next GSQ-RCO 原版 IQ3_XXS；IQ3_S 模板作为历史资料保留。模型来源及量化说明见 [固定版本上游模型文档](https://github.com/Niko1221/Strata/blob/fb58e0dbc8399662c0e47c76578c6e878b14f6cf/docs/MODELS.md)。两个分片、tokenizer、pack 和 MTP 必须保持匹配。
 
 运行包不包含模型。第一分片用于主模型，第二分片用于 PLE mmap。下载后按发布者校验值核验；IQ3_XXS 已核对文件的 SHA-256 另存于 [weights.sha256](../profiles/next-iq3xxs-single/weights.sha256)。
 
@@ -20,22 +20,14 @@ BASE_IMAGE=harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18ef
 mkdir -p /srv/packs
 
 docker run --rm --network none \
-  --env-file "$PWD/engines/strata/c4/environment.env" \
+  --env-file "$PWD/engines/strata/xxs-exact-sel/environment.env" \
   --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
-  --mount type=bind,src=/srv/models/next-iq3s/IQ3_S,dst=/models,readonly \
+  --mount type=bind,src=/srv/models/next-iq3xxs/IQ3_XXS,dst=/models,readonly \
   --mount type=bind,src=/srv/packs,dst=/out \
   --workdir /opt/k100ai/app --entrypoint python3 \
   "$BASE_IMAGE" tools/iq_pack.py \
-  --gguf /models/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf \
-  --out /out/next-iq3s --experts-bin
-```
-
-XXS 转换使用相同工具，修改模型挂载目录、第一分片文件名及输出路径：
-
-```text
-/srv/models/next-iq3xxs/IQ3_XXS → /models
---gguf /models/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf
---out /out/next-iq3xxs
+  --gguf /models/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf \
+  --out /out/next-iq3xxs --experts-bin
 ```
 
 转换需要足够的磁盘空间，输出目录与输入权重分开保存。
@@ -48,7 +40,7 @@ XXS 转换使用相同工具，修改模型挂载目录、第一分片文件名�
 mkdir -p /srv/mtp-work
 
 docker run --rm -e STRATA_SOURCE=modelscope \
-  --env-file "$PWD/engines/strata/c4/environment.env" \
+  --env-file "$PWD/engines/strata/xxs-exact-sel/environment.env" \
   --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
   --mount type=bind,src=/srv/mtp-work,dst=/out \
   --workdir /opt/k100ai/app --entrypoint python3 \
@@ -65,8 +57,10 @@ python3 tools/mtp_rt.py --gguf /out/mtp-q2_0.gguf --out /out/runtime
 
 上述三行为容器内命令。使用 `--entrypoint python3` 时，镜像名后从 `tools/...` 开始填写，不能再重复添加 `python3`。生成后将 `/srv/mtp-work/runtime` 挂载到推理容器 `/mtp`。
 
-## XXS 格式覆盖
+## 格式与质量
 
-相对于 IQ3_S，XXS 的 gate/up 增加 IQ2_XS、IQ2_XXS 类型，down 中 Q2_0 的比例上升，目标输出头由 Q6_K 变为 Q5_K。c4 的通用路径支持这些格式，但并非所有张量均进入 IQ3_S 专用快路径。详见 [OPTIMIZATIONS.md](OPTIMIZATIONS.md)。
+新引擎保留 29 层 exact gate/up，将 19 层 IQ2_XS/IQ2_XXS 交给 fused native int8。Q2_0 与 IQ4_NL down 沿用已有路径，精度政策保持父版状态。
 
-本版本增加 XXS 的 c4 基线配置，不包含另一份 `ad743dbf…` 实验引擎及其专用改动。两套权重的质量差异与实现正确性应分别评估。
+下载入口见 [魔塔模型仓库](https://modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/files)，完整直链与断点续传见 [INSTALL.md](INSTALL.md)。MTP 由 [魔塔 Qwen 官方模型](https://modelscope.cn/models/Qwen/Qwen3.8-Flash-Next/files)按需提取。
+
+不同量化权重的输出可能不同。相同 XXS 权重下的新旧引擎输出对照与跨权重量化质量对照分别记录，见 [参考成绩](BENCHMARKS.md)。

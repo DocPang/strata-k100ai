@@ -1,12 +1,12 @@
 services:
   inference:
-    image: k100ai/strata-c4:v0.1.0-rc.3
+    image: k100ai/strata-xxs-exact-sel:v0.1.0-rc.4
     pull_policy: never
     restart: "no"
     ports:
       - "${BIND_HOST:-127.0.0.1}:${PORT:-8080}:8080"
     environment:
-      PROFILE: ${PROFILE:-next-iq3s-single}
+      PROFILE: ${PROFILE:-next-iq3xxs-single}
       STRATA_API_KEY: ${STRATA_API_KEY:?Set STRATA_API_KEY in deployment.env}
       SHARD1: ${SHARD1:?Set SHARD1}
       SHARD2: ${SHARD2:?Set SHARD2}
@@ -36,7 +36,7 @@ services:
         read_only: true
         bind: {create_host_path: false}
       - type: bind
-        source: ./profiles/${PROFILE:-next-iq3s-single}/settings.json
+        source: ./profiles/${PROFILE:-next-iq3xxs-single}/settings.json
         target: /config/settings.json
         read_only: true
         bind: {create_host_path: false}

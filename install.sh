@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION=v0.1.0-rc.3
+VERSION=v0.1.0-rc.4
 BASE_DEFAULT='harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68'
 BASE_ID='sha256:caeff0e9e6efef918a31359c4764b18bf2d428f2b76e3580c788f4cc8b0e93ad'
-base="$BASE_DEFAULT"; local_only=0; bundle=''; profile=next-iq3s-single
+base="$BASE_DEFAULT"; local_only=0; bundle=''; profile=next-iq3xxs-single
 usage() {
   cat <<'HELP'
 Usage: ./install.sh [--base-image IMAGE] [--bundle FILE] [--local-only]
@@ -35,7 +35,14 @@ if ! docker image inspect "$base" >/dev/null 2>&1; then
 fi
 actual_id="$(docker image inspect --format '{{.Id}}' "$base")"
 [[ "$actual_id" == "$BASE_ID" ]] || { echo "Unsupported base image content: $actual_id. See docs/INSTALL.md." >&2; exit 1; }
-artifact=strata-c4-linux-amd64.tar.gz
+if [[ "$profile" == next-iq3xxs-single ]]; then
+  artifact=strata-xxs-exact-sel-linux-amd64.tar.gz
+  engine_id=xxs-exact-sel
+else
+  artifact=strata-c4-linux-amd64.tar.gz
+  engine_id=c4
+fi
+image="k100ai/strata-$engine_id:$VERSION"
 mkdir -p "$ROOT/.cache/artifacts"
 if [[ -z "$bundle" ]]; then
   bundle="$ROOT/.cache/artifacts/$artifact"
@@ -48,7 +55,7 @@ if [[ -z "$bundle" ]]; then
   fi
 fi
 [[ -f "$bundle" ]] || { echo 'Runtime bundle does not exist.' >&2; exit 1; }
-expected="$(awk '{print $1}' "$ROOT/engines/strata/c4/artifact.sha256")"
+expected="$(awk '{print $1}' "$ROOT/engines/strata/$engine_id/artifact.sha256")"
 if command -v sha256sum >/dev/null; then actual="$(sha256sum "$bundle" | awk '{print $1}')";
 else actual="$(shasum -a 256 "$bundle" | awk '{print $1}')"; fi
 [[ "$actual" == "$expected" ]] || { echo 'Runtime bundle checksum mismatch; refusing installation.' >&2; exit 1; }
@@ -69,7 +76,7 @@ alias_image=k100ai-base-dtk:2604-caeff0e9
 # Local alias avoids resolving the registry digest again during FROM processing.
 docker tag "$base" "$alias_image"
 BUILDX_BUILDER=default docker build --pull=false --network=none \
-  --build-arg "BASE_IMAGE=$alias_image" --tag "k100ai/strata-c4:$VERSION" "$stage"
+  --build-arg "BASE_IMAGE=$alias_image" --build-arg "ENGINE_ID=strata/$engine_id" --tag "$image" "$stage"
 if [[ ! -f "$ROOT/deployment.env" ]]; then
   cp "$ROOT/profiles/$profile/deployment.env.example" "$ROOT/deployment.env"
   chmod 600 "$ROOT/deployment.env"
@@ -78,4 +85,4 @@ if [[ ! -f "$ROOT/deployment.env" ]]; then
     sed -i "s/CHANGE_ME_GENERATE_A_PRIVATE_KEY/$key/" "$ROOT/deployment.env"
   fi
 fi
-printf '\nInstalled k100ai/strata-c4:%s\nEdit deployment.env paths/device and run ./start.sh.\n' "$VERSION"
+printf '\nInstalled %s\nEdit deployment.env paths/device and run ./start.sh.\n' "$image"

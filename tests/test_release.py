@@ -42,7 +42,10 @@ class ConfigurationTests(unittest.TestCase):
     def test_kv_residency_matches_c4_contract(self):
         for value in [0, 20480, 32768]:
             config = entrypoint.render(self.profile, {**self.settings, 'kv_resident': value}, self.env)
-            self.assertEqual(config['args'][config['args'].index('--kv-resident') + 1], str(value))
+            if value == 0:
+                self.assertNotIn('--kv-resident', config['args'])
+            else:
+                self.assertEqual(config['args'][config['args'].index('--kv-resident') + 1], str(value))
         with self.assertRaises(ValueError):
             entrypoint.render(self.profile, {**self.settings, 'kv_resident': 1024}, self.env)
         # A context shorter than the resident setting is fully resident in the engine.
@@ -111,7 +114,7 @@ esac
         self.assertIn('Unsupported base', result.stderr)
 
     def test_xxs_offline_install_is_available(self):
-        bundle = ROOT / 'local-artifacts/strata-c4-linux-amd64.tar.gz'
+        bundle = ROOT / 'local-artifacts/strata-xxs-exact-sel-linux-amd64.tar.gz'
         if not bundle.exists(): self.skipTest('Local release bundle required')
         result = self.run_install('--local-only', '--bundle', str(bundle), '--profile', 'next-iq3xxs-single')
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -125,7 +128,7 @@ esac
         self.assertNotIn('build --', (self.root / 'calls').read_text())
 
     def test_offline_install_contract(self):
-        bundle = ROOT / 'local-artifacts/strata-c4-linux-amd64.tar.gz'
+        bundle = ROOT / 'local-artifacts/strata-xxs-exact-sel-linux-amd64.tar.gz'
         if not bundle.exists(): self.skipTest('Release bundle is checked separately on the publishing host')
         result = self.run_install('--local-only', '--bundle', str(bundle))
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -159,13 +162,13 @@ class EnvironmentTests(unittest.TestCase):
 
 class NativeDeploymentTests(unittest.TestCase):
     def test_native_profiles_and_environment(self):
-        environment = dict(line.split('=', 1) for line in
-                           (ROOT / 'engines/strata/c4/environment.env').read_text().splitlines() if line)
         for name, quant, draft in [('next-iq3s-single', 'IQ3_S', '4'),
                                    ('next-iq3xxs-single', 'IQ3_XXS', '6')]:
             with self.subTest(name=name):
                 native = json.loads((ROOT / 'profiles' / name / 'strata.json').read_text())
                 profile = json.loads((ROOT / 'profiles' / name / 'profile.json').read_text())
+                environment = dict(line.split('=', 1) for line in
+                                   (ROOT / 'engines' / profile['engine'] / 'environment.env').read_text().splitlines() if line)
                 args = native['args']
                 self.assertEqual(args[args.index('--spec') + 1], draft)
                 self.assertEqual(args[args.index('--gpu') + 1], '0')
@@ -176,7 +179,23 @@ class NativeDeploymentTests(unittest.TestCase):
                 for key, value in profile['environment'].items():
                     self.assertEqual(environment[key], value)
                 for flag in ['--prefill', '--max-context', '--kv-resident', '--expert-cache', '--spec']:
-                    self.assertEqual(args[args.index(flag) + 1], profile['arguments'][profile['arguments'].index(flag) + 1])
+                    native_value = args[args.index(flag) + 1] if flag in args else '0'
+                    source_value = profile['arguments'][profile['arguments'].index(flag) + 1] if flag in profile['arguments'] else '0'
+                    self.assertEqual(native_value, source_value)
+
+    def test_recommended_xxs_profile_is_full_resident_fifo(self):
+        profile = json.loads((ROOT / 'profiles/next-iq3xxs-single/profile.json').read_text())
+        settings = json.loads((ROOT / 'profiles/next-iq3xxs-single/settings.json').read_text())
+        result = entrypoint.render(profile, settings, {'SHARD1': 'a.gguf', 'SHARD2': 'b.gguf'})
+        for flag in ['--kv-resident', '--batch', '--batch-mtp']:
+            self.assertNotIn(flag, result['args'])
+        self.assertEqual(profile['engine'], 'strata/xxs-exact-sel')
+        self.assertEqual(result['env']['STRATA_PF_FUSED'], '1')
+        self.assertEqual(result['env']['STRATA_PF_FUSED_NATIVE_EXACT_SKIP'], '1')
+        self.assertEqual(result['env']['STRATA_SEL_BATCH'], '1024')
+        args = result['args']
+        for flag, value in [('--expert-cache', '24576'), ('--max-context', '262144'), ('--prefill', '20480'), ('--spec', '6')]:
+            self.assertEqual(args[args.index(flag) + 1], value)
 
     def test_documented_bash_commands_parse(self):
         files = [ROOT / 'README.md', *sorted((ROOT / 'docs').glob('*.md'))]

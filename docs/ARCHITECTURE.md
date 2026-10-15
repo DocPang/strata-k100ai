@@ -1,8 +1,9 @@
 # 项目结构
 
 ```text
-engines/strata/c4/                 引擎身份、优化环境、源码与依赖补丁
-profiles/next-iq3s-single/          IQ3_S 单卡配置
+engines/strata/xxs-exact-sel/       当前引擎、环境、源码增量与构建记录
+engines/strata/c4/                 历史基线和基础源码恢复配方
+profiles/next-iq3s-single/          IQ3_S 历史配置
 profiles/next-iq3xxs-single/        IQ3_XXS 单卡配置
 containers/strata/                 可选派生镜像与辅助服务入口
 scripts/                          维护与验证工具
@@ -18,7 +19,7 @@ docs/                             部署、参数、容量规划与验证记录
 - `settings.json`：辅助入口的容量与 MTP 参数覆盖。
 - `deployment.env.example`：辅助入口的宿主路径和设备模板。
 
-原生部署的环境来自 `engines/strata/c4/environment.env`。原生配置与辅助配置独立读取，修改其中一种不会自动更新另一种。
+推荐 XXS 原生部署的环境来自 `engines/strata/xxs-exact-sel/environment.env`。原生配置与辅助配置独立读取，修改其中一种不会自动更新另一种。
 
 ## 版本管理
 

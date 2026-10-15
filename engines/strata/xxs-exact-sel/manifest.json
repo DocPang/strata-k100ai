@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "engine": "strata/xxs-exact-sel",
+  "engine_sha256": "5d87f09e07bbe42579322b93e33f13e4f2916decd1c1a8450bc2651ae1e251a1",
+  "runtime_origin": "Pinned upstream serve/tools/data; every copied file compared against frozen c4 source inventory",
+  "runtime_files_verified": 174,
+  "strata_base_commit": "fb58e0dbc8399662c0e47c76578c6e878b14f6cf",
+  "llama_base_commit": "3cf03257f219afbe7334045ff7c6a06ac68c627d",
+  "binary_kind": "incremental parent build plus three-site host STRATA_SEL_BATCH backport",
+  "clean_rebuild_verified": false,
+  "models_included": false,
+  "vendor_libraries_included": false,
+  "parent_binary_sha256": "ad743dbf9cc15026758cfceb26e2dd0aeb25700b295fba028e64ca4b33bc18c0",
+  "gpu_runtime_validation": false,
+  "artifact": "strata-xxs-exact-sel-linux-amd64.tar.gz",
+  "artifact_sha256": "dd9a9648c1f5e07f8cd5518599db97694af064f2e8fdc53a5fc8d6d5adfdc2b5",
+  "artifact_bytes": 8505305,
+  "features": [
+    "STRATA_PF_FUSED_NATIVE_EXACT_SKIP",
+    "STRATA_SEL_BATCH"
+  ],
+  "default_selection_batch": 256
+}

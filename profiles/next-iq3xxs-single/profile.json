@@ -26,8 +26,6 @@
     "262144",
     "--kv",
     "int8",
-    "--kv-resident",
-    "32768",
     "--pool-workers",
     "12",
     "--eos-ids",
@@ -74,9 +72,12 @@
     "STRATA_PF_DMSCRATCH_COND": "1",
     "STRATA_PF_FUSED_SQ": "1",
     "STRATA_MMQ_EXACT_ALL": "1",
-    "STRATA_KV_PREFETCH": "1"
+    "STRATA_KV_PREFETCH": "1",
+    "STRATA_PF_FUSED": "1",
+    "STRATA_PF_FUSED_NATIVE_EXACT_SKIP": "1",
+    "STRATA_SEL_BATCH": "1024"
   },
-  "notes": "c4 baseline; IQ3_XXS reference configuration; experimental XXS kernels excluded",
+  "notes": "IQ3_XXS, 256K full-resident INT8 KV, all experts resident, single-slot FIFO; SEL_BATCH=1024 is an explicit override with workload-dependent benefit.",
   "topology": "single",
-  "engine": "strata/c4"
+  "engine": "strata/xxs-exact-sel"
 }

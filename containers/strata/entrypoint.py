@@ -27,7 +27,7 @@ def render(profile, settings, env):
     args = list(profile['arguments'])
     resolved = {}
     for name, (flag, default, low, high) in SETTINGS.items():
-        baseline = type(default)(args[args.index(flag) + 1])
+        baseline = type(default)(args[args.index(flag) + 1]) if flag in args else (0 if name == 'kv_resident' else default)
         value = settings.get(name, baseline)
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ValueError(name + ' must be numeric')
@@ -36,7 +36,13 @@ def render(profile, settings, env):
         if not low <= value <= high:
             raise ValueError(name + ' is outside the supported range')
         resolved[name] = value
-        args[args.index(flag) + 1] = str(value)
+        if flag in args:
+            if name == 'kv_resident' and value == 0:
+                index = args.index(flag); del args[index:index + 2]
+            else:
+                args[args.index(flag) + 1] = str(value)
+        elif not (name == 'kv_resident' and value == 0):
+            args.extend([flag, str(value)])
     if resolved['prefill'] > resolved['max_context']:
         raise ValueError('prefill must not exceed max_context')
     if 0 < resolved['kv_resident'] < 20480:
@@ -82,7 +88,7 @@ def main():
     key = os.environ.get('STRATA_API_KEY', '').strip()
     if len(key) < 16 or key == 'CHANGE_ME_GENERATE_A_PRIVATE_KEY':
         raise SystemExit('Set STRATA_API_KEY to a private key of at least 16 characters in deployment.env')
-    profile_id = os.environ.get('PROFILE', 'next-iq3s-single')
+    profile_id = os.environ.get('PROFILE', 'next-iq3xxs-single')
     if profile_id not in ('next-iq3s-single', 'next-iq3xxs-single'):
         raise SystemExit('Unsupported PROFILE')
     profile = json.loads((ROOT / 'profiles' / profile_id / 'profile.json').read_text())

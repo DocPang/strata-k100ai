@@ -1,5 +1,7 @@
 # 优化内容与格式覆盖
 
+当前引擎在 c4 基础上增加 exact/fused 分派及 selection 参数：29 层保留 exact，19 层 IQ2_XS/IQ2_XXS 走 fused native int8；`STRATA_SEL_BATCH` 同步控制实际批次和两处工作区记账。其余优化沿用父版。
+
 c4 累计改动覆盖平台适配、量化计算、MoE 分派、prefill、decode 和工作区管理。源码补丁位于 `engines/strata/c4/replay/patches/`。
 
 ## 实现范围
@@ -31,11 +33,11 @@ INT8 KV、KV streaming、prompt/会话缓存及 MTP 基于上游能力。本项�
 
 | 部位 | IQ3_S | IQ3_XXS | c4 适用范围 |
 | --- | --- | --- | --- |
-| gate/up | IQ2_S、IQ3_XXS、IQ3_S、IQ4_XS | 增加 IQ2_XS、IQ2_XXS | 新类型使用通用路径；19/48 层不进入现有 exact gate/up 分支 |
+| gate/up | IQ2_S、IQ3_XXS、IQ3_S、IQ4_XS | 增加 IQ2_XS、IQ2_XXS | 19/48 层使用 fused native int8，29 层保留 exact |
 | down | IQ4_NL 39 层、Q2_0 9 层 | IQ4_NL 18 层、Q2_0 30 层 | 已有两类实现，实际分派仍受形状约束 |
 | 目标输出头 | Q6_K | Q5_K | Q6 packed 优化不直接覆盖 Q5_K 目标头 |
 
-层数为静态类型统计，不代表时间占比。本版本新增 XXS 的配置及模型校验，不包含独立实验引擎的专用优化。
+层数为静态类型统计，不代表时间占比。本版包含该分派改动及三处 selection 参数回移植；其他 wv2 实验内核未纳入。
 
 ## 数值与性能记录
 

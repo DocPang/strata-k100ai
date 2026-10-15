@@ -1,0 +1,16 @@
+{
+  "parent_binary_sha256": "ad743dbf9cc15026758cfceb26e2dd0aeb25700b295fba028e64ca4b33bc18c0",
+  "parent_prefill_sha256": "764133f701d121a3f8382dcf7577d9ce01b18855967cf49605a2de9ab590ea15",
+  "patched_prefill_sha256": "b5a9305121ab7de87c114d6289fb20ba1dea570c13e2576e14d612ea2d73df59",
+  "compile_command": "/opt/dtk/llvm/bin/clang++ -I/parent/source/src/prefill -DSTRATA_HIP_GFX906=1 -DSTRATA_NATIVE_EXPERTS=1 -DSTRATA_PREFILL_FUSED=1 -DSTRATA_PREFILL_MMQ=1 -DSTRATA_VERSION=\\\"0.1.41\\\" -D__HIP_PLATFORM_AMD__=1 -D__HIP_PLATFORM_HCC__=1 -D__HIP_ROCclr__=1 -I/parent/source/include -I/parent/llama-pin/ggml/src/../include -isystem /parent/source/include/strata/platform/hip_compat -isystem /opt/dtk/hip/include -O3 -DNDEBUG -std=c++20 -Wall -Wextra -MD -MT CMakeFiles/strata_prefill.dir/src/prefill/prefill.cpp.o -MF CMakeFiles/strata_prefill.dir/src/prefill/prefill.cpp.o.d -o CMakeFiles/strata_prefill.dir/src/prefill/prefill.cpp.o -c /work/prefill.cpp",
+  "link_command": ": && /opt/dtk/llvm/bin/clang++ --gpu-max-threads-per-block=1024 -DSTRATA_GFX928_DOT4=1 -O3 -DNDEBUG --offload-arch=gfx928  CMakeFiles/strata.dir/src/program/generate.cpp.o -o strata -L/usr/lib/gcc/x86_64-linux-gnu/11   -L/opt/hyhal/lib   -L/opt/dtk/opencl/lib   -L/opt/dtk/dushmem/lib -Wl,-rpath,/opt/dtk/lib:/opt/dtk/hip/lib  libstrata_engine.a  libstrata_prefill.a  libstrata_spec.a  libstrata_engine.a  libstrata_kernels.a  libstrata_core.a  libstrata_kernels_cpu.a  ggml/src/libggml-cpu.a  /opt/dtk/lib/libhipblas.so.2.3  libstrata_mmq.a  /opt/dtk/hip/lib/libgalaxyhip.so.5.2.26113.2065-6699a1f0  -L\"/opt/dtk/llvm/lib/clang/17.0.0/include/../lib/linux\" -lclang_rt.builtins-x86_64  /opt/dtk/hip/lib/libgalaxyhip.so.5.2.26113.2065-6699a1f0  /opt/dtk/llvm/lib/clang/17.0.0/lib/linux/libclang_rt.builtins-x86_64.a  ggml/src/libggml-base.a  -lm  -lgcc  -lgcc_s  -lc  -lgcc  -lgcc_s  -lstdc++  -lm  -lgcc_s  -lgcc  -lc  -lgcc_s  -lgcc /opt/dtk/lib/libhipblaslt.so && :",
+  "change": "Backport STRATA_SEL_BATCH to three host-side allocation/dispatch sites; default 256; exact-skip retained.",
+  "gpu_validation": false,
+  "binary_sha256": "5d87f09e07bbe42579322b93e33f13e4f2916decd1c1a8450bc2651ae1e251a1",
+  "source_patch_sha256": "3d409fc63e52001a15a4b788a4868b77bdb2d0969390214d4c8f94e008275671",
+  "source_replay": {
+    "base": "strata/c4",
+    "changed_files": 1,
+    "prefill_sha256": "b5a9305121ab7de87c114d6289fb20ba1dea570c13e2576e14d612ea2d73df59"
+  }
+}

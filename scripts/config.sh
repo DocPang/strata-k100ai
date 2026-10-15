@@ -3,7 +3,7 @@
 load_deployment_env() {
   [[ -f deployment.env ]] || { echo 'Run install.sh and edit deployment.env first.' >&2; return 1; }
   BIND_HOST=127.0.0.1; PORT=8080; HYHAL_DIR=/opt/hyhal; EXTRAS_DIR=./extras
-  PROFILE=next-iq3s-single; CONTROL_VECTOR=''; INSTANCE=next-iq3s-single; STRATA_API_KEY=''; SHARD1=''; SHARD2=''
+  PROFILE=next-iq3xxs-single; CONTROL_VECTOR=''; INSTANCE=next-iq3xxs-single; STRATA_API_KEY=''; SHARD1=''; SHARD2=''
   local line key value
   while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%$'\r'}"

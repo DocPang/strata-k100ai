@@ -29,10 +29,10 @@ sha256:caeff0e9e6efef918a31359c4764b18bf2d428f2b76e3580c788f4cc8b0e93ad
 在项目根目录下载并校验运行包：
 
 ```bash
-curl -fL --retry 3 -o strata-c4-linux-amd64.tar.gz \
-  https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.3/strata-c4-linux-amd64.tar.gz
-sha256sum -c engines/strata/c4/artifact.sha256
-tar -xzf strata-c4-linux-amd64.tar.gz
+curl -fL --retry 3 -o strata-xxs-exact-sel-linux-amd64.tar.gz \
+  https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.4/strata-xxs-exact-sel-linux-amd64.tar.gz
+sha256sum -c engines/strata/xxs-exact-sel/artifact.sha256
+tar -xzf strata-xxs-exact-sel-linux-amd64.tar.gz
 (cd runtime && sha256sum -c FILES.sha256)
 ```
 
@@ -100,7 +100,23 @@ cp containers/strata/entrypoint.py "$BUILD_DIR/entrypoint.py"
 docker tag "$BASE_IMAGE" k100ai-base-dtk:2604-caeff0e9
 BUILDX_BUILDER=default docker build --pull=false --network=none \
   --build-arg BASE_IMAGE=k100ai-base-dtk:2604-caeff0e9 \
-  -t k100ai/strata-c4:v0.1.0-rc.3 "$BUILD_DIR"
+  -t k100ai/strata-xxs-exact-sel:v0.1.0-rc.4 "$BUILD_DIR"
 ```
 
 采用 Docker-backed builder 复用本机镜像。Dockerfile 不执行 apt/pip 安装。仓库保留 `install.sh`、`start.sh` 和 Compose 作为兼容入口；主要运行与调试流程见 [RUNNING.md](RUNNING.md)。
+
+## 魔塔权重下载
+
+[魔塔模型页面](https://modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/files)。以下为可断点续传的两个直接下载命令：
+
+```bash
+mkdir -p /srv/models/next-iq3xxs/IQ3_XXS
+cd /srv/models/next-iq3xxs/IQ3_XXS
+curl -fL --retry 3 -C - -o Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf \
+  'https://modelscope.cn/api/v1/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/repo?Revision=master&FilePath=IQ3_XXS%2FQwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf'
+curl -fL --retry 3 -C - -o Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf \
+  'https://modelscope.cn/api/v1/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/repo?Revision=master&FilePath=IQ3_XXS%2FQwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf'
+sha256sum -c /absolute/path/strata-k100ai/profiles/next-iq3xxs-single/weights.sha256
+```
+
+2026-10-16 核验：两个直链可访问，大小与 SHA-256 对应已核验权重。DTK 镜像来自海光国内 sourcefind 仓库，已核验匿名拉取的 manifest 摘要；未将其他平台的镜像链接作为其副本。

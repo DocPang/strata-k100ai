@@ -2,7 +2,7 @@
   "prefill": 20480,
   "max_context": 262144,
   "expert_cache": 24576,
-  "kv_resident": 32768,
+  "kv_resident": 0,
   "spec": 6,
   "spec_min_p": 0.7,
   "vram_reserve_mib": 2048,
