@@ -41,7 +41,7 @@ docker save -o dtk-base.tar my-local-dtk:2604
 
 ## 显卡、内存与启动
 
-`ls -l /dev/dri/by-path/` 用于查看 PCI 路径与 render 节点对应关系。用供应方工具确认选定卡空闲。启动器只映射一个 render 节点及 `/dev/kfd`；引擎容器内使用 GPU 0。不要把全部显卡目录映射进去。
+`ls -l /dev/dri/by-path/` 用于查看 PCI 路径与 render 节点对应关系。用供应方工具确认选定卡空闲。启动器只映射一个 render 节点及 `/dev/kfd`；引擎容器内使用 GPU 0。容器保留所选 render 节点的原路径，避免重命名后与驱动枚举不一致。不要把全部显卡目录映射进去。
 
 此配置使用全部 24,576 个专家槽，另有 dense、workspace、KV 与 MTP 占用。是否能容纳必须看引擎加载日志和实际空闲显存。宿主还需容纳 mmap/页缓存、KV pinned RAM 和最高 16 GiB 会话缓存；不保证低内存机器可用。
 

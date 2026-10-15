@@ -12,7 +12,7 @@ services:
       CONTROL_VECTOR: ${CONTROL_VECTOR:-}
     devices:
       - /dev/kfd:/dev/kfd
-      - ${RENDER_DEVICE:?Set one render device}:/dev/dri/renderD128
+      - ${RENDER_DEVICE:?Set one render device}:${RENDER_DEVICE:?Set one render device}
     volumes:
       - type: bind
         source: ${MODEL_DIR:?Set MODEL_DIR}

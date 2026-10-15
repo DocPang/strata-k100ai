@@ -21,7 +21,7 @@ image=k100ai/strata-c4:v0.1.0-rc.1
 docker image inspect "$image" >/dev/null
 args=(run --detach --name "k100ai-$INSTANCE" --restart=no
   --publish "$BIND_HOST:$PORT:8080" --env-file "$PWD/deployment.env"
-  --device /dev/kfd:/dev/kfd --device "$RENDER_DEVICE:/dev/dri/renderD128"
+  --device /dev/kfd:/dev/kfd --device "$RENDER_DEVICE:$RENDER_DEVICE"
   --mount "type=bind,src=$MODEL_DIR,dst=/models,readonly"
   --mount "type=bind,src=$PACK_DIR,dst=/pack,readonly"
   --mount "type=bind,src=$MTP_DIR,dst=/mtp,readonly"
