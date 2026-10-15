@@ -1,51 +1,72 @@
 # 模型、native pack 与 MTP
 
-本 Release 不包含 GGUF、native pack 或 MTP 权重，也不自动下载模型。首版配置针对 **Qwen3.8-Flash-Next GSQ-RCO 原版 IQ3_S**，不等于任何同名 IQ3_S 模型都兼容。
+## 权重
 
-模型来源与上游说明见 [Strata 的固定版本模型文档](https://github.com/Niko1221/Strata/blob/fb58e0dbc8399662c0e47c76578c6e878b14f6cf/docs/MODELS.md)。下载原发布者的两个 GGUF 分片并按其校验值核验，保留来源和哈希。分片一用于主模型，分片二用于 PLE mmap；第二分片不整体常驻显存。
+本版本提供 Qwen3.8-Flash-Next GSQ-RCO 原版的 IQ3_S、IQ3_XXS 配置。模型来源及量化说明见 [固定版本上游模型文档](https://github.com/Niko1221/Strata/blob/fb58e0dbc8399662c0e47c76578c6e878b14f6cf/docs/MODELS.md)。两个分片、tokenizer、pack 和 MTP 必须保持匹配。
 
-## 已有 pack
-
-复用时确认 pack、tokenizer、GGUF 两个分片和 MTP 运行时相互匹配。`PACK_DIR` 内必须有 `tokenizer`；只改权重路径、不重新生成对应 pack 不算换模型完成。
-
-## 转换 native pack
-
-安装优化镜像后，可在容器内使用工具，宿主无需 Python。以下转换命令不映射 GPU，输出目录需要有足够空间；将示例路径和文件名替换为自己的：
+运行包不包含模型。第一分片用于主模型，第二分片用于 PLE mmap。下载后按发布者校验值核验；IQ3_XXS 已核对文件的 SHA-256 另存于 [weights.sha256](../profiles/next-iq3xxs-single/weights.sha256)。
 
 ```bash
+# 在包含两个 XXS 分片的目录中执行，校验表路径按项目位置填写。
+sha256sum -c /absolute/path/strata-k100ai/profiles/next-iq3xxs-single/weights.sha256
+```
+
+## native pack
+
+不同量化配置分别生成 pack，不复用另一套权重的专家数据、偏移或类型表。`pack/tokenizer` 应存在。以下命令使用官方 DTK 镜像内的 Python，宿主无需 Python，也不需要映射 GPU。
+
+```bash
+BASE_IMAGE=harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68
+mkdir -p /srv/packs
+
 docker run --rm --network none \
-  -v /srv/models/next-iq3s:/models:ro \
-  -v /srv/packs:/out \
-  k100ai/strata-c4:v0.1.0-rc.2 \
-  tool iq_pack.py --gguf /models/model-00001-of-00002.gguf \
+  --env-file "$PWD/engines/strata/c4/environment.env" \
+  --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
+  --mount type=bind,src=/srv/models/next-iq3s/IQ3_S,dst=/models,readonly \
+  --mount type=bind,src=/srv/packs,dst=/out \
+  --workdir /opt/k100ai/app --entrypoint python3 \
+  "$BASE_IMAGE" tools/iq_pack.py \
+  --gguf /models/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf \
   --out /out/next-iq3s --experts-bin
 ```
 
-## 独立 MTP
+XXS 转换使用相同工具，修改模型挂载目录、第一分片文件名及输出路径：
 
-目标 GGUF 不包含完整 MTP 草稿头。已有校验过的 MTP runtime 可以直接挂载；否则执行独立下载、核验、转换。下载命令需要联网，其余步骤可离线：
+```text
+/srv/models/next-iq3xxs/IQ3_XXS → /models
+--gguf /models/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf
+--out /out/next-iq3xxs
+```
+
+转换需要足够的磁盘空间，输出目录与输入权重分开保存。
+
+## MTP
+
+目标 GGUF 不包含完整草稿头。可复用已核验的匹配 MTP runtime；重新准备时分为下载、验证、量化和运行时转换。以下下载步骤需要联网，其余步骤可增加 `--network none`。
 
 ```bash
 mkdir -p /srv/mtp-work
+
 docker run --rm -e STRATA_SOURCE=modelscope \
-  -v /srv/mtp-work:/out k100ai/strata-c4:v0.1.0-rc.2 \
-  tool mtp_fetch.py fetch --out /out/bf16
-
-docker run --rm --network none \
-  -v /srv/mtp-work:/out k100ai/strata-c4:v0.1.0-rc.2 \
-  tool mtp_fetch.py verify --out /out/bf16
-
-docker run --rm --network none \
-  -v /srv/mtp-work:/out k100ai/strata-c4:v0.1.0-rc.2 \
-  tool mtp_pack.py --src /out/bf16 --experts q2_0 --out /out/mtp-q2_0.gguf
-
-docker run --rm --network none \
-  -v /srv/mtp-work:/out k100ai/strata-c4:v0.1.0-rc.2 \
-  tool mtp_rt.py --gguf /out/mtp-q2_0.gguf --out /out/runtime
+  --env-file "$PWD/engines/strata/c4/environment.env" \
+  --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
+  --mount type=bind,src=/srv/mtp-work,dst=/out \
+  --workdir /opt/k100ai/app --entrypoint python3 \
+  "$BASE_IMAGE" tools/mtp_fetch.py fetch --out /out/bf16
 ```
 
-最后设置 `MTP_DIR=/srv/mtp-work/runtime`。下载来源、权重许可和磁盘空间由用户自行检查。模型转换工具打包可调用不代表本次重新转换并验收了整套权重。
+保留同样的挂载和环境，依次替换命令部分：
 
-## 后续 IQ3_XXS
+```bash
+python3 tools/mtp_fetch.py verify --out /out/bf16
+python3 tools/mtp_pack.py --src /out/bf16 --experts q2_0 --out /out/mtp-q2_0.gguf
+python3 tools/mtp_rt.py --gguf /out/mtp-q2_0.gguf --out /out/runtime
+```
 
-未来的 XXS 配置需独立记录权重哈希、pack、实际量化类型、内核覆盖和测试结果。当前 c4 历史上已被 XXS 服务复用，但本 Release 没有将未完成的 XXS 专用优化作为受支持配置提供。不要把 IQ3_S profile 直接改个文件名就发布为 XXS 优化版。
+上述三行为容器内命令。使用 `--entrypoint python3` 时，镜像名后从 `tools/...` 开始填写，不能再重复添加 `python3`。生成后将 `/srv/mtp-work/runtime` 挂载到推理容器 `/mtp`。
+
+## XXS 格式覆盖
+
+相对于 IQ3_S，XXS 的 gate/up 增加 IQ2_XS、IQ2_XXS 类型，down 中 Q2_0 的比例上升，目标输出头由 Q6_K 变为 Q5_K。c4 的通用路径支持这些格式，但并非所有张量均进入 IQ3_S 专用快路径。详见 [OPTIMIZATIONS.md](OPTIMIZATIONS.md)。
+
+本版本增加 XXS 的 c4 基线配置，不包含另一份 `ad743dbf…` 实验引擎及其专用改动。两套权重的质量差异与实现正确性应分别评估。

@@ -17,7 +17,7 @@ done
 [[ -d "$PACK_DIR/tokenizer" ]] || { echo 'PACK_DIR/tokenizer is missing.' >&2; exit 1; }
 [[ -d "$EXTRAS_DIR" ]] || { echo 'EXTRAS_DIR must exist.' >&2; exit 1; }
 extras="$(cd "$EXTRAS_DIR" && pwd)"
-image=k100ai/strata-c4:v0.1.0-rc.2
+image=k100ai/strata-c4:v0.1.0-rc.3
 docker image inspect "$image" >/dev/null
 args=(run --detach --name "k100ai-$INSTANCE" --restart=no
   --publish "$BIND_HOST:$PORT:8080" --env-file "$PWD/deployment.env"
@@ -26,7 +26,7 @@ args=(run --detach --name "k100ai-$INSTANCE" --restart=no
   --mount "type=bind,src=$PACK_DIR,dst=/pack,readonly"
   --mount "type=bind,src=$MTP_DIR,dst=/mtp,readonly"
   --mount "type=bind,src=$HYHAL_DIR,dst=/opt/hyhal,readonly"
-  --mount "type=bind,src=$PWD/profiles/next-iq3s-single/settings.json,dst=/config/settings.json,readonly"
+  --mount "type=bind,src=$PWD/profiles/$PROFILE/settings.json,dst=/config/settings.json,readonly"
   --mount "type=bind,src=$extras,dst=/extras,readonly"
   --shm-size=2g --ulimit memlock=-1:-1 --security-opt seccomp=unconfined
   --health-cmd "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=10)\""

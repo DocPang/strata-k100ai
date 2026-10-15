@@ -11,7 +11,7 @@ SETTINGS = {
     'prefill': ('--prefill', 20480, 1, 262144),
     'max_context': ('--max-context', 262144, 1024, 262144),
     'expert_cache': ('--expert-cache', 24576, 1, 24576),
-    'kv_resident': ('--kv-resident', 32768, 1024, 262144),
+    'kv_resident': ('--kv-resident', 32768, 0, 262144),
     'spec': ('--spec', 4, 0, 16),
     'spec_min_p': ('--spec-min-p', 0.70, 0, 1),
     'vram_reserve_mib': ('--vram-reserve-mib', 2048, 0, 65536),
@@ -25,20 +25,22 @@ def render(profile, settings, env):
     if unknown:
         raise ValueError('Unknown settings: ' + ', '.join(sorted(unknown)))
     args = list(profile['arguments'])
+    resolved = {}
     for name, (flag, default, low, high) in SETTINGS.items():
-        value = settings.get(name, default)
+        baseline = type(default)(args[args.index(flag) + 1])
+        value = settings.get(name, baseline)
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ValueError(name + ' must be numeric')
         if isinstance(default, int) and not isinstance(value, int):
             raise ValueError(name + ' must be an integer')
         if not low <= value <= high:
             raise ValueError(name + ' is outside the supported range')
+        resolved[name] = value
         args[args.index(flag) + 1] = str(value)
-    resolved = {name: settings.get(name, spec[1]) for name, spec in SETTINGS.items()}
     if resolved['prefill'] > resolved['max_context']:
         raise ValueError('prefill must not exceed max_context')
-    if resolved['kv_resident'] > resolved['max_context']:
-        raise ValueError('kv_resident must not exceed max_context')
+    if 0 < resolved['kv_resident'] < 20480:
+        raise ValueError('kv_resident must be 0 or at least 20480 for c4')
     bindings = {'PACK': '/pack', 'MODEL_SHARD_1': '/models/' + env.get('SHARD1', ''),
                 'MODEL_SHARD_2': '/models/' + env.get('SHARD2', ''),
                 'MTP_RUNTIME': '/mtp', 'EXPERT_PROFILE': str(APP / 'data/expert-profile.bin')}
@@ -80,7 +82,10 @@ def main():
     key = os.environ.get('STRATA_API_KEY', '').strip()
     if len(key) < 16 or key == 'CHANGE_ME_GENERATE_A_PRIVATE_KEY':
         raise SystemExit('Set STRATA_API_KEY to a private key of at least 16 characters in deployment.env')
-    profile = json.loads((ROOT / 'profile.json').read_text())
+    profile_id = os.environ.get('PROFILE', 'next-iq3s-single')
+    if profile_id not in ('next-iq3s-single', 'next-iq3xxs-single'):
+        raise SystemExit('Unsupported PROFILE')
+    profile = json.loads((ROOT / 'profiles' / profile_id / 'profile.json').read_text())
     settings = json.loads(Path('/config/settings.json').read_text())
     config = render(profile, settings, os.environ)
     for path in ['/pack/tokenizer', '/mtp', '/opt/hyhal/lib',

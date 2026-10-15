@@ -1,64 +1,89 @@
-# 参数说明
+# 参数参考
 
-宿主路径、显卡、端口和 API key 在 `deployment.env`；引擎参数在 `profiles/next-iq3s-single/settings.json`。修改后在没有请求时执行 `./stop.sh`，再 `./start.sh`，会重新加载模型。
+原生启动使用各 profile 下的 `strata.json`。编辑 `args` 中的参数及对应值后，停止并重建目标容器。优化环境通过 `engines/strata/c4/environment.env` 传入；配置文件的 `env` 可覆盖指定变量。
 
-## 用户可调整的引擎参数
+## 模型与设备
 
-| JSON 项 | 引擎参数 | 默认 | 含义 |
-| --- | --- | ---: | --- |
-| prefill | --prefill | 20480 | prefill 分块上限；增大可能增加 workspace 与显存压力 |
-| max_context | --max-context | 262144 | 最大上下文；不是流畅性或并发承诺 |
-| expert_cache | --expert-cache | 24576 | 专家槽数量；此配方以全部专家常驻为目标 |
-| kv_resident | --kv-resident | 32768 | INT8 KV 的显存驻留窗口；其余 KV 使用宿主内存 |
-| spec | --spec | 4 | MTP 草稿长度；更大不保证更快 |
-| spec_min_p | --spec-min-p | 0.70 | 草稿接受控制；收益依赖任务与接受率 |
-| vram_reserve_mib | --vram-reserve-mib | 2048 | 显存预留 MiB |
-| conversation_cache_mib | --conversation-cache-mib | 16384 | 宿主会话缓存预算 MiB；不是 GPU 并发槽数 |
-| conversation_cache_slots | --conversation-cache-slots | 4 | 会话缓存条目数量；不是同时解码请求数 |
+| 参数 | 说明 |
+| --- | --- |
+| --gpu 0 | 使用容器可见的 GPU 0；宿主物理卡通过 Docker render 节点映射选择 |
+| --pack | 与当前权重匹配的 native pack 目录 |
+| --native | GGUF 第一分片，包含主模型数据 |
+| --ple-gguf | PLE 所在的第二分片 |
+| --ple-io mmap | 以 mmap 访问 PLE 数据，使用宿主页缓存 |
+| --mmap-experts | 使用专家 mmap 相关加载路径；实际驻留由缓存参数和日志确认 |
+| --expert-profile | 专家分布辅助数据文件 |
+| --mtp | 独立 MTP runtime 目录 |
+| --eos-ids 248046 | 参考模型的结束 token ID |
 
-prefill 和 kv_resident 不能超过 max_context。降低上下文时同时检查这三项。未知项、无效数值和不完整文件名会拒绝启动，避免参数拼错后悄悄使用默认值。
+默认文件名分别为 `Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-...gguf` 和 `Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-...gguf`。实际文件名不同时应修改配置，不依赖重命名权重规避类型核验。
 
-## 固定参数
+## 容量与计算
 
-完整值见 [profile.json](../profiles/next-iq3s-single/profile.json)。除路径绑定外，包含：
+| 参数 | IQ3_S | IQ3_XXS | 说明 |
+| --- | ---: | ---: | --- |
+| --expert-cache | 24576 | 24576 | 全部专家槽；减少会影响驻留和搬运 |
+| --prefill | 20480 | 20480 | prefill 分块上限，与临时工作区和 TTFT 有关 |
+| --max-context | 262144 | 262144 | 会话总上下文容量 |
+| --kv | int8 | int8 | KV 存储格式 |
+| --kv-resident | 32768 | 32768 | KV 显存缓存容量；0 为完整驻留，c4 的非零有效下限为 20480 |
+| --vram-reserve-mib | 2048 | 2048 | GPU 内存规划预留，单位 MiB |
+| --pool-workers | 12 | 12 | CPU 专家工作线程数量 |
+| --no-prefill-borrow | 开启 | 开启 | 禁止 prefill 借用专家区域，保留参考配置的驻留策略 |
 
-- `--native` GGUF 第一分片，`--ple-gguf` 第二分片，`--ple-io mmap`。
-- `--pack /pack`、`--mmap-experts`、冻结的 `--expert-profile`。
-- `--kv int8`、`--pool-workers 12`、`--eos-ids 248046`。
-- `--mtp /mtp`，MTP 运行时独立准备。
-- `--prompt-cache 8`、`--prompt-cache-every 16384`。
-- `--conversation-cache-min-free-mib 8192`、`--no-prefill-borrow`。
-- 服务默认 temperature=0；具体请求和上游服务支持的采样设置仍可能改变行为。
+容量估算、OOM 调整顺序及系统内存开销见 [MEMORY.md](MEMORY.md)。
 
-未加入 `--batch` 或 `--batch-mtp`，此版不声明支持已验证的多请求同时解码。会话缓存槽数与推理并发是不同概念。
+## MTP
 
-## GPU 优化环境
+| 参数 | IQ3_S | IQ3_XXS | 说明 |
+| --- | ---: | ---: | --- |
+| --spec | 4 | 6 | 草稿长度；需联合接受率和窗口成本评估 |
+| --spec-min-p | 0.70 | 0.70 | 草稿概率阈值 |
 
-完整环境固定在 profile，不建议普通用户逐个更改：
+更长草稿会增加草稿计算、验证窗口及相关状态。接受率较低时可能降低吞吐，不能仅按 spec 数值估算速度。独立 MTP 权重和 runtime 必须与配置共同准备。
 
-| 范围 | 主要开关 |
+## 服务缓存
+
+| 参数 | 默认 | 说明 |
+| --- | ---: | --- |
+| --prompt-cache | 8 | prompt 缓存配置 |
+| --prompt-cache-every | 16384 | prompt 缓存间隔 |
+| --conversation-cache-mib | 16384 | 宿主会话缓存预算，MiB |
+| --conversation-cache-slots | 4 | 会话缓存条目数 |
+| --conversation-cache-min-free-mib | 8192 | 会话缓存保留的主存余量阈值 |
+
+这些参数用于前缀/会话复用，不等同于并发解码配置。本版本未启用 `--batch` 或 `--batch-mtp`。
+
+## 优化环境
+
+两种量化配置共用 c4 环境文件。
+
+| 范围 | 主要变量 |
 | --- | --- |
 | PLE / attention | STRATA_PLE_PRELAUNCH=1、STRATA_ATTN_LANECELL=1 |
-| Q6 / Q8 packed | STRATA_Q6_PACKED=1、STRATA_Q6_WAVE_PACK_PREP=1、STRATA_Q6_WAVE_PACK=1、STRATA_Q8_PACKED=1 |
+| Q6 / Q8 | STRATA_Q6_PACKED=1、STRATA_Q6_WAVE_PACK_PREP=1、STRATA_Q6_WAVE_PACK=1、STRATA_Q8_PACKED=1 |
 | GR / GDN | STRATA_GR_DOWN_PREFETCH=2、STRATA_HC_SPLIT=2、STRATA_GDN_HEAD=1、STRATA_GDN_NOY=1 |
 | MoE | STRATA_MMQ_RESIDENT_SORT_NE=1、STRATA_MMQ_RESIDENT_SORT_NATIVE=1、STRATA_EXPERT_V2=1、STRATA_DOWN_MT=1、STRATA_MMQ_EXACT_ALL=1 |
 | Prefill / GEMM | STRATA_HIP_WMMA=1、STRATA_HIP_PROMPT_F16=1、STRATA_PF_PAD_ROCBLAS=1、STRATA_PREFILL_RING=8 |
-| 显存 / 融合 | STRATA_PF_GATED_IN_REGION=1、STRATA_EMB_REUSE_ACCOUNT=1、STRATA_PF_DMSCRATCH_COND=1、STRATA_PF_FUSED_SQ=1 |
+| 工作区与融合 | STRATA_PF_GATED_IN_REGION=1、STRATA_EMB_REUSE_ACCOUNT=1、STRATA_PF_DMSCRATCH_COND=1、STRATA_PF_FUSED_SQ=1 |
 | KV | STRATA_KV_PREFETCH=1 |
-| 已关闭 | STRATA_PREFILL_CPU_SHARE=0、STRATA_SH_STREAM=0 |
+| 关闭项 | STRATA_PREFILL_CPU_SHARE=0、STRATA_SH_STREAM=0 |
 
-`STRATA_SH_STREAM=1` 在历史 gfx928 实验中触发过崩溃，不应开启。部分名称保留上游历史命名，不能据名字判断实际走 CUDA/WMMA 或所有张量均命中；以 gfx928 代码分支和实际类型为准。
+`STRATA_SH_STREAM=1` 在 gfx928 历史实验中出现过崩溃，维持关闭。其他开关的有效范围取决于量化类型、形状和实际分派。c4 保留 FP16 中间结果策略，数值结果不保证与原版位级相同。
 
-保留历史已接受的 FP16 中间结果策略。整套配置不是位级无损方案，特定 exact 路径的证明不能扩展到全部计算。
+## 可选控制向量
 
-## 控制向量
+默认不加载控制向量。需要复现带控制向量的参考配置时，在容器中挂载对应文件，并向 `args` 增加：
 
-默认**不加载**控制向量，避免默认改变模型行为；因此不宣称输出与使用控制向量的历史服务一致。
-
-确实需要复现历史控制向量设置时，用户自行准备文件，将其目录指定为 `EXTRAS_DIR`，设置：
-
-```dotenv
-CONTROL_VECTOR=/extras/your-vector.gguf
+```json
+"--control-vector-scaled", "/extras/vector.gguf:1.0",
+"--control-vector-layer-range", "4", "44",
+"--cvec-mode", "project",
+"--cvec-dir", "per-layer"
 ```
 
-此入口使用 scale=1.0、layers 4..44、project/per-layer。历史参考文件 SHA-256 为 `59f9ae8b4372107ae79044278a4406bdfe8f8861fe599aa5848515f0d072be38`。文件不随项目分发；使用其他文件需自行验证。
+历史参考文件 SHA-256 为 `59f9ae8b4372107ae79044278a4406bdfe8f8861fe599aa5848515f0d072be38`。控制向量会改变输出行为，与性能参数独立管理。
+
+## 辅助入口
+
+`settings.json`、`deployment.env`、`install.sh`、`start.sh` 和 Compose 为保留的辅助接口。`PROFILE` 可选 `next-iq3s-single` 或 `next-iq3xxs-single`。辅助接口读取 `settings.json`；本页的原生启动读取 `strata.json`，两者修改互不自动同步。建议一次部署固定使用其中一种配置方式。

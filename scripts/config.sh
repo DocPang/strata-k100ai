@@ -3,7 +3,7 @@
 load_deployment_env() {
   [[ -f deployment.env ]] || { echo 'Run install.sh and edit deployment.env first.' >&2; return 1; }
   BIND_HOST=127.0.0.1; PORT=8080; HYHAL_DIR=/opt/hyhal; EXTRAS_DIR=./extras
-  CONTROL_VECTOR=''; INSTANCE=next-iq3s-single; STRATA_API_KEY=''; SHARD1=''; SHARD2=''
+  PROFILE=next-iq3s-single; CONTROL_VECTOR=''; INSTANCE=next-iq3s-single; STRATA_API_KEY=''; SHARD1=''; SHARD2=''
   local line key value
   while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%$'\r'}"
@@ -11,10 +11,11 @@ load_deployment_env() {
     [[ "$line" == *=* ]] || { echo 'Expected literal KEY=value in deployment.env' >&2; return 1; }
     key="${line%%=*}"; value="${line#*=}"
     case "$key" in
-      MODEL_DIR|SHARD1|SHARD2|PACK_DIR|MTP_DIR|HYHAL_DIR|RENDER_DEVICE|BIND_HOST|PORT|STRATA_API_KEY|EXTRAS_DIR|CONTROL_VECTOR|INSTANCE)
+      MODEL_DIR|SHARD1|SHARD2|PACK_DIR|MTP_DIR|HYHAL_DIR|RENDER_DEVICE|BIND_HOST|PORT|STRATA_API_KEY|EXTRAS_DIR|CONTROL_VECTOR|INSTANCE|PROFILE)
         printf -v "$key" '%s' "$value";;
       *) echo "Unknown deployment setting: $key" >&2; return 1;;
     esac
   done < deployment.env
+  case "$PROFILE" in next-iq3s-single|next-iq3xxs-single) ;; *) echo 'Unsupported PROFILE' >&2; return 1;; esac
   [[ "$INSTANCE" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] || { echo 'Invalid INSTANCE' >&2; return 1; }
 }

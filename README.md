@@ -1,99 +1,109 @@
 # Strata for K100AI
 
-面向海光 K100AI 的 Strata 推理优化，提供 GPU 内核适配、显存与长上下文调优，以及基于官方 DTK 镜像的轻量部署。**本地有基础镜像就复用，没有就自动拉取；也支持完全使用本地文件安装。** 不需要在宿主机安装 Python，不在用户机器上重新编译 GPU 引擎。
+面向海光 K100AI（gfx928）的 Strata 推理优化项目。提供 GPU 内核适配、MoE 计算优化、显存管理、长上下文配置及可复现部署资料。
 
-当前版本：`v0.1.0-rc.2`，提供 **Strata / Qwen3.8-Flash-Next GSQ-RCO IQ3_S / K100AI 单卡** 配置。运行包约 **8.1 MiB**，基础镜像、模型 GGUF、native pack、MTP 权重、宿主驱动另外准备。
+运行环境基于海光 DTK 镜像。推理引擎、服务程序和配置独立分发，模型权重与驱动由使用方准备。
 
-> 这是候选发布。安装包使用已核对 SHA-256 的历史 c4 引擎。源码补丁回放和 CMake 配置已验证，完整干净编译及新构建产物的 GPU 等价验证尚未完成。256K 是配置上限，不代表已保证 256K 延迟、并发或所有机器的稳定性。见 [验证范围](docs/VALIDATION.md)。
+## 版本与配置
 
-## 快速安装
+当前版本：**v0.1.0-rc.3**。
 
-需要 Linux x86_64、K100AI/gfx928、匹配的宿主驱动与 HyHAL、Docker Engine（默认启动不需要 Compose）。只选择空闲显卡。此配方以全部专家常驻显存为目标，不是通用低显存配方。
+| 配置 | 权重 | 引擎 | 拓扑 | MTP spec |
+| --- | --- | --- | --- | ---: |
+| [next-iq3s-single](profiles/next-iq3s-single/strata.json) | Qwen3.8-Flash-Next GSQ-RCO IQ3_S | Strata c4 | 单卡 | 4 |
+| [next-iq3xxs-single](profiles/next-iq3xxs-single/strata.json) | Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS | Strata c4 | 单卡 | 6 |
 
-从 [Releases](https://github.com/DocPang/strata-k100ai/releases) 下载 `deployment-v0.1.0-rc.2.tar.gz`，解压并进入目录：
+两套配置均保留全部专家。XXS 使用 c4 基线及通用量化回退路径；XXS 专用实验内核不包含在本版本中。TP2 尚未发布。
 
-```bash
-tar -xzf deployment-v0.1.0-rc.2.tar.gz
-cd strata-k100ai-v0.1.0-rc.2
-./install.sh
-```
+运行包约 8.1 MiB。发布产物、基础镜像、源码及验证范围见 [版本说明](docs/VALIDATION.md)。
 
-安装器自动取得小型运行包，校验其 SHA-256，复用/拉取固定的 DTK 基础镜像，生成本地镜像 `k100ai/strata-c4:v0.1.0-rc.2`。安装过程不启动服务、不改宿主驱动、不切换已有服务。基础环境完全没有时仍需要下载大型官方镜像。
+## 环境要求
 
-编辑安装器生成的 `deployment.env`：
+- Linux x86_64、K100AI/gfx928，以及匹配的宿主驱动与 HyHAL。
+- Docker Engine；原生启动不依赖 Compose 或宿主 Python 环境。
+- 对应权重的两个 GGUF 分片、native pack、tokenizer 和独立 MTP runtime。
+- 足够的显存、系统内存与磁盘空间。参考配置以专家全部驻留显存为目标，容量规划见 [显存与上下文](docs/MEMORY.md)。
 
-```dotenv
-MODEL_DIR=/srv/models/next-iq3s
-SHARD1=model-00001-of-00002.gguf
-SHARD2=model-00002-of-00002.gguf
-PACK_DIR=/srv/packs/next-iq3s
-MTP_DIR=/srv/mtp-runtime
-HYHAL_DIR=/opt/hyhal
-RENDER_DEVICE=/dev/dri/renderD128
-BIND_HOST=127.0.0.1
-PORT=8080
-STRATA_API_KEY=替换为至少16字符的私有密钥
-```
-
-`SHARD1/SHARD2` 是实际文件名；其他目录使用宿主机绝对路径。安装器在有 openssl 时自动生成私有密钥，已有配置不会覆盖。显卡节点请在本机确认，不照抄别人的卡号。模型准备方法见 [模型与 pack](docs/MODELS.md)。
+## 获取运行文件
 
 ```bash
-./start.sh
-docker logs -f k100ai-next-iq3s-single
-curl --fail http://127.0.0.1:8080/health
+git clone https://github.com/DocPang/strata-k100ai.git
+cd strata-k100ai
+git checkout v0.1.0-rc.3
+
+curl -fL --retry 3 \
+  -o strata-c4-linux-amd64.tar.gz \
+  https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.3/strata-c4-linux-amd64.tar.gz
+sha256sum -c engines/strata/c4/artifact.sha256
+tar -xzf strata-c4-linux-amd64.tar.gz
+(cd runtime && sha256sum -c FILES.sha256)
 ```
 
-`./start.sh --check` 可先检查路径和设备，不启动容器。已有同名容器时不会自动替换；修改配置后先 `./stop.sh`，再 `./start.sh`。
+无 Git 环境可从 [Releases](https://github.com/DocPang/strata-k100ai/releases) 下载部署包。基础镜像的获取、本地镜像复用及离线准备见 [环境准备](docs/INSTALL.md)。
 
-API 地址：`http://127.0.0.1:8080/v1`；API key 使用自己的 `STRATA_API_KEY`。默认只发布到宿主回环地址。需要远程访问时修改 `BIND_HOST`，保留 API key。停止服务：
+## 原生 Docker 启动示例
+
+以下示例在指定的一张卡上启动 IQ3_S 服务。模型文件名由 `strata.json` 中的 `--native` 和 `--ple-gguf` 指定；模型目录、pack 和 MTP 使用宿主绝对路径。
 
 ```bash
-./stop.sh
+BASE_IMAGE=harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68
+RENDER_DEVICE=/dev/dri/renderD129
+export STRATA_API_KEY="$(openssl rand -hex 24)"
+
+docker run --rm -it --name strata-iq3s \
+  --device /dev/kfd:/dev/kfd \
+  --device "$RENDER_DEVICE:$RENDER_DEVICE" \
+  --ulimit memlock=-1:-1 --shm-size=2g \
+  --security-opt seccomp=unconfined \
+  --tmpfs /var/log/hylog:rw,nosuid,nodev,mode=0755 \
+  --publish 127.0.0.1:18641:8080 \
+  --env STRATA_API_KEY \
+  --env-file "$PWD/engines/strata/c4/environment.env" \
+  --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
+  --mount type=bind,src=/srv/models/next-iq3s/IQ3_S,dst=/models,readonly \
+  --mount type=bind,src=/srv/packs/next-iq3s,dst=/pack,readonly \
+  --mount type=bind,src=/srv/mtp-runtime,dst=/mtp,readonly \
+  --mount type=bind,src=/opt/hyhal,dst=/opt/hyhal,readonly \
+  --mount "type=bind,src=$PWD/profiles/next-iq3s-single/strata.json,dst=/config/strata.json,readonly" \
+  --workdir /opt/k100ai/app --entrypoint python3 \
+  "$BASE_IMAGE" -m serve.server --engine strata \
+  --config /config/strata.json --host 0.0.0.0 --port 8080
 ```
 
-## 使用本地镜像 / 离线安装
+`RENDER_DEVICE` 需按本机 PCI 与设备节点映射选择。宿主卡号不等于容器内 GPU 序号：示例只开放一个 render 节点，容器内使用 GPU 0。
 
-用户已经有相同基础镜像内容时，可以指定本地 tag：
+完整的 **IQ3_S、IQ3_XXS 两套启动命令**、后台运行、日志、API 调用及直接引擎调用见 [运行与调试](docs/RUNNING.md)。服务启动命令直接调用上游服务模块，推理参数保存在可编辑的原生 `strata.json` 中。
 
-```bash
-./install.sh --base-image my-local-dtk:2604
-```
+## 参数与容量规划
 
-完全离线时，同时从 Release 下载 `strata-c4-linux-amd64.tar.gz`，把它和部署包传入服务器：
+| 参数 | IQ3_S | IQ3_XXS | 作用 |
+| --- | ---: | ---: | --- |
+| --expert-cache | 24576 | 24576 | 全部专家槽 |
+| --prefill | 20480 | 20480 | 每次 prefill 的分块上限 |
+| --max-context | 262144 | 262144 | 输入、历史与输出共用的上下文上限 |
+| --kv | int8 | int8 | KV 存储格式 |
+| --kv-resident | 32768 | 32768 | 显存 KV 驻留缓存容量 |
+| --spec | 4 | 6 | MTP 草稿长度 |
+| --vram-reserve-mib | 2048 | 2048 | 显存容量规划预留 |
 
-```bash
-./install.sh --local-only \
-  --base-image my-local-dtk:2604 \
-  --bundle /absolute/path/strata-c4-linux-amd64.tar.gz
-```
+IQ3_S 的专家原始数据约 46.84 GiB，IQ3_XXS 约 39.97 GiB；这些数值不含 dense、KV、MTP 与工作区。启用 KV streaming 后，增长上下文仍会增加系统内存及部分 GPU 状态开销。最大上下文参数不代表对应长度的时延和并发能力。
 
-`--local-only` 缺少本地镜像或运行包就报错，不自动下载。只支持已验证基础镜像的相同内容，改个名字不能让不兼容镜像通过检查。见 [安装细节](docs/INSTALL.md)。
+显存不足时优先检查其他进程占用及 prefill 工作区，再调整上下文与 KV 驻留。减少专家常驻量会增加数据搬运，可能显著降低解码速度。具体调节顺序与内存估算见 [MEMORY.md](docs/MEMORY.md)。
 
-## 启动参数与优化内容
+## 文档
 
-- [参数说明](docs/PARAMETERS.md)：prefill、上下文、专家缓存、MTP、KV、会话缓存和环境开关。
-- [优化清单](docs/OPTIMIZATIONS.md)：平台移植、量化核、MoE、prefill、decode、内存与部署调优；区分源码改动和上游能力配置。
-- [源码构建](docs/SOURCE_BUILD.md)：固定原版提交、补丁与文件校验；包含未完成的验证项。
-- [版本验证](docs/VALIDATION.md)：安装和运行包的证据及边界。
-
-## 项目结构与后续版本
-
-```text
-engines/<后端>/<引擎版本>/    运行产物身份、源码补丁、构建来源
-profiles/<模型-量化-拓扑>/   单独管理模型类型、拓扑和参数
-containers/<后端>/          对应服务入口与镜像配方
-scripts/                    维护与打包工具
-install.sh / compose.yaml   当前发行版安装和启动入口
-docs/                       使用、优化、验证与扩展约定
-```
-
-当前可安装配置只有 `next-iq3s-single`。**IQ3_XXS 和 TP2 后续分别加入配置、引擎产物及验证记录**；不会只改一个名字就宣称支持。TP2 若使用不同推理后端，也可以放在新的 `engines/<backend>/` 和 `containers/<backend>/` 下，不与 Strata 混在一起。详情见 [扩展约定](docs/ARCHITECTURE.md)。
+- [环境准备](docs/INSTALL.md)
+- [原生启动与调试](docs/RUNNING.md)
+- [参数参考](docs/PARAMETERS.md)
+- [显存、上下文与并发](docs/MEMORY.md)
+- [模型、pack 与 MTP](docs/MODELS.md)
+- [优化内容与格式覆盖](docs/OPTIMIZATIONS.md)
+- [源码构建](docs/SOURCE_BUILD.md)
+- [发布验证](docs/VALIDATION.md)
+- [目录结构与后续扩展](docs/ARCHITECTURE.md)
 
 ## 来源与许可证
 
-本项目是独立的 K100AI 部署与优化整理项目，不是海光或 Strata 官方发行版。
+项目基于 [Strata](https://github.com/Niko1221/Strata) 和 [llama.cpp](https://github.com/ggml-org/llama.cpp)，保留 MIT 许可及原作者署名。本仓库部署代码使用 [MIT](LICENSE)，Strata 许可见 [engines/strata/LICENSE](engines/strata/LICENSE)。
 
-- 上游 [Niko1221/Strata](https://github.com/Niko1221/Strata)，固定参考 `fb58e0dbc8399662c0e47c76578c6e878b14f6cf`，MIT。
-- 底层依赖 [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp)，固定参考 `3cf03257f219afbe7334045ff7c6a06ac68c627d`，MIT。
-- 本仓库部署代码使用 [MIT](LICENSE)，保留 [Strata 许可](engines/strata/LICENSE)；运行包包含上游许可文件。
-- 基础镜像由用户从供应方取得；本项目不随包分发 DTK/HyHAL 库、模型权重或控制向量，各自适用其许可证。
+本项目由独立维护者发布，与海光及 Strata 上游无官方隶属关系。DTK/HyHAL、模型权重及可选控制向量遵循各自的许可条件，不包含在运行包中。

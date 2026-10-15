@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION=v0.1.0-rc.2
+VERSION=v0.1.0-rc.3
 BASE_DEFAULT='harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68'
 BASE_ID='sha256:caeff0e9e6efef918a31359c4764b18bf2d428f2b76e3580c788f4cc8b0e93ad'
 base="$BASE_DEFAULT"; local_only=0; bundle=''; profile=next-iq3s-single
 usage() {
   cat <<'HELP'
 Usage: ./install.sh [--base-image IMAGE] [--bundle FILE] [--local-only]
-                    [--profile next-iq3s-single]
+                    [--profile next-iq3s-single|next-iq3xxs-single]
 Installs a local image; never starts a service or changes the host driver.
 --local-only requires BOTH a local compatible base image and a local runtime bundle.
 Only the pinned DTK image content is supported, including local aliases of it.
@@ -25,7 +25,7 @@ while (($#)); do
     *) printf 'Unknown option: %s\n' "$1" >&2; exit 2;;
   esac
 done
-[[ "$profile" == next-iq3s-single ]] || { echo 'This release supports only next-iq3s-single; XXS/TP2 are not released.' >&2; exit 2; }
+case "$profile" in next-iq3s-single|next-iq3xxs-single) ;; *) echo 'Unsupported profile.' >&2; exit 2;; esac
 [[ "$(uname -s)" == Linux && "$(uname -m)" == x86_64 ]] || { echo 'Linux x86_64 host required.' >&2; exit 1; }
 command -v docker >/dev/null || { echo 'Install Docker Engine first.' >&2; exit 1; }
 docker info >/dev/null
@@ -58,7 +58,7 @@ tar -tzf "$bundle" | awk '/^\// || /(^|\/)\.\.(\/|$)/ {bad=1} END {exit bad}' ||
 tar -xzf "$bundle" -C "$stage"
 cp "$ROOT/containers/strata/Dockerfile" "$stage/Dockerfile"
 cp "$ROOT/containers/strata/entrypoint.py" "$stage/entrypoint.py"
-cp "$ROOT/profiles/$profile/profile.json" "$stage/profile.json"
+cp -R "$ROOT/profiles" "$stage/profiles"
 # A Docker-backed default builder can read the Engine's local image store.
 # Never use a docker-container/remote builder for the local-image installation path.
 if docker buildx version >/dev/null 2>&1; then
@@ -71,7 +71,7 @@ docker tag "$base" "$alias_image"
 BUILDX_BUILDER=default docker build --pull=false --network=none \
   --build-arg "BASE_IMAGE=$alias_image" --tag "k100ai/strata-c4:$VERSION" "$stage"
 if [[ ! -f "$ROOT/deployment.env" ]]; then
-  cp "$ROOT/deployment.env.example" "$ROOT/deployment.env"
+  cp "$ROOT/profiles/$profile/deployment.env.example" "$ROOT/deployment.env"
   chmod 600 "$ROOT/deployment.env"
   if command -v openssl >/dev/null; then
     key="$(openssl rand -hex 24)"

@@ -25,7 +25,7 @@ python3 "$RECIPE/prepare.py" \
   --out "$PWD/prepared"
 ```
 
-脚本检查原版每个文件、补丁和应用后的文件哈希；不会修改输入 checkout，也不覆盖已有输出目录。源码恢复成功覆盖 2,426 个 Strata 文件和 3,609 个 llama.cpp 文件。补丁为最终累计差异，不伪装成过去每轮实验的 Git 历史。
+脚本校验原版输入、补丁与应用后文件的哈希，在新的输出目录中恢复源码，输入 checkout 保持只读。源码恢复成功覆盖 2,426 个 Strata 文件和 3,609 个 llama.cpp 文件。补丁为累计源码快照，逐次实验提交历史未纳入该快照。
 
 ## 在固定 DTK 容器中构建
 
@@ -36,7 +36,7 @@ docker run --rm --network none --cpus=8 --memory=40g --pids-limit=2048 \
   --entrypoint bash "$BASE_IMAGE" /recipe/build-in-container.sh /work
 ```
 
-此步骤不映射 GPU，不读取模型。它创建全新 build 目录，禁止复用旧 `.o`。只检查配置可加 `-e K100AI_CONFIGURE_ONLY=1`；不能把该模式的成功写成编译成功。
+构建使用 CPU 和源码输入，创建全新 build 目录。只检查配置可加 `-e K100AI_CONFIGURE_ONLY=1`；配置生成、编译链接与运行验收分别记录。
 
 关键配方包括 `STRATA_HIP_GFX906=ON`、`STRATA_ENABLE_HIP=OFF`、目标 `gfx928`、gfx928 dot4、hipBLASLt、early-inline/no-function-calls。命名中的 gfx906 是该项目的 wave64 兼容后端，不代表目标硬件是 gfx906。脚本只在一次性构建容器中修正 HSA include 链接。
 

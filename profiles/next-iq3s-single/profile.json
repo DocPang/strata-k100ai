@@ -76,7 +76,7 @@
     "STRATA_MMQ_EXACT_ALL": "1",
     "STRATA_KV_PREFETCH": "1"
   },
-  "notes": "c4 recorded optimization flags; public default omits optional control vector.",
+  "notes": "c4 baseline; IQ3_S; optional control vector excluded",
   "topology": "single",
   "engine": "strata/c4"
 }

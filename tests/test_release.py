@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -30,6 +31,22 @@ class ConfigurationTests(unittest.TestCase):
         config = entrypoint.render(self.profile, self.settings, self.env)
         self.assertEqual(config['args'][config['args'].index('--prefill') + 1], '8192')
         self.assertEqual(config['env']['STRATA_SH_STREAM'], '0')
+
+    def test_xxs_keeps_profile_default_spec(self):
+        profile = json.loads((ROOT / 'profiles/next-iq3xxs-single/profile.json').read_text())
+        config = entrypoint.render(profile, {}, self.env)
+        self.assertEqual(config['args'][config['args'].index('--spec') + 1], '6')
+        config = entrypoint.render(profile, {'spec': 3}, self.env)
+        self.assertEqual(config['args'][config['args'].index('--spec') + 1], '3')
+
+    def test_kv_residency_matches_c4_contract(self):
+        for value in [0, 20480, 32768]:
+            config = entrypoint.render(self.profile, {**self.settings, 'kv_resident': value}, self.env)
+            self.assertEqual(config['args'][config['args'].index('--kv-resident') + 1], str(value))
+        with self.assertRaises(ValueError):
+            entrypoint.render(self.profile, {**self.settings, 'kv_resident': 1024}, self.env)
+        # A context shorter than the resident setting is fully resident in the engine.
+        entrypoint.render(self.profile, {**self.settings, 'prefill': 4096, 'max_context': 8192}, self.env)
 
     def test_control_vector_is_explicit(self):
         self.env['CONTROL_VECTOR'] = '/extras/vector.gguf'
@@ -93,6 +110,13 @@ esac
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Unsupported base', result.stderr)
 
+    def test_xxs_offline_install_is_available(self):
+        bundle = ROOT / 'local-artifacts/strata-c4-linux-amd64.tar.gz'
+        if not bundle.exists(): self.skipTest('Local release bundle required')
+        result = self.run_install('--local-only', '--bundle', str(bundle), '--profile', 'next-iq3xxs-single')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('pull ', (self.root / 'calls').read_text())
+
     def test_tampered_bundle_never_builds(self):
         bad = self.root / 'bad.tar.gz'; bad.write_bytes(b'bad')
         result = self.run_install('--local-only', '--bundle', str(bad))
@@ -131,6 +155,36 @@ class EnvironmentTests(unittest.TestCase):
                                      '_', str(ROOT / 'scripts/config.sh')], cwd=folder, capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('Unknown deployment setting', result.stderr)
+
+
+class NativeDeploymentTests(unittest.TestCase):
+    def test_native_profiles_and_environment(self):
+        environment = dict(line.split('=', 1) for line in
+                           (ROOT / 'engines/strata/c4/environment.env').read_text().splitlines() if line)
+        for name, quant, draft in [('next-iq3s-single', 'IQ3_S', '4'),
+                                   ('next-iq3xxs-single', 'IQ3_XXS', '6')]:
+            with self.subTest(name=name):
+                native = json.loads((ROOT / 'profiles' / name / 'strata.json').read_text())
+                profile = json.loads((ROOT / 'profiles' / name / 'profile.json').read_text())
+                args = native['args']
+                self.assertEqual(args[args.index('--spec') + 1], draft)
+                self.assertEqual(args[args.index('--gpu') + 1], '0')
+                self.assertIn(quant + '-00001-of-00002.gguf', args[args.index('--native') + 1])
+                self.assertEqual(native['env'], {})
+                self.assertEqual(native['log'], '/tmp/strata-engine.log')
+                self.assertNotIn('${', json.dumps(native))
+                for key, value in profile['environment'].items():
+                    self.assertEqual(environment[key], value)
+                for flag in ['--prefill', '--max-context', '--kv-resident', '--expert-cache', '--spec']:
+                    self.assertEqual(args[args.index(flag) + 1], profile['arguments'][profile['arguments'].index(flag) + 1])
+
+    def test_documented_bash_commands_parse(self):
+        files = [ROOT / 'README.md', *sorted((ROOT / 'docs').glob('*.md'))]
+        for path in files:
+            for index, match in enumerate(re.finditer(r'```(?:bash|sh)\n(.*?)```', path.read_text(), re.S)):
+                with self.subTest(path=path.name, block=index):
+                    result = subprocess.run(['bash', '-n'], input=match.group(1), text=True, capture_output=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == '__main__':
