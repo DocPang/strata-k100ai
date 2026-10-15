@@ -1,8 +1,8 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 LABEL org.opencontainers.image.title="K100AI Strata c4" \
-      org.opencontainers.image.source="https://github.com/DocPang/k100ai-inference-kit" \
-      org.opencontainers.image.version="v0.1.0-rc.1"
+      org.opencontainers.image.source="https://github.com/DocPang/strata-k100ai" \
+      org.opencontainers.image.version="v0.1.0-rc.2"
 COPY runtime/ /opt/k100ai/
 COPY entrypoint.py /opt/k100ai/entrypoint.py
 COPY profile.json /opt/k100ai/profile.json

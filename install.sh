@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION=v0.1.0-rc.1
+VERSION=v0.1.0-rc.2
 BASE_DEFAULT='harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68'
 BASE_ID='sha256:caeff0e9e6efef918a31359c4764b18bf2d428f2b76e3580c788f4cc8b0e93ad'
 base="$BASE_DEFAULT"; local_only=0; bundle=''; profile=next-iq3s-single
@@ -43,7 +43,7 @@ if [[ -z "$bundle" ]]; then
     ((local_only == 0)) || { echo 'Runtime bundle missing; pass --bundle FILE for offline installation.' >&2; exit 1; }
     command -v curl >/dev/null || { echo 'Install curl or pass --bundle FILE.' >&2; exit 1; }
     curl --fail --location --retry 3 --output "$bundle.part" \
-      "https://github.com/DocPang/k100ai-inference-kit/releases/download/$VERSION/$artifact"
+      "https://github.com/DocPang/strata-k100ai/releases/download/$VERSION/$artifact"
     mv "$bundle.part" "$bundle"
   fi
 fi

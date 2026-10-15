@@ -1,6 +1,6 @@
 services:
   inference:
-    image: k100ai/strata-c4:v0.1.0-rc.1
+    image: k100ai/strata-c4:v0.1.0-rc.2
     pull_policy: never
     restart: "no"
     ports:

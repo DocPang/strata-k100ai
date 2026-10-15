@@ -18,7 +18,7 @@ git clone https://github.com/Niko1221/Strata.git strata-original
 git -C strata-original checkout --detach fb58e0dbc8399662c0e47c76578c6e878b14f6cf
 git clone https://github.com/ggml-org/llama.cpp.git llama-original
 git -C llama-original checkout --detach 3cf03257f219afbe7334045ff7c6a06ac68c627d
-RECIPE=/absolute/path/k100ai-inference-kit/engines/strata/c4/replay
+RECIPE=/absolute/path/strata-k100ai/engines/strata/c4/replay
 python3 "$RECIPE/prepare.py" \
   --strata-source "$PWD/strata-original" \
   --llama-source "$PWD/llama-original" \

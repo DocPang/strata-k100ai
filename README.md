@@ -1,8 +1,8 @@
-# K100AI Inference Kit
+# Strata for K100AI
 
-在已有海光 DTK 官方镜像上安装经过整理的推理优化程序。**本地有基础镜像就复用，没有就自动拉取；也支持完全使用本地文件安装。** 不需要在宿主机安装 Python，不在用户机器上重新编译 GPU 引擎。
+面向海光 K100AI 的 Strata 推理优化，提供 GPU 内核适配、显存与长上下文调优，以及基于官方 DTK 镜像的轻量部署。**本地有基础镜像就复用，没有就自动拉取；也支持完全使用本地文件安装。** 不需要在宿主机安装 Python，不在用户机器上重新编译 GPU 引擎。
 
-首版：`v0.1.0-rc.1`，提供 **Strata / Qwen3.8-Flash-Next GSQ-RCO IQ3_S / K100AI 单卡** 配置。运行包约 **8.1 MiB**，基础镜像、模型 GGUF、native pack、MTP 权重、宿主驱动另外准备。
+当前版本：`v0.1.0-rc.2`，提供 **Strata / Qwen3.8-Flash-Next GSQ-RCO IQ3_S / K100AI 单卡** 配置。运行包约 **8.1 MiB**，基础镜像、模型 GGUF、native pack、MTP 权重、宿主驱动另外准备。
 
 > 这是候选发布。安装包使用已核对 SHA-256 的历史 c4 引擎。源码补丁回放和 CMake 配置已验证，完整干净编译及新构建产物的 GPU 等价验证尚未完成。256K 是配置上限，不代表已保证 256K 延迟、并发或所有机器的稳定性。见 [验证范围](docs/VALIDATION.md)。
 
@@ -10,15 +10,15 @@
 
 需要 Linux x86_64、K100AI/gfx928、匹配的宿主驱动与 HyHAL、Docker Engine（默认启动不需要 Compose）。只选择空闲显卡。此配方以全部专家常驻显存为目标，不是通用低显存配方。
 
-从 [Releases](https://github.com/DocPang/k100ai-inference-kit/releases) 下载 `deployment-v0.1.0-rc.1.tar.gz`，解压并进入目录：
+从 [Releases](https://github.com/DocPang/strata-k100ai/releases) 下载 `deployment-v0.1.0-rc.2.tar.gz`，解压并进入目录：
 
 ```bash
-tar -xzf deployment-v0.1.0-rc.1.tar.gz
-cd k100ai-inference-kit-v0.1.0-rc.1
+tar -xzf deployment-v0.1.0-rc.2.tar.gz
+cd strata-k100ai-v0.1.0-rc.2
 ./install.sh
 ```
 
-安装器自动取得小型运行包，校验其 SHA-256，复用/拉取固定的 DTK 基础镜像，生成本地镜像 `k100ai/strata-c4:v0.1.0-rc.1`。安装过程不启动服务、不改宿主驱动、不切换已有服务。基础环境完全没有时仍需要下载大型官方镜像。
+安装器自动取得小型运行包，校验其 SHA-256，复用/拉取固定的 DTK 基础镜像，生成本地镜像 `k100ai/strata-c4:v0.1.0-rc.2`。安装过程不启动服务、不改宿主驱动、不切换已有服务。基础环境完全没有时仍需要下载大型官方镜像。
 
 编辑安装器生成的 `deployment.env`：
 

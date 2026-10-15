@@ -16,7 +16,7 @@
 docker run --rm --network none \
   -v /srv/models/next-iq3s:/models:ro \
   -v /srv/packs:/out \
-  k100ai/strata-c4:v0.1.0-rc.1 \
+  k100ai/strata-c4:v0.1.0-rc.2 \
   tool iq_pack.py --gguf /models/model-00001-of-00002.gguf \
   --out /out/next-iq3s --experts-bin
 ```
@@ -28,19 +28,19 @@ docker run --rm --network none \
 ```bash
 mkdir -p /srv/mtp-work
 docker run --rm -e STRATA_SOURCE=modelscope \
-  -v /srv/mtp-work:/out k100ai/strata-c4:v0.1.0-rc.1 \
+  -v /srv/mtp-work:/out k100ai/strata-c4:v0.1.0-rc.2 \
   tool mtp_fetch.py fetch --out /out/bf16
 
 docker run --rm --network none \
-  -v /srv/mtp-work:/out k100ai/strata-c4:v0.1.0-rc.1 \
+  -v /srv/mtp-work:/out k100ai/strata-c4:v0.1.0-rc.2 \
   tool mtp_fetch.py verify --out /out/bf16
 
 docker run --rm --network none \
-  -v /srv/mtp-work:/out k100ai/strata-c4:v0.1.0-rc.1 \
+  -v /srv/mtp-work:/out k100ai/strata-c4:v0.1.0-rc.2 \
   tool mtp_pack.py --src /out/bf16 --experts q2_0 --out /out/mtp-q2_0.gguf
 
 docker run --rm --network none \
-  -v /srv/mtp-work:/out k100ai/strata-c4:v0.1.0-rc.1 \
+  -v /srv/mtp-work:/out k100ai/strata-c4:v0.1.0-rc.2 \
   tool mtp_rt.py --gguf /out/mtp-q2_0.gguf --out /out/runtime
 ```
 
