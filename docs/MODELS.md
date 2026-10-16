@@ -20,7 +20,7 @@ BASE_IMAGE=harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18ef
 mkdir -p /srv/packs
 
 docker run --rm --network none \
-  --env-file "$PWD/engines/strata/xxs-20261016/environment.env" \
+  --env-file "$PWD/engines/strata/xxs-20261016-gold/environment.env" \
   --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
   --mount type=bind,src=/srv/models/next-iq3xxs/IQ3_XXS,dst=/models,readonly \
   --mount type=bind,src=/srv/packs,dst=/out \
@@ -40,7 +40,7 @@ docker run --rm --network none \
 mkdir -p /srv/mtp-work
 
 docker run --rm -e STRATA_SOURCE=modelscope \
-  --env-file "$PWD/engines/strata/xxs-20261016/environment.env" \
+  --env-file "$PWD/engines/strata/xxs-20261016-gold/environment.env" \
   --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
   --mount type=bind,src=/srv/mtp-work,dst=/out \
   --workdir /opt/k100ai/app --entrypoint python3 \

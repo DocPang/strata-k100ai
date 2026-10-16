@@ -1,6 +1,6 @@
 # 累计优化与发布范围
 
-v0.1.0-rc.5 固定分发 `d87a4678a21b` 引擎。该程序同时包含此前 K100AI 平台适配、已保留的内核优化及本次 XXS 长上下文改动。本页将累计实现与本次新增项分别说明。
+v0.1.0-rc.6 固定分发 `43002a7262e5` 引擎；上一版 v0.1.0-rc.5 分发 `d87a4678a21b`。rc.6 在 rc.5 之上继续增加若干内核路径，两者都包含此前 K100AI 平台适配与已保留的内核优化。本页将累计实现、按版本区分的新增项分别说明。
 
 “采用”表示该实现或配置包含在发布方案中；具体执行仍受量化类型、张量形状和运行分派约束。已有上游内核的适配与开关选择，不等于新增一种算法；也不能将所有历史单项收益归到本次发布。
 
@@ -34,16 +34,30 @@ v0.1.0-rc.5 固定分发 `d87a4678a21b` 引擎。该程序同时包含此前 K10
 | 累计内容 | 实现或启用方式 | 适用范围与边界 |
 | --- | --- | --- |
 | Scores 网格轴序 | SCORES_SWAP 未设置时默认开启 | 改变 CTA 遍历次序，改善相邻 query 的数据复用；不是修改模型选择预算 |
-| MMAC scores 与 LDS 合并装载 | SCORES_MMAC=2、SCORES_MMAC_LDS=1、SCORES_MMAC_NB=1 | 本次主要新增；LDS 合并装载是已测长上下文收益的必要条件 |
+| MMAC scores 与 LDS 合并装载 | SCORES_MMAC=2、SCORES_MMAC_LDS=1；合并批次 SCORES_MMAC_NB 由 1 提至 2（rc.6） | rc.5 引入 LDS 合并装载，是已测长上下文收益的必要条件；rc.6 将合并批次翻倍 |
 | FP16 scores 缓冲 | SEL_SCORES_FP16=1 | 本次主要新增；每分数 4→2 字节，改变中间精度，不能宣称所有输入逐位等价 |
-| Topk 访问与 selection 批次 | TOPK_STRIDE 默认开启；SEL_BATCH 未显式覆盖 | lane-major 访问，批次按 max_blocks 分档；不是后续 16 位两遍 radix 实验 |
+| Topk 访问与调度 | TOPK_STRIDE 默认开启、SEL_BATCH 未显式覆盖；rc.6 增加 TOPK_H16=1 与 TOPK_REG_MAX=7168 | lane-major 访问，批次按 max_blocks 分档；rc.6 的 topk 走 2-pass h16 核并用寄存器缓存最大值。核的线程数扩容 `TOPK_H16_T` 已测为显著回归，本版不设置 |
 | Attention V / K 暂存及索引 | INT8 V 暂存、合并读取、页索引计算；PA_KSTAGE 默认开启并模板化 | K 暂存模板化属于本次主要新增；保留此前 V 侧和地址计算优化 |
 | Lane/cell 分派与 PLE 调度 | ATTN_LANECELL=1、PLE_PRELAUNCH=1 | 作用于各自 attention/PLE 路径；具体命中以实际分派为准 |
-| MMVQ LDS 与 wave 路径 | MMVQ_WV2_LDS=1；保留 wave 分派 | 本次启用与验证 LDS 路径；未启用额外的 WV2_GROUP 分组配置 |
+| MMVQ LDS 与 wave 路径 | MMVQ_WV2_LDS=1；rc.6 增加 MMVQ_WV2_GROUP=1；保留 wave 分派 | rc.5 启用并验证 LDS 路径；rc.6 进一步启用 WV2 分组 |
+| Q6K packed-wave LDS | Q6_WAVE_PACK_LDS=1（rc.6，decode） | 作用于 Q6K packed-wave 路径；按张量类型分派，不适用于 XXS 的 Q5_K 输出头 |
+| 稠密 GEMM 累加器精度 | GEMM_Y_F16=qkv\|qf\|sg\|su\|sd\|z（rc.6） | 六个投影族的 GEMM Y 累加器改走 16 位路径；改变中间精度，正确性范围见成绩说明 |
 
 环境变量表中省略的 `STRATA_` 前缀适用于所有开关。默认开启的实现无需在环境文件中重复声明；未见变量不等于缺失优化。
 
-## 本次新增项的单项记录
+## 按版本的新增项单项记录
+
+### v0.1.0-rc.6
+
+| 项目 | 已有测试记录 |
+| --- | --- |
+| GEMM_Y_F16（六投影族） | 见 [BENCHMARKS.md](BENCHMARKS.md) 本版合计；单项拆分未单独保存 |
+| TOPK_H16 + TOPK_REG_MAX | 见本版合计 |
+| SCORES_MMAC_NB 1→2 | 见本版合计 |
+| Q6_WAVE_PACK_LDS / MMVQ_WV2_GROUP | 见本版合计 |
+| TOPK_H16_T（线程数扩容） | **已否决**：250K 整模 +11.96%、qsa select +86%（相对非 regmax 基线）；相对单独 REG_MAX 基线 +13.7%。6 个臂输出 SHA 一致 |
+
+### v0.1.0-rc.5
 
 | 项目 | 已有同批测试记录 |
 | --- | --- |
@@ -53,7 +67,7 @@ v0.1.0-rc.5 固定分发 `d87a4678a21b` 引擎。该程序同时包含此前 K10
 | K 暂存模板化 | 寄存器记录为 VGPR 131→119，改善对应 attention 相位 |
 | MMVQ LDS | 指定 decode 负载 A/B/A/B 中，窗口平均耗时约 −2.2% |
 
-这些数字来自不同单项对照，不能相加。最终组合的 15.71 / 70.83 / 146.79 秒对应固定输入和配置，见 [BENCHMARKS.md](BENCHMARKS.md)。源码快照恢复不等于完整干净重建验证，见 [VALIDATION.md](VALIDATION.md)。
+这些数字来自不同单项对照，不能相加。rc.5 组合的 15.71 / 70.83 / 146.79 秒与 rc.6 组合的 15.597 / 142.119 秒对应各自的固定输入和配置，见 [BENCHMARKS.md](BENCHMARKS.md)。源码快照恢复不等于完整干净重建验证，见 [VALIDATION.md](VALIDATION.md)。
 
 ## 部署配置与上游能力
 
@@ -72,11 +86,11 @@ Docker 组合安装、模型下载命令、权重校验、设备选择和服务�
 ## 源码核对依据
 
 - [c4 Strata 累计补丁](../engines/strata/c4/replay/patches/strata-c4.patch)与 [ggml/llama.cpp 适配补丁](../engines/strata/c4/replay/patches/llama-gfx928.patch)。
-- [c4 到当前 XXS 快照的增量](../engines/strata/xxs-20261016/patches/c4-to-xxs-20261016.patch)，覆盖 10 个变更文件。
-- [当前环境配置](../engines/strata/xxs-20261016/environment.env)及[源码恢复校验表](../engines/strata/xxs-20261016/source-recovery.json)。
+- [c4 到 XXS 快照的增量](../engines/strata/xxs-20261016/patches/c4-to-xxs-20261016.patch)，覆盖 10 个变更文件。**rc.6 的增量源码不在本仓库内**，其清单见 [rc.6 引擎目录](../engines/strata/xxs-20261016-gold/manifest.json)，`clean_rebuild_verified` 为 `false`。
+- [当前环境配置](../engines/strata/xxs-20261016-gold/environment.env)（rc.6）及 [rc.5 快照的源码恢复校验表](../engines/strata/xxs-20261016/source-recovery.json)。
 
 c4 配方保留 21 个修改文件、4 个新增实现头文件；ggml/llama.cpp 补丁包含 2 个修改文件和 1 个新增配置。这是文件变更范围，不是独立优化项数量，也不代表每个历史候选路径均在当前配置启用。
 
 ## 未计入本版本的项目
 
-后续 GDN chunked 平台修复、16 位 topk 及之后的研究构建、TP2、不满足性能或正确性检查而关闭的候选、仅有组件测量但未保留的实验，均不计入当前优化成果。计时、日志和硬件屋顶线探针属于研究工具，不列为运行性能优化。
+rc.6 之后的 GDN chunked 平台修复、TP2、不满足性能或正确性检查而关闭的候选（含 `TOPK_H16_T` 线程数扩容）、仅有组件测量但未保留的实验，均不计入当前优化成果。计时、日志和硬件屋顶线探针属于研究工具，不列为运行性能优化。

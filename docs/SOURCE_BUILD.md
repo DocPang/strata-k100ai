@@ -1,8 +1,10 @@
 # 源码恢复与构建
 
-v0.1.0-rc.5 直接分发已测的 `d87a4678a21b` 冻结二进制。源码恢复与日常安装是两条独立流程，运行包使用者不需要自行编译。
+v0.1.0-rc.6 直接分发已测的 `43002a7262e5` 冻结二进制；上一版 rc.5 分发 `d87a4678a21b`。源码恢复与日常安装是两条独立流程，运行包使用者不需要自行编译。
 
-先按下文恢复 c4 源码，再应用本版附加补丁：
+**rc.6 相对 rc.5 快照的增量源码不在本仓库内。** 下面可回放的补丁只覆盖到 rc.5 的 `xxs-20261016` 快照；rc.6 新增的 GEMM_Y_F16、TOPK_H16/REG_MAX、SCORES_MMAC_NB=2、Q6_WAVE_PACK_LDS 与 MMVQ_WV2_GROUP 只有清单，没有公开补丁，见 [rc.6 引擎清单](../engines/strata/xxs-20261016-gold/manifest.json)（`clean_rebuild_verified` 为 `false`）。
+
+先按下文恢复 c4 源码，再应用下列 rc.5 快照补丁：
 
 ```bash
 git -C prepared/strata apply --check /absolute/path/strata-k100ai/engines/strata/xxs-20261016/patches/c4-to-xxs-20261016.patch

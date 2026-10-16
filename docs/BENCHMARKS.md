@@ -1,20 +1,36 @@
 # 参考成绩
 
-本文汇总 K100AI（gfx928、64 GiB 显存）的既有测试结果。除注明外，测试日期为 2026-10-15。不同引擎、权重或输入内容的结果分别列出，不据此推导发布附件的性能。
+本文汇总 K100AI（gfx928、64 GiB 显存）的既有测试结果。测试日期按各节标注，多数历史记录为 2026-10-15，rc.6 记录为 2026-10-16。不同引擎、权重或输入内容的结果分别列出，不据此推导发布附件的性能。
 
-## v0.1.0-rc.5：IQ3_XXS 固定引擎实测
+## v0.1.0-rc.6：IQ3_XXS 固定引擎实测
 
-本版本运行包分发的二进制为 `d87a4678a21b3c482658e53e6e766f7e54c2033853e6367bbf39e8e088ca4d6b`，构建于 2026-10-16 01:51（UTC+08:00）。以下成绩直接对应该二进制，来自同批 A/B/A 测试；发布打包期间未重新运行 GPU 实验。
+本版本运行包分发的二进制为 `43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac`，29,290,960 字节，构建于 2026-10-16 20:20（UTC+08:00），并已部署到生产实例。本版只复测了 32K 与 250K 两档，未重做同批参考臂对照；下表与 rc.5 记录的差值来自两个不同批次，只能当作指示值，不是同批 A/B。
 
-测试配置：IQ3_XXS、单张 K100AI、max-context=262144、expert-cache=24576、INT8 KV、不传 kv-resident、prefill=30602、spec=4、spec-min-p=0.70、vram-reserve-mib=2048。关闭 prompt/conversation cache；每臂两次完整 prefill。参考臂与优化臂使用同一二进制和输入，优化臂增加下列五个变量：
+测试配置：IQ3_XXS、单张 K100AI、max-context=262144、expert-cache=24576、INT8 KV、不传 kv-resident、prefill=30602、spec=4、spec-min-p=0.70、vram-reserve-mib=2048。关闭 prompt/conversation cache。下表为本版单臂 prefill 结果：
+
+**rc.6 发布引擎（`43002a7262e5`）的开关**：
 
 ```ini
+STRATA_GEMM_Y_F16=qkv|qf|sg|su|sd|z
+STRATA_TOPK_H16=1
+STRATA_TOPK_REG_MAX=7168
 STRATA_SCORES_MMAC=2
 STRATA_SCORES_MMAC_LDS=1
-STRATA_SCORES_MMAC_NB=1
+STRATA_SCORES_MMAC_NB=2
 STRATA_SEL_SCORES_FP16=1
 STRATA_GATEUP_EXACT_IQ2=1
+STRATA_MMVQ_WV2_LDS=1
+STRATA_MMVQ_WV2_GROUP=1
+STRATA_Q6_WAVE_PACK_LDS=1
 ```
+
+| 实际输入 token | 本版平均耗时 | 有效吞吐 | 相对上一版发布二进制 |
+| --- | ---: | ---: | ---: |
+| 30603 | 15.597 s | 1962.0 tok/s | 约 −0.7% |
+| 126857 | 本版未复测 | — | — |
+| 249986 | 142.119 s | 1759.0 tok/s | 约 −3.2% |
+
+**上一版（rc.5，`d87a4678a21b`）的同协议记录**（保留供对照，本版只复测了 32K 与 250K）：
 
 | 实际输入 token | 优化臂 prefill 两个样本 | 平均耗时 | 有效吞吐 | 相对同批参考配置的耗时下降 |
 | --- | --- | ---: | ---: | ---: |
@@ -22,13 +38,17 @@ STRATA_GATEUP_EXACT_IQ2=1
 | 126857 | 70.8586 / 70.7970 s | 70.8278 s | 1791.1 tok/s | 约 17.8% |
 | 249986 | 147.0392 / 146.5480 s | 146.7936 s | 1703.0 tok/s | 约 23.3% |
 
-250K 第二批优化臂为 147.0584 / 146.6623 s，平均 146.8604 s。将 chunk 降至 20480 的独立记录为 149.7275 / 149.7749 s，平均 149.7512 s。
+rc.5 的 250K 第二批优化臂为 147.0584 / 146.6623 s，平均 146.8604 s。将 chunk 降至 20480 的独立记录为 149.7275 / 149.7749 s，平均 149.7512 s。本版未重做同批参考臂对照，因此不给出新的"相对参考配置"百分比。
+
+**本版打包时对运行中生产引擎（同一二进制）的验证请求**：约 39K token 输入 20.376 s、约 66K token 输入 25.728 s；短提示 + 300 token 输出时 TTFT 为 1.06 s（关 thinking）与 0.70 s（开 thinking）。该组协议与上表不同，不可混用。
+
+**本版记录并否决的开关**：`STRATA_TOPK_H16_T`（h16 topk 核线程数 256→1024）。250K 下整模 +11.96%、qsa select +86%（相对非 regmax 基线）；相对单独 `REG_MAX` 基线为 +13.7%。同批次 6 个臂输出 SHA 完全一致，说明回归出在性能侧而非结果侧。该键在发布环境中不设置。
 
 Decode 单独测试使用 32K prefill 后生成 128 token。`STRATA_MMVQ_WV2_LDS=1` 的 A/B/A/B 检查中，窗口平均耗时由 41.98 ms 降到 41.04 ms（约 −2.2%）；优化样本生成速率为 77.33 / 81.94 / 77.65 / 82.23 tok/s。此负载与历史 8192 入、512 出不同，不能据此推导 decode 从 60 提高到 82 tok/s。
 
 正确性范围：250K 对照与复测的输出 SHA 相同，前缀 `08d2c11d70446fe6`。32K/128K 优化臂前缀为 `84f393bfc11ffe91`，已有一个 EOS 后 token 差异记录。测试为固定提示家族、16-token 长输入输出，不等于完整质量评测。FP16 scores 与纯 FP32 打分并非所有中间结果逐位相同。
 
-[公开测试结果汇总](../engines/strata/xxs-20261016/benchmarks.json)保留输入长度、样本耗时和程序摘要，不包含内部端点、凭据或完整提示。后续实验构建不属于本发布版本。
+[公开测试结果汇总](../engines/strata/xxs-20261016-gold/benchmarks.json)保留输入长度、样本耗时和程序摘要，不包含内部端点、凭据或完整提示。后续实验构建不属于本发布版本。
 
 ## 引擎标识与发布关系
 
@@ -40,6 +60,8 @@ Decode 单独测试使用 32K prefill 后生成 128 token。`STRATA_MMVQ_WV2_LDS
 | XXS exact+fused 基准引擎 | `ad743dbf9cc1` | 已完成 XXS 测试的对照程序；下文的混合计算及全 KV 驻留成绩来自该程序 |
 | rc.4 历史发布引擎 | `5d87f09e07bb` | 在 XXS 基准引擎上增加 selection 参数及配套显存记账；尚无该二进制的独立 GPU 性能测试结果 |
 | 长上下文实验引擎 | `ecd44f1c900c` | 2026-10-16 构建，累计包含 QSA selection 与 attention 等优化；未作为 rc.4 运行包发布 |
+| rc.5 发布引擎 | `d87a4678a21b` | v0.1.0-rc.5 的运行程序；本页保留其原始成绩供对照 |
+| rc.6 发布引擎 | `43002a7262e5` | v0.1.0-rc.6 的运行程序（当前推荐）；在 rc.5 上增加 GEMM_Y_F16、TOPK_H16/REG_MAX、SCORES_MMAC_NB=2、Q6_WAVE_PACK_LDS、MMVQ_WV2_GROUP |
 
 ## 历史权重与部署对照
 

@@ -22,14 +22,15 @@
 | Hyper-connection 计算 | gfx928 upmix 融合、split/staged read 与 down prefetch，减少分离计算和数据访问开销 |
 | 激活量化复用 | 对唯一 token 行量化一次，再按专家索引 gather；融合 SwiGLU 与量化，减少重复量化和中间读写 |
 | Prefill 工作区 | 条件分配 scratch、复用 embedding 缓冲、共享 gated 工作区和暂存 ring；显存记账与实际布局协同 |
-| QSA scores 访问与计算 | 调整网格轴序改善复用，使用 gfx928 MMAC，并通过 LDS 合并装载 query/key |
-| QSA topk 与调度 | lane-major 访问；selection 批次按最大上下文缓冲尺寸分档，不使用固定 1024 覆盖 |
+| QSA scores 访问与计算 | 调整网格轴序改善复用，使用 gfx928 MMAC，并通过 LDS 合并装载 query/key；合并批次由 1 提至 2 |
+| QSA topk 与调度 | lane-major 访问；selection 批次按最大上下文缓冲尺寸分档；topk 走 2-pass h16 核并用寄存器缓存最大值 |
 | Selection 缓冲 | FP16 scores 将分数缓冲从 4 字节缩为 2 字节；该步骤改变中间精度，正确性范围见成绩说明 |
 | Attention 数据路径 | INT8 V 暂存与合并读取、K 暂存模板化、页索引地址计算和 lane/cell 路径调整 |
 | PLE 访问 | prelaunch 调度与 mmap 数据访问配合 |
-| Decode 稠密计算 | MMVQ wave/packed 路径，并启用已测有收益的 MMVQ LDS 激活暂存 |
+| Decode 稠密计算 | MMVQ wave/packed 路径、MMVQ LDS 激活暂存与 WV2 分组；Q6K packed-wave 走 LDS |
+| 稠密 GEMM 累加器 | GEMM_Y_F16：qkv / qf / sg / su / sd / z 六个投影族的 GEMM Y 累加器改走 16 位路径 |
 
-**本次发布的主要新增项**是 MMAC scores 的 LDS 合并装载、IQ2 exact 扩展、FP16 scores 缓冲、K 暂存模板化及 MMVQ LDS 的启用与验证。其余内容从此前版本沿用，构成本版本测试的基础。
+**本版（rc.6）的主要新增项**是 16 位 GEMM Y 累加器 `GEMM_Y_F16`、h16 topk 核与寄存器最大值缓存 `TOPK_H16`/`TOPK_REG_MAX`、scores 合并批次 `SCORES_MMAC_NB` 翻倍、Q6K packed-wave LDS 与 MMVQ WV2 分组。上一版（rc.5）新增的 MMAC scores LDS 合并装载、IQ2 exact 扩展、FP16 scores 缓冲、K 暂存模板化与 MMVQ LDS 均仍在本版启用。其余内容从此前版本沿用，构成本版本测试的基础。
 
 部署层面另采用 **IQ3_XXS、24576 专家槽全部驻留、256K INT8 KV 全显存驻留、prefill=30602、MTP spec=4、单槽 FIFO**。多卡通过独立实例分发请求。KV、MTP、会话缓存和 API 服务基于上游能力，这里提供 K100AI 的配置与验证记录；默认关闭会话缓存以复现冷 prefill。
 
@@ -37,17 +38,19 @@
 
 ## 实测性能
 
-环境：K100AI 单卡、IQ3_XXS、最大上下文 262144、INT8 KV 全显存驻留、expert-cache=24576、prefill=30602、spec=4。每个测试臂运行两次完整 prefill，并在同一批次运行前后参考配置。会话缓存关闭。
+环境：K100AI 单卡、IQ3_XXS、最大上下文 262144、INT8 KV 全显存驻留、expert-cache=24576、prefill=30602、spec=4。会话缓存关闭；本版对 32K 与 250K 各做单臂复测，未重做同批参考臂对照。
 
-| 输入档位 | 实际输入 token | 优化配置平均耗时 | 有效吞吐 | 相对同批参考配置的耗时下降 |
+| 输入档位 | 实际输入 token | 本版平均耗时 | 有效吞吐 | 相对上一版发布二进制 |
 | --- | ---: | ---: | ---: | ---: |
-| 32K | 30603 | **15.71 秒** | **1948 tok/s** | 约 11.5% |
-| 128K | 126857 | **70.83 秒** | **1791 tok/s** | 约 17.8% |
-| 250K | 249986 | **146.79 秒** | **1703 tok/s** | 约 23.3% |
+| 32K | 30603 | **15.60 秒** | **1962 tok/s** | 约 −0.7% |
+| 128K | 126857 | 本版未复测 | — | — |
+| 250K | 249986 | **142.12 秒** | **1759 tok/s** | 约 −3.2% |
 
-250K 第二批复测平均为 **146.86 秒**。同一输入改用 prefill=20480 时平均为 **149.75 秒**。这些数字均来自本版本分发的二进制；它们不是不同长度历史请求间的加速比。
+上一版（rc.5）在同协议下的记录为 32K 15.71 秒、128K 70.83 秒、250K 146.79 秒。本版只复测了 32K 与 250K，128K 请以上一版记录为准，不当作本版成绩。上表"相对上一版"的百分比来自两个不同批次，只是指示值，不是同批 A/B。这些数字均来自本版本分发的二进制；它们不是不同长度历史请求间的加速比。
 
-Decode 的独立对照使用 32K 输入、128-token 生成：启用 MMVQ LDS 后，窗口平均耗时由 41.98 ms 降为 41.04 ms（约 −2.2%）；四个优化样本的生成速率为 77.33、81.94、77.65、82.23 tok/s。提示内容和草稿接受率影响生成速度，不将最高样本作为通用吞吐保证。
+打包时另对**正在运行的生产引擎**（同一二进制）做了验证请求：约 39K token 输入 **20.38 秒**、约 66K token 输入 **25.73 秒**；短提示 + 300 token 输出的 TTFT 为 **0.70–1.06 秒**。该组协议与上表不同，不可混用，原始字段见 [引擎目录](engines/strata/xxs-20261016-gold/benchmarks.json)。
+
+Decode 的打包验证使用短提示 + 300 token 输出：TTFT 为 1.06 秒（关 thinking）与 0.70 秒（开 thinking），纯解码约 **79–80 tok/s**。上一版记录的 MMVQ LDS 对照（32K 输入、128-token 生成，窗口平均耗时 41.98 → 41.04 ms）在其版本内有效，本版未重做该 A/B。提示内容和草稿接受率影响生成速度，不将最高样本作为通用吞吐保证。
 
 250K 的已测对照输出 SHA 一致。短输入记录存在一个 EOS 后 token 差异；已有结果不构成所有提示或不同量化权重的输出等价证明。多任务质量、长时间稳定性和干净源码重建尚未完成。详见 [成绩与原始汇总](docs/BENCHMARKS.md)、[发布验证](docs/VALIDATION.md)。
 
@@ -77,16 +80,16 @@ free -h
 ```bash
 mkdir -p "$HOME/strata-deploy"
 cd "$HOME/strata-deploy"
-git clone --depth 1 --branch v0.1.0-rc.5 \
-  https://github.com/DocPang/strata-k100ai.git strata-k100ai-rc5
-cd strata-k100ai-rc5
+git clone --depth 1 --branch v0.1.0-rc.6 \
+  https://github.com/DocPang/strata-k100ai.git strata-k100ai-rc6
+cd strata-k100ai-rc6
 
 export PROJECT_DIR="$PWD"
 export DATA_DIR="$PROJECT_DIR/data"
 mkdir -p "$DATA_DIR/models/IQ3_XXS" "$DATA_DIR/packs" "$DATA_DIR/mtp"
 ```
 
-也可从 [Release](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.5) 下载 `deployment-v0.1.0-rc.5.tar.gz` 解压，进入解压目录后设置上述两个变量。
+也可从 [Release](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.6) 下载 `deployment-v0.1.0-rc.6.tar.gz` 解压，进入解压目录后设置上述两个变量。
 
 ### 3. 准备国内 DTK 基础镜像
 
@@ -117,7 +120,7 @@ tar -xzf strata-xxs-20261016-gold-linux-amd64.tar.gz
 sha256sum runtime/bin/strata
 ```
 
-最后一条应显示本页开头的 `d87a4678a21b…` 完整摘要。所有校验通过后再继续。
+最后一条应显示本页开头的 `43002a7262e5…` 完整摘要。所有校验通过后再继续。
 
 ### 5. 从魔塔下载两个 IQ3_XXS 权重分片
 

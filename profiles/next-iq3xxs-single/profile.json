@@ -54,6 +54,7 @@
     "STRATA_Q6_PACKED": "1",
     "STRATA_Q6_WAVE_PACK_PREP": "1",
     "STRATA_Q6_WAVE_PACK": "1",
+    "STRATA_Q6_WAVE_PACK_LDS": "1",
     "STRATA_GR_DOWN_PREFETCH": "2",
     "STRATA_HC_SPLIT": "2",
     "STRATA_MMQ_RESIDENT_SORT_NE": "1",
@@ -77,12 +78,16 @@
     "STRATA_PF_FUSED_NATIVE_EXACT_SKIP": "1",
     "STRATA_SCORES_MMAC": "2",
     "STRATA_SCORES_MMAC_LDS": "1",
-    "STRATA_SCORES_MMAC_NB": "1",
+    "STRATA_SCORES_MMAC_NB": "2",
     "STRATA_SEL_SCORES_FP16": "1",
     "STRATA_GATEUP_EXACT_IQ2": "1",
-    "STRATA_MMVQ_WV2_LDS": "1"
+    "STRATA_MMVQ_WV2_LDS": "1",
+    "STRATA_MMVQ_WV2_GROUP": "1",
+    "STRATA_GEMM_Y_F16": "qkv|qf|sg|su|sd|z",
+    "STRATA_TOPK_H16": "1",
+    "STRATA_TOPK_REG_MAX": "7168"
   },
-  "notes": "Frozen d87a4678 engine; IQ3_XXS; 256K full-resident INT8 KV; 24576 expert slots; single-slot FIFO; 30602 prefill and spec=4. No manual SEL_BATCH override.",
+  "notes": "Frozen 43002a72 engine (rc.6); IQ3_XXS; 256K full-resident INT8 KV; 24576 expert slots; single-slot FIFO; 30602 prefill and spec=4. No manual SEL_BATCH override; STRATA_TOPK_H16_T deliberately unset.",
   "topology": "single",
-  "engine": "strata/xxs-20261016"
+  "engine": "strata/xxs-20261016-gold"
 }

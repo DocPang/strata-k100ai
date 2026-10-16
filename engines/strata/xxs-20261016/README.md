@@ -2,6 +2,8 @@
 
 本目录对应 v0.1.0-rc.5，分发已完成指定负载 GPU 测试的冻结程序 `d87a4678a21b`，完整摘要和大小见 [manifest.json](manifest.json)。
 
+**该引擎已被 v0.1.0-rc.6 取代**：当前推荐版本分发 `43002a7262e5`，见 [xxs-20261016-gold](../xxs-20261016-gold/README.md)。本目录保留 rc.5 的二进制摘要、成绩、源码快照补丁与发布检查记录，供对照和回退参考；rc.5 的 Release 资产保留原始内容。
+
 - SCORES_MMAC=2 + LDS=1 + NB=1：合并装载与矩阵计算。
 - SEL_SCORES_FP16=1：2 字节 selection 分数缓冲。
 - GATEUP_EXACT_IQ2=1：IQ2_XS/IQ2_XXS exact 扩展。

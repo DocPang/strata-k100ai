@@ -114,7 +114,7 @@ esac
         self.assertIn('Unsupported base', result.stderr)
 
     def test_xxs_offline_install_is_available(self):
-        bundle = ROOT / 'local-artifacts/strata-xxs-20261016-linux-amd64.tar.gz'
+        bundle = ROOT / 'local-artifacts/strata-xxs-20261016-gold-linux-amd64.tar.gz'
         if not bundle.exists(): self.skipTest('Local release bundle required')
         result = self.run_install('--local-only', '--bundle', str(bundle), '--profile', 'next-iq3xxs-single')
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -128,7 +128,7 @@ esac
         self.assertNotIn('build --', (self.root / 'calls').read_text())
 
     def test_offline_install_contract(self):
-        bundle = ROOT / 'local-artifacts/strata-xxs-20261016-linux-amd64.tar.gz'
+        bundle = ROOT / 'local-artifacts/strata-xxs-20261016-gold-linux-amd64.tar.gz'
         if not bundle.exists(): self.skipTest('Release bundle is checked separately on the publishing host')
         result = self.run_install('--local-only', '--bundle', str(bundle))
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -189,12 +189,19 @@ class NativeDeploymentTests(unittest.TestCase):
         result = entrypoint.render(profile, settings, {'SHARD1': 'a.gguf', 'SHARD2': 'b.gguf'})
         for flag in ['--kv-resident', '--batch', '--batch-mtp']:
             self.assertNotIn(flag, result['args'])
-        self.assertEqual(profile['engine'], 'strata/xxs-20261016')
+        self.assertEqual(profile['engine'], 'strata/xxs-20261016-gold')
         self.assertEqual(result['env']['STRATA_PF_FUSED'], '1')
         self.assertEqual(result['env']['STRATA_PF_FUSED_NATIVE_EXACT_SKIP'], '1')
         self.assertNotIn('STRATA_SEL_BATCH', result['env'])
         self.assertEqual(result['env']['STRATA_GATEUP_EXACT_IQ2'], '1')
         self.assertEqual(result['env']['STRATA_SCORES_MMAC_LDS'], '1')
+        self.assertEqual(result['env']['STRATA_SCORES_MMAC_NB'], '2')
+        self.assertEqual(result['env']['STRATA_MMVQ_WV2_GROUP'], '1')
+        self.assertEqual(result['env']['STRATA_Q6_WAVE_PACK_LDS'], '1')
+        self.assertEqual(result['env']['STRATA_TOPK_H16'], '1')
+        self.assertEqual(result['env']['STRATA_TOPK_REG_MAX'], '7168')
+        self.assertEqual(result['env']['STRATA_GEMM_Y_F16'], 'qkv|qf|sg|su|sd|z')
+        self.assertNotIn('STRATA_TOPK_H16_T', result['env'])
         args = result['args']
         for flag, value in [('--expert-cache', '24576'), ('--max-context', '262144'), ('--prefill', '30602'), ('--spec', '4')]:
             self.assertEqual(args[args.index(flag) + 1], value)
