@@ -2,7 +2,7 @@
 
 面向海光 K100AI（gfx928、64 GiB 显存）的 **Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS** 推理优化与部署配置。
 
-当前版本为 **[v0.1.0-rc.6](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.6)**，分发 2026-10-16 已完成分档性能测试的固定引擎。引擎 SHA-256 为 `43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac`。本版在上一版基础上新增 16 位 GEMM Y 累加器、h16 topk 核与寄存器最大值缓存、scores 合并批次加倍、Q6K packed-wave LDS 与 MMVQ WV2 分组；已否决的 h16 topk 线程数扩容未纳入。
+当前版本为 **[v0.1.0-rc.6](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.6)**，分发 2026-10-16 的固定引擎：32K 与 250K 已在本版复测，128K 沿用上一版记录。引擎 SHA-256 为 `43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac`。本版在上一版基础上新增 16 位 GEMM Y 累加器、h16 topk 核与寄存器最大值缓存、scores 合并批次加倍、Q6K packed-wave LDS 与 MMVQ WV2 分组；已否决的 h16 topk 线程数扩容未纳入。
 
 运行包约 8.5 MiB，包含推理程序、HTTP 服务与模型转换工具；基础镜像、驱动和模型权重单独准备。支持直接复用本机 DTK 镜像，也可将运行包加入基础镜像生成本地派生镜像。
 

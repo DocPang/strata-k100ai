@@ -8,6 +8,7 @@
 - 打包时对运行中的生产引擎做了验证请求：约 39K token 输入 20.38 s、约 66K token 输入 25.73 s；短提示 TTFT 0.70–1.06 s。同二进制在实验卡上的工程记录（250K / 32K / decode）单独列出，两组条件不同不可混用。
 - 新增 [卡外 KV 容量扩展](docs/KV_CAPACITY.md)：说明如何用引擎原生的会话存/读接口在 tmpfs 与 SSD 上建立跨卡共享的 KV 池，并给出实测的搬运耗时与容量换算。
 - 本包不含源码快照或增量补丁，`clean_rebuild_verified` 为 `false`；不要据此宣称可从公开材料重建出相同二进制。
+- 2026-10-17 修正：安装器此前仍按 rc.5 的名称下载 XXS 运行包（rc.6 未分发该文件），现改为 `VERSION=v0.1.0-rc.6` 与 `xxs-20261016-gold`；`start.sh`、`compose.yaml`、Dockerfile 与 `profiles/next-iq3xxs-single` 同步到 rc.6 开关；首页与文档按 rc.6 更新，rc.5 记录保留并标注为上一版；`deployment-v0.1.0-rc.6.tar.gz` 由同一标签重新生成。
 
 ## v0.1.0-rc.5
 
