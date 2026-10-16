@@ -1,6 +1,6 @@
 # 优化内容与格式覆盖
 
-当前引擎在 c4 基础上增加 exact/fused 分派及 selection 参数：29 层保留 exact，19 层 IQ2_XS/IQ2_XXS 走 fused native int8；`STRATA_SEL_BATCH` 同步控制实际批次和两处工作区记账。其余优化沿用父版。
+当前引擎在 c4 基础上增加 exact/fused 分派及 selection 参数：29 层保留 exact，19 层 IQ2_XS/IQ2_XXS 走 fused native int8；`STRATA_SEL_BATCH` 同步控制实际批次和两处工作区记账。其余优化沿用XXS exact+fused 基准引擎（`ad743dbf9cc1`）。
 
 c4 累计改动覆盖平台适配、量化计算、MoE 分派、prefill、decode 和工作区管理。源码补丁位于 `engines/strata/c4/replay/patches/`。
 

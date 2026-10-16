@@ -59,7 +59,7 @@ python3 tools/mtp_rt.py --gguf /out/mtp-q2_0.gguf --out /out/runtime
 
 ## 格式与质量
 
-新引擎保留 29 层 exact gate/up，将 19 层 IQ2_XS/IQ2_XXS 交给 fused native int8。Q2_0 与 IQ4_NL down 沿用已有路径，精度政策保持父版状态。
+新引擎保留 29 层 exact gate/up，将 19 层 IQ2_XS/IQ2_XXS 交给 fused native int8。Q2_0 与 IQ4_NL down 沿用已有路径，精度政策保持XXS exact+fused 基准引擎（`ad743dbf9cc1`）状态。
 
 下载入口见 [魔塔模型仓库](https://modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/files)，完整直链与断点续传见 [INSTALL.md](INSTALL.md)。MTP 由 [魔塔 Qwen 官方模型](https://modelscope.cn/models/Qwen/Qwen3.8-Flash-Next/files)按需提取。
 

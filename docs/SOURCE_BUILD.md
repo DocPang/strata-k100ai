@@ -1,12 +1,12 @@
 # 源码恢复与构建
 
-当前推荐引擎为 exact+fused 父版加 selection-batch 参数回移植，实际产物身份见 [新引擎记录](../engines/strata/xxs-exact-sel/build-record.json)。先按下述步骤恢复 c4 源码，再应用附加补丁：
+rc.4 发布引擎（`5d87f09e07bb`）在 XXS exact+fused 基准引擎（`ad743dbf9cc1`）上增加 selection-batch 参数及配套显存记账，实际产物身份见 [新引擎记录](../engines/strata/xxs-exact-sel/build-record.json)。先按下述步骤恢复 c4 源码，再应用附加补丁：
 
 ```bash
 git -C prepared/strata apply /absolute/path/strata-k100ai/engines/strata/xxs-exact-sel/patches/c4-to-exact-sel.patch
 ```
 
-附加补丁仅修改 `src/prefill/prefill.cpp`，已验证输出与此次编译输入一致。实际发布二进制使用父版静态对象和新 prefill 对象完成增量链接；下面的全量构建仍需另行完成和验收。
+附加补丁仅修改 `src/prefill/prefill.cpp`，已验证输出与此次编译输入一致。实际发布二进制使用 XXS 基准引擎（`ad743dbf9cc1`）的静态对象和新 prefill 对象完成增量链接；下面的全量构建仍需另行完成和验收。
 
 # c4 基础源码恢复
 

@@ -61,7 +61,7 @@ docker rm strata-iq3xxs
 
 默认不传 `--kv-resident`、`--batch`、`--batch-mtp`。如需恢复 KV streaming 对照，可显式添加 `--kv-resident 32768`；它是容量回退选项，不是 64 GiB XXS 的默认配置。
 
-`STRATA_SEL_BATCH=1024` 调整 QSA selection 并行度，不增加会话并发。设为 256 可回到父版 selection 宽度。三处工作区记账和实际批次必须一致，不能仅用旧二进制设置该变量。
+`STRATA_SEL_BATCH=1024` 调整 QSA selection 并行度，不增加会话并发。设为 256 可使用与 XXS 基准引擎相同的 selection 批次。三处工作区记账和实际批次必须一致，不能仅用旧二进制设置该变量。
 
 prefill 工作区受限时将 `--prefill 20480` 降至 8192。最大上下文保留 262144；此版本不提供 1M 外推配置。容量和性能条件见 [MEMORY.md](MEMORY.md) 与 [BENCHMARKS.md](BENCHMARKS.md)。
 

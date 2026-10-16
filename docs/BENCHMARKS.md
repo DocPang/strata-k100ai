@@ -1,6 +1,17 @@
 # 参考成绩
 
-以下为 K100AI/gfx928、64 GiB 显存的已有记录，非跨硬件速度承诺。除注明外，数据来自 2026-10-15 的隔离卡实验。父版 exact+fused 为 `ad743dbf9cc15026758cfceb26e2dd0aeb25700b295fba028e64ca4b33bc18c0`；本次 `5d87f09e…` 增加 selection 参数的构建不冒用父版的测量身份。
+本文汇总 K100AI（gfx928、64 GiB 显存）的既有测试结果。除注明外，测试日期为 2026-10-15。不同引擎、权重或输入内容的结果分别列出，不据此推导发布附件的性能。
+
+## 引擎标识与发布关系
+
+下表使用二进制 SHA-256 前 12 位标识引擎；完整摘要见本页各节或构建清单。
+
+| 引擎 | 标识 | 用途与发布关系 |
+| --- | --- | --- |
+| c4 基线引擎 | `c4be512a7d25` | rc.1—rc.3 的运行程序；rc.4 保留该运行包供 IQ3_S 配置使用 |
+| XXS exact+fused 基准引擎 | `ad743dbf9cc1` | 已完成 XXS 测试的对照程序；下文的混合计算及全 KV 驻留成绩来自该程序 |
+| rc.4 发布引擎 | `5d87f09e07bb` | 在 XXS 基准引擎上增加 selection 参数及配套显存记账；尚无该二进制的独立 GPU 性能测试结果 |
+| 长上下文实验引擎 | `ecd44f1c900c` | 2026-10-16 构建，累计包含 QSA selection 与 attention 等优化；未作为 rc.4 运行包发布 |
 
 ## 权重与部署对照
 
@@ -29,7 +40,7 @@ Decode 为报告记录的三次中位结果。总显存与专家原始数据是�
 | Prefill 131072 | 1223.9 tok/s | — | 1239.9 tok/s |
 | Decode 8192/512 | 60.6 tok/s | — | 60.3 tok/s |
 
-父版 exact-skip 保留 29 层 exact gate/up，仅让 19 层 IQ2_XS/IQ2_XXS 使用 fused native int8。128、2048、8192、16384 输入的四组提示在**同一 XXS 权重的新旧引擎之间**贪心输出 SHA 一致。此结果不表示 IQ3_S 与 XXS 输出相同，也不等于完整质量评估。
+XXS exact+fused 基准引擎的 exact-skip 保留 29 层 exact gate/up，仅让 19 层 IQ2_XS/IQ2_XXS 使用 fused native int8。128、2048、8192、16384 输入的四组提示在**同一 XXS 权重的新旧引擎之间**贪心输出 SHA 一致。此结果不表示 IQ3_S 与 XXS 输出相同，也不等于完整质量评估。
 
 ## 全 KV 驻留
 
@@ -46,7 +57,7 @@ XXS + `ad743dbf…`，256K 最大上下文、spec=6：
 
 ## 单卡 batch 与 FIFO
 
-父版 XXS 引擎、INT8 KV。不同上下文和测试程序分别列出，总吞吐与每路生成速率不混用。
+XXS exact+fused 基准引擎（`ad743dbf9cc1`）、INT8 KV。不同上下文和测试程序分别列出，总吞吐与每路生成速率不混用。
 
 | 条件 | 配置 | 单请求或单路 | 并发总吞吐 / 现象 |
 | --- | --- | ---: | --- |
@@ -61,7 +72,7 @@ XXS + `ad743dbf…`，256K 最大上下文、spec=6：
 
 ## QSA selection 参数
 
-来源：STATUS §186，build #57 `d0c643af…`，ctx128、prefill=30602、kv-resident=32768，带相位计时；每臂两次 full-prefill，前后参考共四次。
+来源：STATUS §186，selection 参数实验引擎 `d0c643af96a9`，ctx128、prefill=30602、kv-resident=32768，带相位计时；每臂两次 full-prefill，前后参考共四次。
 
 | 项目 | sel_batch=256 参考 | sel_batch=1024 | 变化 |
 | --- | ---: | ---: | ---: |
@@ -78,11 +89,11 @@ XXS + `ad743dbf…`，256K 最大上下文、spec=6：
 | 约 128K（126856 token） | 83.1816 s，参考四样本均值 | 81.5953 s | 较宽 selection 有收益 |
 | 约 250K（249986 token） | 185.636 s | 202.634 s | 更大工作区引发竞争，结果反转 |
 
-后续实验的权重、缓冲与内核状态与 HCU0 发布配方不同，不能直接推广。当前配置按指定使用 1024；需要回到父版 selection 宽度时，设置 `STRATA_SEL_BATCH=256`。1024 在新 XXS 全驻留配方上的最终收益仍需独立 A/B。
+上述 IQ3_S 实验与 rc.4 的 XXS 全 KV 驻留配置不同。rc.4 显式设置 1024；设置 `STRATA_SEL_BATCH=256` 可使用与 XXS 基准引擎相同的批次。1024 在 rc.4 发布配置中的性能影响尚未独立测试。
 
-## 晚间长上下文引擎（build #63，2026-10-16 00:02）
+## 长上下文实验结果（2026-10-16，`ecd44f1c900c`）
 
-引擎 SHA-256：`ecd44f1c900c700032d6bff48b265ee3daebffa0c6779f7cf5f33361773e6151`。已对照服务器上的二进制摘要、构建记录和 `h5tiers2.run.log`。
+构建时间：2026-10-16 00:02（UTC+08:00）。引擎 SHA-256：`ecd44f1c900c700032d6bff48b265ee3daebffa0c6779f7cf5f33361773e6151`。已对照服务器上的二进制摘要、构建记录和 `h5tiers2.run.log`。
 
 测试使用 **IQ3_S**、HCU5、max-context=262144、expert-cache=24576、INT8 KV、kv-resident=32768、prefill=30602、spec=4；每档两次完整 prefill，日志记录 REUSED=0、fallbacks=0。这组结果与本项目 IQ3_XXS 全 KV 驻留配方不同。
 
@@ -95,26 +106,26 @@ XXS + `ad743dbf…`，256K 最大上下文、spec=6：
 
 历史生产记录为约 255K 输入、363.4 s。与本轮 249986 token、182.6 s 相比，耗时下降约 49.8%；**输入、引擎和部署配置不同，该数字只作历史参考，不是同负载 A/B 的两倍加速结论**。
 
-新版累计包含 prompt 工作区与分块调整、QSA scores 网格轴序调整、topk 访问与 selection 并行度调整，以及 attention K 数据的合并暂存。不能把累计改善全部归因于 `STRATA_SEL_BATCH=1024`。
+该实验引擎累计包含 prompt 工作区与分块调整、QSA scores 网格轴序调整、topk 访问与 selection 并行度调整，以及 attention K 数据的合并暂存。不能把累计改善全部归因于 `STRATA_SEL_BATCH=1024`。
 
-可直接归因的最新同批 A/B 为 build #62 的 K 暂存开关：
+使用对照引擎 `6e5c89cf`，在同一批测试中仅改变 K 暂存开关，结果如下：
 
 | 输入档位 | KSTAGE=0 | KSTAGE=1 | 整模耗时变化 | attention 相位变化 |
 | --- | ---: | ---: | ---: | ---: |
 | 128K | 84.2901 s | 81.9903 s | −2.73% | −21.0% |
 | 250K | 187.0160 s | 183.0941 s | −2.10% | −20.1% |
 
-两档各自的完整生成 token SHA 与对照一致。build #63 将该开关默认启用（`STRATA_PA_KSTAGE=0` 回退）；MMAC scores 仍默认关闭，250K 上已有变慢记录。selection 默认按最大上下文缓冲尺寸分档：`max_blocks <= 32770` 用 4096，否则 256，环境变量可覆盖；它不是按每条请求实际长度动态选择。
+两档各自的完整生成 token SHA 与对照一致。长上下文实验引擎 `ecd44f1c900c` 将该开关默认启用（`STRATA_PA_KSTAGE=0` 回退）；MMAC scores 仍默认关闭，250K 上已有变慢记录。selection 默认按最大上下文缓冲尺寸分档：`max_blocks <= 32770` 用 4096，否则 256，环境变量可覆盖；它不是按每条请求实际长度动态选择。
 
-正确性范围：32K/64K/128K 的固定答案检查通过。250K 日志的 `retrieval_answer_match=False`，该检查沿用另一条提示的固定答案，本轮通过 `STRATA_AB_SKIP_RETRIEVAL=1` 跳过；该档有新旧生成 SHA 一致记录，但尚不能表述为独立的 250K 检索答案验收通过。以上各档只生成 16 token，不构成长输出 decode 或稳定性验收。
+正确性范围：32K/64K/128K 的固定答案检查通过。250K 日志的 `retrieval_answer_match=False`，该检查沿用另一条提示的固定答案，测试设置 `STRATA_AB_SKIP_RETRIEVAL=1` 跳过该检查；该档有新旧生成 SHA 一致记录，但尚不能表述为独立的 250K 检索答案验收通过。以上各档只生成 16 token，不构成长输出 decode 或稳定性验收。
 
-IQ3_XXS 另有 build #60（`4cde924e…`）的迁移记录：同 HCU4、全 KV 驻留、prefill=20480 下，8K 从 1423.8 降至 1272.5 tok/s（−10.6%），32K 从 1549.8 降至 1494.9（−3.5%），131K 从 1239.9 升至 1310.5（+5.7%），decode 60.3 tok/s 持平。该轮配置的短长输入收益方向不同；build #63 尚缺同条件的 XXS 全档验证，不能将上表作为 XXS 的发布成绩。
+较早的长上下文实验引擎（`4cde924efb21`）另有 IQ3_XXS 测试记录：同 HCU4、全 KV 驻留、prefill=20480 下，8K 从 1423.8 降至 1272.5 tok/s（−10.6%），32K 从 1549.8 降至 1494.9（−3.5%），131K 从 1239.9 升至 1310.5（+5.7%），decode 60.3 tok/s 持平。该轮配置的短长输入收益方向不同；长上下文实验引擎 `ecd44f1c900c` 尚未完成相同条件下的 XXS 全档测试，不能将上表作为 XXS 的发布成绩。
 
 ## 其他已有检查
 
-- 父版服务：健康检查、SSE 完成标记、工具调用及结果回填通过。
-- 父版 XXS 缓存：cold → identical → continued → other-conversation → restore-parked 五项通过。
+- XXS exact+fused 基准引擎的服务接口：健康检查、SSE 完成标记、工具调用及结果回填通过。
+- XXS exact+fused 基准引擎的会话缓存：cold → identical → continued → other-conversation → restore-parked 五项通过。
 - 小规模质量检查：IQ3_S 与 XXS 的四项客观题均为 4/4；规模不足以建立通用质量等价结论。
 - 1M 试验可启动短请求，但仅余 38 MiB 且 prefill 从 20480 降至 6144；GGUF 原生 context_length=262144，发布配置采用 256K。
 
-记录来源：`REPORT_IQ3XXS_20261015.md` §§2、6、8，`KV_AND_CONCURRENCY_20261015.md`，`STATUS_20261013.md` §§178–191；build #60 的 XXS 迁移记录来自对应验证任务。本文保留测量条件和汇总，不发布内部接口、凭据或原始对话。
+记录来源：`REPORT_IQ3XXS_20261015.md` §§2、6、8，`KV_AND_CONCURRENCY_20261015.md`，`STATUS_20261013.md` §§178–191；长上下文实验引擎 `4cde924efb21` 的 XXS 迁移记录来自对应验证任务。本文保留测量条件和汇总，不发布内部接口、凭据或原始对话。

@@ -64,7 +64,7 @@ XXS 使用新引擎环境文件，IQ3_S 历史配方使用 c4 环境。新增推
 | STRATA_PF_FUSED_NATIVE_EXACT_SKIP | 1，29 层保持 exact，19 层 IQ2 走 fused |
 | STRATA_SEL_BATCH | 1024，selection 的 query 批次；不是 decoder 会话 batch |
 
-HCU0 父版不识别 SEL_BATCH，本版发布的回移植引擎同时支持上述变量。其余环境沿用父版：
+XXS exact+fused 基准引擎（`ad743dbf9cc1`）不识别 SEL_BATCH，本版发布的回移植引擎同时支持上述变量。其他环境参数与该基准引擎相同：
 
 | 范围 | 主要变量 |
 | --- | --- |

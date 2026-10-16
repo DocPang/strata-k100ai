@@ -2,7 +2,9 @@
 
 面向海光 K100AI（gfx928、64 GiB 显存）的 Qwen3.8-Flash-Next 推理优化。当前预发布版本 **v0.1.0-rc.4** 提供 **IQ3_XXS、exact+fused 引擎、256K 全 KV 显存驻留、单槽 FIFO**，多卡并发使用独立实例和网关分发。
 
-本版用于部署方案与文档审阅。新增引擎已完成增量编译和打包，尚未完成独立 GPU 验收；历史运行成绩与晚间 build #63 的实验成绩分别列于 [参考成绩](docs/BENCHMARKS.md)。本运行包不包含 build #63 的整套 wv2 改动。
+本版为预发布版本，提供部署配置、运行程序和使用文档。发布附件中的引擎（SHA-256 前缀 `5d87f09e07bb`）已完成增量编译与打包检查，尚未完成该二进制的独立 GPU 质量与性能测试。
+
+[参考成绩](docs/BENCHMARKS.md) 分别列出已测试的 XXS exact+fused 基准引擎（`ad743dbf9cc1`）和 2026-10-16 长上下文实验引擎（`ecd44f1c900c`）的结果。两者均不同于发布附件中的二进制；实验引擎的全部优化尚未纳入本运行包。
 
 ## 下载
 
@@ -41,7 +43,7 @@ docker pull "$BASE_IMAGE"
 | STRATA_PF_FUSED_NATIVE_EXACT_SKIP | 1，29 层保持 exact，19 层 IQ2 走 fused |
 | STRATA_SEL_BATCH | 1024，QSA selection 参数；不增加会话槽 |
 
-`SEL_BATCH=1024` 按指定发布配方保留。其已测收益来自另一个引擎的 128K 实验；收益随上下文和显存布局变化，不作为所有 256K 请求的速度保证。适用条件见 [参考成绩](docs/BENCHMARKS.md)。
+发布配置显式设置 `SEL_BATCH=1024`。其已测收益来自另一个引擎的 128K 实验；收益随上下文和显存布局变化，不作为所有 256K 请求的速度保证。适用条件见 [参考成绩](docs/BENCHMARKS.md)。
 
 ## 原生启动
 
@@ -79,7 +81,7 @@ docker run --rm -it --name strata-iq3xxs \
 
 ## 参考成绩
 
-父版 exact+fused 引擎 `ad743dbf…` 的同卡历史部署对照：
+以下为同一张 K100AI 上的历史部署对照，XXS 使用 exact+fused 基准引擎（`ad743dbf9cc1`）：
 
 | 指标 | IQ3_S | IQ3_XXS + exact/fused |
 | --- | ---: | ---: |
@@ -89,12 +91,12 @@ docker run --rm -it --name strata-iq3xxs \
 | Prefill，131072 token | 1235.3 tok/s | 1239.9 tok/s |
 | Prefill，261120 token | 745.5 tok/s | 731.7 tok/s |
 
-XXS 全 KV 驻留历史实验记录为 decode 61.0 tok/s、加载后空闲 8186 MiB。上述成绩来自父版及各自记录的配置，未将本次新增 selection 参数后的构建当作已重测产物。完整成绩、并发对照和正确性范围见 [BENCHMARKS.md](docs/BENCHMARKS.md)。
+XXS 全 KV 驻留历史实验记录为 decode 61.0 tok/s、加载后空闲 8186 MiB。XXS 成绩来自基准引擎（`ad743dbf9cc1`），不代表 rc.4 发布引擎（`5d87f09e07bb`）的独立测试结果。完整成绩、并发对照和正确性范围见 [BENCHMARKS.md](docs/BENCHMARKS.md)。
 
 ## 文档与发布范围
 
 [环境准备](docs/INSTALL.md) · [模型准备](docs/MODELS.md) · [参数](docs/PARAMETERS.md) · [显存](docs/MEMORY.md) · [成绩](docs/BENCHMARKS.md) · [源码](docs/SOURCE_BUILD.md) · [验证](docs/VALIDATION.md)
 
-新引擎以 HCU0 的 exact+fused 父版为基础，仅回移植 selection batch 的三处宿主参数/显存记账，编译后的 SHA-256 为 `5d87f09e…`。已完成源码回放和增量编译链接；本发布构建的独立 GPU 数值/性能验收另行记录。IQ3_S/c4 配方作为历史资料保留，TP2 尚未发布。
+新引擎以 XXS exact+fused 基准引擎（`ad743dbf9cc1`）为基础，仅回移植 selection batch 的三处宿主参数/显存记账，编译后的 SHA-256 为 `5d87f09e…`。已完成源码回放和增量编译链接；该二进制的独立 GPU 质量与性能测试尚未完成。IQ3_S/c4 配方作为历史资料保留，TP2 尚未发布。
 
 项目基于 [Strata](https://github.com/Niko1221/Strata) 和 [llama.cpp](https://github.com/ggml-org/llama.cpp)，遵循 [MIT](LICENSE) 并保留[上游许可](engines/strata/LICENSE)。本项目由独立维护者发布。DTK/HyHAL、权重和控制向量遵循各自许可。
