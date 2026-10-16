@@ -39,7 +39,7 @@ v0.1.0-rc.6 固定分发 `43002a7262e5` 引擎；上一版 v0.1.0-rc.5 分发 `d
 | Topk 访问与调度 | TOPK_STRIDE 默认开启、SEL_BATCH 未显式覆盖；rc.6 增加 TOPK_H16=1 与 TOPK_REG_MAX=7168 | lane-major 访问，批次按 max_blocks 分档；rc.6 的 topk 走 2-pass h16 核并用寄存器缓存最大值。核的线程数扩容 `TOPK_H16_T` 已测为显著回归，本版不设置 |
 | Attention V / K 暂存及索引 | INT8 V 暂存、合并读取、页索引计算；PA_KSTAGE 默认开启并模板化 | K 暂存模板化属于本次主要新增；保留此前 V 侧和地址计算优化 |
 | Lane/cell 分派与 PLE 调度 | ATTN_LANECELL=1、PLE_PRELAUNCH=1 | 作用于各自 attention/PLE 路径；具体命中以实际分派为准 |
-| MMVQ LDS 与 wave 路径 | MMVQ_WV2_LDS=1；rc.6 增加 MMVQ_WV2_GROUP=1；保留 wave 分派 | rc.5 启用并验证 LDS 路径；rc.6 进一步启用 WV2 分组 |
+| MMVQ LDS 与 wave 路径 | MMVQ_WV2_LDS=1；rc.6 增加 MMVQ_WV2_GROUP=1；保留 wave 分派 | rc.5 启用并验证 LDS 路径；rc.6 的 WV2 分组只有核级逐位与微基准证据，整模 A/B 未做 |
 | Q6K packed-wave LDS | Q6_WAVE_PACK_LDS=1（rc.6，decode） | 作用于 Q6K packed-wave 路径；按张量类型分派，不适用于 XXS 的 Q5_K 输出头 |
 | 稠密 GEMM 累加器精度 | GEMM_Y_F16=qkv\|qf\|sg\|su\|sd\|z（rc.6） | 六个投影族的 GEMM Y 累加器改走 16 位路径；改变中间精度，正确性范围见成绩说明 |
 
@@ -51,10 +51,12 @@ v0.1.0-rc.6 固定分发 `43002a7262e5` 引擎；上一版 v0.1.0-rc.5 分发 `d
 
 | 项目 | 已有测试记录 |
 | --- | --- |
-| GEMM_Y_F16（六投影族） | 见 [BENCHMARKS.md](BENCHMARKS.md) 本版合计；单项拆分未单独保存 |
-| TOPK_H16 + TOPK_REG_MAX | 见本版合计 |
-| SCORES_MMAC_NB 1→2 | 见本版合计 |
-| Q6_WAVE_PACK_LDS / MMVQ_WV2_GROUP | 见本版合计 |
+| GEMM_Y_F16（六投影族） | **同批 A/B/A**：250K 142.3606 → 137.4764 s（−3.43%）；32K 15.8336 → 14.9644 s（−5.49%）；输出逐位一致 |
+| TOPK_REG_MAX=7168 | **同批 A/B/A**：250K 三臂 144.572 / 142.119 / 144.205 s，整体 −1.57%、qsa select −10.45%；32K 中性；输出逐位一致 |
+| TOPK_H16=1 | 250K qsa select 22,667 → 20,703（−8.7%）、整模约 −1.2%；128K select −1.4%；输出逐位一致 |
+| SCORES_MMAC_NB 1→2 | 同批对照样本已并入上表的基线臂，未单独保存 |
+| Q6_WAVE_PACK_LDS=1（decode） | **同批 A/B/A/B**：decode 81.36 → 82.07 tok/s、窗口 40.45 → 40.05 ms，10/10 配对一致；幅度接近样本漂移下限 |
+| MMVQ_WV2_GROUP=1（decode） | **仅组件级**：核级输出逐位一致、孤立微基准 −24.8%（nc=5、300 次调用）；整模 A/B 未做，不影响上表的 prefill 成绩 |
 | TOPK_H16_T（线程数扩容） | **已否决**：250K 整模 +11.96%、qsa select +86%（相对非 regmax 基线）；相对单独 REG_MAX 基线 +13.7%。6 个臂输出 SHA 一致 |
 
 ### v0.1.0-rc.5
@@ -67,7 +69,7 @@ v0.1.0-rc.6 固定分发 `43002a7262e5` 引擎；上一版 v0.1.0-rc.5 分发 `d
 | K 暂存模板化 | 寄存器记录为 VGPR 131→119，改善对应 attention 相位 |
 | MMVQ LDS | 指定 decode 负载 A/B/A/B 中，窗口平均耗时约 −2.2% |
 
-这些数字来自不同单项对照，不能相加。rc.5 组合的 15.71 / 70.83 / 146.79 秒与 rc.6 组合的 15.597 / 142.119 秒对应各自的固定输入和配置，见 [BENCHMARKS.md](BENCHMARKS.md)。源码快照恢复不等于完整干净重建验证，见 [VALIDATION.md](VALIDATION.md)。
+这些数字来自不同单项对照，不能相加。rc.5 组合的 15.71 / 70.83 / 146.79 秒与 rc.6 组合的 14.964 / 137.476 秒对应各自的固定输入和配置，见 [BENCHMARKS.md](BENCHMARKS.md)。源码快照恢复不等于完整干净重建验证，见 [VALIDATION.md](VALIDATION.md)。
 
 ## 部署配置与上游能力
 

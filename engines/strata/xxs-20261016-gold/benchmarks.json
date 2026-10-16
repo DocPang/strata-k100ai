@@ -51,18 +51,57 @@
     ]
   },
   {
-    "test": "engineering-record-2026-10-16",
+    "test": "gold-same-batch-abba-2026-10-16",
+    "binary_sha256": "43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac",
+    "status": "PASS",
+    "source": "Same-batch A/B/A on the isolated experiment cards (32K on card 4, 250K on card 5) with the packaged binary; every arm ran the published switch set except the one switch under test.",
+    "harness": "One engine process per arm, fixed token file per tier, chunk 30602, spec 4, spec-min-p 0.70, max-context 262144, int8 KV fully resident, expert cache 24576, vram-reserve 2048 MiB, prompt/conversation cache off, eos-ids 0 (fixed-length output), temperature 0. Each request was issued twice inside the same process. The retrieval gate and the whole output-token list SHA-256 were compared per arm; fallbacks 0.",
+    "tiers": [
+      {
+        "tier": "32K",
+        "input_tokens": 30603,
+        "candidate_samples_ms": [15070.4, 14858.3],
+        "candidate_mean_ms": 14964.35,
+        "candidate_tps": 2045.1,
+        "same_batch_baseline_samples_ms": [16168.9, 15498.2],
+        "same_batch_baseline_mean_ms": 15833.55,
+        "delta_pct": -5.49,
+        "output_sha256_prefix": "97e6833014e9deab"
+      },
+      {
+        "tier": "250K",
+        "input_tokens": 249986,
+        "candidate_samples_ms": [137472.8, 137453.0, 137646.3, 137333.4],
+        "candidate_mean_ms": 137476.4,
+        "candidate_tps": 1818.4,
+        "same_batch_baseline_samples_ms": [142786.4, 142094.3, 142356.3, 142344.8, 142363.4, 142218.4],
+        "same_batch_baseline_mean_ms": 142360.6,
+        "delta_pct": -3.43,
+        "output_sha256_prefix": "08d2c11d70446fe6"
+      }
+    ],
+    "single_switch_record": "The only difference between the candidate arms and the baseline arms is STRATA_GEMM_Y_F16; the delta above is therefore that switch's own record (-5.49% at 32K, -3.43% at 250K).",
+    "decode": {
+      "protocol": "32K prefill followed by 128 generated tokens, engine decoder timing",
+      "arm_samples_tps": [74.6, 83.9, 78.1, 83.8],
+      "band_tps": "74.6-83.9",
+      "output_sha256_prefix": "97e6833014e9deab",
+      "note": "Sample-to-sample drift comes from session state; the band, not the highest sample, is the honest statement."
+    },
+    "notes": [
+      "The 32K tier ran on card 4 and the 250K tier on card 5; both cards are the same model and the baseline/candidate pair of each tier ran on the same card.",
+      "Input token counts are the engine-reported prompt tokens. Wall time is the engine's own prefill phase, not a client-side measurement.",
+      "128K was not re-measured for this release; see docs/BENCHMARKS.md for the previous version's record."
+    ]
+  },
+  {
+    "test": "production-online-verification-2026-10-16",
     "binary_sha256": "43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac",
     "status": "RECORDED",
-    "source": "Optimization worklog for the same binary; reproduced here for reference, not re-measured during packaging.",
-    "notes": [
-      "Measured on the isolated experiment card (HCU5), not on the packaged production engine.",
-      "Reported as an end-to-end prefill wall time with the engine's phase timing enabled."
-    ],
-    "results": [
-      { "tier": "250K context", "prefill_ms": 142119, "prefill_tps": 1759, "output_sha": "08d2c11d70446fe6" },
-      { "tier": "32K context", "prefill_ms": 15597, "prefill_tps": 1962, "output_sha": "84f393bfc11ffe91" },
-      { "tier": "decode (longgen32)", "output_tps": 82, "output_sha": "97e6833014e9deab" }
+    "source": "Deployment-time verification recorded by the project for the two production instances (configs hcu0/hcu1 with --prefill 20480), reproduced here as the deployment record; not re-measured during packaging.",
+    "requests": [
+      { "instance": "production instance A (card0, prefill 20480)", "input_tokens": 120670, "prefill_ms": 65281, "prefill_tps": 1848.5 },
+      { "instance": "production instance B (card1, prefill 20480)", "input_tokens": 32230, "prefill_ms": 17113, "prefill_tps": 1883.4 }
     ]
   }
 ]
