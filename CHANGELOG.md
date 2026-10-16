@@ -2,6 +2,8 @@
 
 ## v0.1.0-rc.5
 
+- 补全首页累计优化范围，恢复早期平台、量化布局、MoE、GDN/HC、数据复用、工作区及 attention 优化说明，区分本次新增、上游能力与未启用实验。
+
 - 分发已完成指定负载 GPU 测试的固定引擎 d87a4678a21b，不包含后续研究构建。
 - 启用 MMAC scores 合并装载、IQ2 exact 扩展、FP16 scores、K 暂存模板化与 MMVQ LDS。
 - XXS 默认 prefill=30602、spec=4、256K KV 全显存驻留、全部专家驻留和单槽 FIFO；移除 SEL_BATCH=1024 覆盖，关闭会话缓存以便复现冷输入。

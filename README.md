@@ -6,16 +6,34 @@
 
 运行包约 8.5 MiB，包含推理程序、HTTP 服务与模型转换工具；基础镜像、驱动和模型权重单独准备。支持直接复用本机 DTK 镜像，也可将运行包加入基础镜像生成本地派生镜像。
 
-## 本版本优化
+## 累计优化内容
 
-| 优化项 | 实现与作用 |
+当前运行包包含早期 K100AI 适配与内核优化，以及本次 IQ3_XXS 长上下文优化。下表列出发布版本采用的累计内容；部分属于已有内核的 gfx928 适配、分派或参数选择，不代表每一项算法均由本项目从零实现。
+
+| 范围 | 发布版本采用的优化 |
 | --- | --- |
-| QSA scores 矩阵计算 | 使用 gfx928 MMAC；通过 LDS 合并装载 query/key，降低零散访存成本 |
-| IQ2 专家计算 | 增加 IQ2_XS、IQ2_XXS exact 展开与 MMAC 路径，使该 XXS 权重的 48 层 gate/up 全部具备 exact 路径 |
-| FP16 scores 缓冲 | 将 selection 中间分数缓冲从 4 字节缩为 2 字节，减少显存占用和 topk 读取量；该步骤会改变中间分数精度，输出一致性范围见成绩说明 |
-| Attention K 暂存 | 合并读取 K 数据，并将暂存路径模板化，降低寄存器开销 |
-| Decode 稠密计算 | 启用已验证有收益的 MMVQ LDS 路径 |
-| 单卡资源配置 | 全部专家和 256K INT8 KV 驻留显存；单槽 FIFO；多卡通过独立实例分发请求 |
+| K100AI 平台适配 | gfx928 HIP 兼容层、DTK 编译链接、指令与架构分派适配，以及 ggml/llama.cpp MMQ 衔接 |
+| 量化稠密计算 | Q6_K/Q8_0 packed 布局、Q6 wave packing 与准备路径；按实际张量类型命中，不将 Q6 优化归到 XXS 的 Q5_K 输出头 |
+| MoE 专家布局与分派 | 常驻专家排序、native/MMQ/fused 路径协同，减少不必要的数据重排 |
+| MoE gate/up | exact 展开和 MMAC 路径，增加 IQ2_XS/IQ2_XXS 支持，使该 XXS 权重的 48 层 gate/up 全部具备 exact 路径 |
+| MoE down 投影 | IQ4_NL exact preexpand、Q2_0 展开与 int8 MMAC、staging 及行 tile 调整；按格式和形状分派 |
+| GEMM 形状与布局 | 按专家组行数选择计算 tile，采用 rocBLAS 步长 padding，并保留 DTK BLAS 接口适配 |
+| GDN 递归与写回 | 采用八 lane 协作递归路径，关闭无消费者的 FP32 中间结果写回 |
+| Hyper-connection 计算 | gfx928 upmix 融合、split/staged read 与 down prefetch，减少分离计算和数据访问开销 |
+| 激活量化复用 | 对唯一 token 行量化一次，再按专家索引 gather；融合 SwiGLU 与量化，减少重复量化和中间读写 |
+| Prefill 工作区 | 条件分配 scratch、复用 embedding 缓冲、共享 gated 工作区和暂存 ring；显存记账与实际布局协同 |
+| QSA scores 访问与计算 | 调整网格轴序改善复用，使用 gfx928 MMAC，并通过 LDS 合并装载 query/key |
+| QSA topk 与调度 | lane-major 访问；selection 批次按最大上下文缓冲尺寸分档，不使用固定 1024 覆盖 |
+| Selection 缓冲 | FP16 scores 将分数缓冲从 4 字节缩为 2 字节；该步骤改变中间精度，正确性范围见成绩说明 |
+| Attention 数据路径 | INT8 V 暂存与合并读取、K 暂存模板化、页索引地址计算和 lane/cell 路径调整 |
+| PLE 访问 | prelaunch 调度与 mmap 数据访问配合 |
+| Decode 稠密计算 | MMVQ wave/packed 路径，并启用已测有收益的 MMVQ LDS 激活暂存 |
+
+**本次发布的主要新增项**是 MMAC scores 的 LDS 合并装载、IQ2 exact 扩展、FP16 scores 缓冲、K 暂存模板化及 MMVQ LDS 的启用与验证。其余内容从此前版本沿用，构成本版本测试的基础。
+
+部署层面另采用 **IQ3_XXS、24576 专家槽全部驻留、256K INT8 KV 全显存驻留、prefill=30602、MTP spec=4、单槽 FIFO**。多卡通过独立实例分发请求。KV、MTP、会话缓存和 API 服务基于上游能力，这里提供 K100AI 的配置与验证记录；默认关闭会话缓存以复现冷 prefill。
+
+[完整优化清单](docs/OPTIMIZATIONS.md)逐项说明实现位置、启用方式和测试范围。未启用的实验路径、否定结果及后续研究构建不计入上述清单；单项收益不能相加作为累计加速比。
 
 ## 实测性能
 
