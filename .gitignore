@@ -10,3 +10,6 @@ __pycache__/
 *.log
 *.tar.gz
 .env
+
+/data/
+/.strata-api-key

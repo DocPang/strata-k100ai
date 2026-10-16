@@ -1,6 +1,6 @@
 # 参数参考
 
-当前推荐使用 `profiles/next-iq3xxs-single/strata.json`；IQ3_S 列为历史参考。编辑 `args` 中的参数及对应值后，停止并重建目标容器。优化环境通过 `engines/strata/xxs-exact-sel/environment.env` 传入；配置文件的 `env` 可覆盖指定变量。
+当前推荐使用 `profiles/next-iq3xxs-single/strata.json`；IQ3_S 列为历史参考。编辑 `args` 中的参数及对应值后，停止并重建目标容器。优化环境通过 `engines/strata/xxs-20261016/environment.env` 传入；配置文件的 `env` 可覆盖指定变量。
 
 ## 模型与设备
 
@@ -23,7 +23,7 @@
 | 参数 | IQ3_S | IQ3_XXS | 说明 |
 | --- | ---: | ---: | --- |
 | --expert-cache | 24576 | 24576 | 全部专家槽；减少会影响驻留和搬运 |
-| --prefill | 20480 | 20480 | prefill 分块上限，与临时工作区和 TTFT 有关 |
+| --prefill | 20480 | 30602 | prefill 分块上限，与临时工作区和 TTFT 有关 |
 | --max-context | 262144 | 262144 | 会话总上下文容量 |
 | --kv | int8 | int8 | KV 存储格式 |
 | --kv-resident | 32768（历史） | 省略 | KV 显存缓存容量；0 为完整驻留，c4 的非零有效下限为 20480 |
@@ -37,7 +37,7 @@
 
 | 参数 | IQ3_S | IQ3_XXS | 说明 |
 | --- | ---: | ---: | --- |
-| --spec | 4 | 6 | 草稿长度；需联合接受率和窗口成本评估 |
+| --spec | 4 | 4 | 草稿长度；需联合接受率和窗口成本评估 |
 | --spec-min-p | 0.70 | 0.70 | 草稿概率阈值 |
 
 更长草稿会增加草稿计算、验证窗口及相关状态。接受率较低时可能降低吞吐，不能仅按 spec 数值估算速度。独立 MTP 权重和 runtime 必须与配置共同准备。
@@ -46,9 +46,9 @@
 
 | 参数 | 默认 | 说明 |
 | --- | ---: | --- |
-| --prompt-cache | 8 | prompt 缓存配置 |
+| --prompt-cache | 0 | prompt 缓存配置 |
 | --prompt-cache-every | 16384 | prompt 缓存间隔 |
-| --conversation-cache-mib | 16384 | 宿主会话缓存预算，MiB |
+| --conversation-cache-mib | 0 | 宿主会话缓存预算，MiB |
 | --conversation-cache-slots | 4 | 会话缓存条目数 |
 | --conversation-cache-min-free-mib | 8192 | 会话缓存保留的主存余量阈值 |
 
@@ -61,10 +61,10 @@ XXS 使用新引擎环境文件，IQ3_S 历史配方使用 c4 环境。新增推
 | 变量 | 设置与作用 |
 | --- | --- |
 | STRATA_PF_FUSED | 1，启用 fused native 路径 |
-| STRATA_PF_FUSED_NATIVE_EXACT_SKIP | 1，29 层保持 exact，19 层 IQ2 走 fused |
-| STRATA_SEL_BATCH | 1024，selection 的 query 批次；不是 decoder 会话 batch |
+| STRATA_PF_FUSED_NATIVE_EXACT_SKIP | 1，保留已支持的 exact 路径；本版通过 GATEUP_EXACT_IQ2 扩展到全部 48 层 |
+| STRATA_SEL_BATCH | 不显式设置，使用引擎按缓冲尺寸选择的默认值；不是会话 batch |
 
-XXS exact+fused 基准引擎（`ad743dbf9cc1`）不识别 SEL_BATCH，本版发布的回移植引擎同时支持上述变量。其他环境参数与该基准引擎相同：
+本版在基础优化环境上启用 SCORES_MMAC=2、SCORES_MMAC_LDS=1、SCORES_MMAC_NB=1、SEL_SCORES_FP16=1、GATEUP_EXACT_IQ2=1 和 MMVQ_WV2_LDS=1。`STRATA_SEL_BATCH` 不覆盖。完整环境文件位于 `engines/strata/xxs-20261016/environment.env`。其他主要变量如下：
 
 | 范围 | 主要变量 |
 | --- | --- |

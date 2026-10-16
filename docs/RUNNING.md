@@ -1,5 +1,7 @@
 # 运行与调试
 
+完整的下载、转换和启动步骤见[首页](../README.md#安装与运行)。本节的 `/srv` 路径是独立示例，使用前应按实际目录替换。
+
 推荐实例使用 IQ3_XXS、全 KV 显存驻留、全部专家常驻和单槽 FIFO。先按 [INSTALL.md](INSTALL.md) 取得 DTK 镜像、权重和运行文件。
 
 ## 原生服务
@@ -17,11 +19,11 @@ docker run --rm -it --name strata-iq3xxs \
   --security-opt seccomp=unconfined \
   --tmpfs /var/log/hylog:rw,nosuid,nodev,mode=0755 \
   --publish 127.0.0.1:18640:8080 --env STRATA_API_KEY \
-  --env-file "$PWD/engines/strata/xxs-exact-sel/environment.env" \
+  --env-file "$PWD/engines/strata/xxs-20261016/environment.env" \
   --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
   --mount type=bind,src=/srv/models/next-iq3xxs/IQ3_XXS,dst=/models,readonly \
   --mount type=bind,src=/srv/packs/next-iq3xxs,dst=/pack,readonly \
-  --mount type=bind,src=/srv/mtp-runtime,dst=/mtp,readonly \
+  --mount type=bind,src=/srv/mtp-work/runtime,dst=/mtp,readonly \
   --mount type=bind,src=/opt/hyhal,dst=/opt/hyhal,readonly \
   --mount "type=bind,src=$PWD/profiles/next-iq3xxs-single/strata.json,dst=/config/strata.json,readonly" \
   --workdir /opt/k100ai/app --entrypoint python3 \
@@ -61,9 +63,9 @@ docker rm strata-iq3xxs
 
 默认不传 `--kv-resident`、`--batch`、`--batch-mtp`。如需恢复 KV streaming 对照，可显式添加 `--kv-resident 32768`；它是容量回退选项，不是 64 GiB XXS 的默认配置。
 
-`STRATA_SEL_BATCH=1024` 调整 QSA selection 并行度，不增加会话并发。设为 256 可使用与 XXS 基准引擎相同的 selection 批次。三处工作区记账和实际批次必须一致，不能仅用旧二进制设置该变量。
+本版不设置 `STRATA_SEL_BATCH` 覆盖值，使用引擎默认分档。它控制 selection 的 query 批次，不增加会话并发。关键优化变量及作用见 [OPTIMIZATIONS.md](OPTIMIZATIONS.md)。
 
-prefill 工作区受限时将 `--prefill 20480` 降至 8192。最大上下文保留 262144；此版本不提供 1M 外推配置。容量和性能条件见 [MEMORY.md](MEMORY.md) 与 [BENCHMARKS.md](BENCHMARKS.md)。
+prefill 工作区受限时将 `--prefill 30602` 先降至 20480，再降至 16384。最大上下文为 262144；本版不提供 1M 外推配置。默认关闭 prompt/conversation cache，开启缓存后需重新检查主机内存和延迟。容量和成绩条件见 [MEMORY.md](MEMORY.md) 与 [BENCHMARKS.md](BENCHMARKS.md)。
 
 ## 多卡并发
 
@@ -83,11 +85,11 @@ docker run --rm -it --name strata-iq3xxs-engine \
   --ulimit memlock=-1:-1 --shm-size=2g \
   --security-opt seccomp=unconfined \
   --tmpfs /var/log/hylog:rw,nosuid,nodev,mode=0755 \
-  --env-file "$PWD/engines/strata/xxs-exact-sel/environment.env" \
+  --env-file "$PWD/engines/strata/xxs-20261016/environment.env" \
   --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
   --mount type=bind,src=/srv/models/next-iq3xxs/IQ3_XXS,dst=/models,readonly \
   --mount type=bind,src=/srv/packs/next-iq3xxs,dst=/pack,readonly \
-  --mount type=bind,src=/srv/mtp-runtime,dst=/mtp,readonly \
+  --mount type=bind,src=/srv/mtp-work/runtime,dst=/mtp,readonly \
   --mount type=bind,src=/opt/hyhal,dst=/opt/hyhal,readonly \
   --mount "type=bind,src=$PWD/prompt.ids,dst=/input/prompt.ids,readonly" \
   --workdir /opt/k100ai/app --entrypoint /opt/k100ai/bin/strata \
@@ -97,9 +99,9 @@ docker run --rm -it --name strata-iq3xxs-engine \
   --ple-gguf /models/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf \
   --ple-io mmap --mmap-experts \
   --expert-cache 24576 --expert-profile /opt/k100ai/app/data/expert-profile.bin \
-  --vram-reserve-mib 2048 --prefill 20480 \
+  --vram-reserve-mib 2048 --prefill 30602 \
   --max-context 262144 --kv int8 \
-  --mtp /mtp --spec 6 --spec-min-p 0.70 --pool-workers 12 \
+  --mtp /mtp --spec 4 --spec-min-p 0.70 --pool-workers 12 \
   --eos-ids 248046 --no-prefill-borrow \
   --tokens-file /input/prompt.ids --max-new 128
 ```

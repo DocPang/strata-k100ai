@@ -17,9 +17,9 @@
     "--vram-reserve-mib",
     "2048",
     "--prefill",
-    "20480",
+    "30602",
     "--spec",
-    "6",
+    "4",
     "--spec-min-p",
     "0.70",
     "--max-context",
@@ -35,9 +35,9 @@
     "--mtp",
     "${MTP_RUNTIME}",
     "--prompt-cache",
-    "8",
+    "0",
     "--conversation-cache-mib",
-    "16384",
+    "0",
     "--no-prefill-borrow",
     "--conversation-cache-slots",
     "4",
@@ -75,9 +75,14 @@
     "STRATA_KV_PREFETCH": "1",
     "STRATA_PF_FUSED": "1",
     "STRATA_PF_FUSED_NATIVE_EXACT_SKIP": "1",
-    "STRATA_SEL_BATCH": "1024"
+    "STRATA_SCORES_MMAC": "2",
+    "STRATA_SCORES_MMAC_LDS": "1",
+    "STRATA_SCORES_MMAC_NB": "1",
+    "STRATA_SEL_SCORES_FP16": "1",
+    "STRATA_GATEUP_EXACT_IQ2": "1",
+    "STRATA_MMVQ_WV2_LDS": "1"
   },
-  "notes": "IQ3_XXS, 256K full-resident INT8 KV, all experts resident, single-slot FIFO; SEL_BATCH=1024 is an explicit override with workload-dependent benefit.",
+  "notes": "Frozen d87a4678 engine; IQ3_XXS; 256K full-resident INT8 KV; 24576 expert slots; single-slot FIFO; 30602 prefill and spec=4. No manual SEL_BATCH override.",
   "topology": "single",
-  "engine": "strata/xxs-exact-sel"
+  "engine": "strata/xxs-20261016"
 }

@@ -1,0 +1,12 @@
+{
+  "engine_sha256": "d87a4678a21b3c482658e53e6e766f7e54c2033853e6367bbf39e8e088ca4d6b",
+  "derived_image_build": true,
+  "dynamic_libraries": true,
+  "engine_and_conversion_tool_help": true,
+  "raw_native_lazy_service": true,
+  "gpu_devices_mapped": false,
+  "gpu_inference_executed": false,
+  "network_packages_installed": false,
+  "local_checks": 15,
+  "source_patch_replayed_files": 316
+}

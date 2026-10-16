@@ -1,16 +1,19 @@
 # 源码恢复与构建
 
-rc.4 发布引擎（`5d87f09e07bb`）在 XXS exact+fused 基准引擎（`ad743dbf9cc1`）上增加 selection-batch 参数及配套显存记账，实际产物身份见 [新引擎记录](../engines/strata/xxs-exact-sel/build-record.json)。先按下述步骤恢复 c4 源码，再应用附加补丁：
+v0.1.0-rc.5 直接分发已测的 `d87a4678a21b` 冻结二进制。源码恢复与日常安装是两条独立流程，运行包使用者不需要自行编译。
+
+先按下文恢复 c4 源码，再应用本版附加补丁：
 
 ```bash
-git -C prepared/strata apply /absolute/path/strata-k100ai/engines/strata/xxs-exact-sel/patches/c4-to-exact-sel.patch
+git -C prepared/strata apply --check /absolute/path/strata-k100ai/engines/strata/xxs-20261016/patches/c4-to-xxs-20261016.patch
+git -C prepared/strata apply /absolute/path/strata-k100ai/engines/strata/xxs-20261016/patches/c4-to-xxs-20261016.patch
 ```
 
-附加补丁仅修改 `src/prefill/prefill.cpp`，已验证输出与此次编译输入一致。实际发布二进制使用 XXS 基准引擎（`ad743dbf9cc1`）的静态对象和新 prefill 对象完成增量链接；下面的全量构建仍需另行完成和验收。
+补丁恢复 10 个变更文件，依据保留的源码和后续改动前备份，逐文件摘要见 [恢复清单](../engines/strata/xxs-20261016/source-recovery.json)。历史构建继承了已有静态对象；完整干净编译、全部对象来源与重新构建产物的 GPU 等价性尚未完成。因此，源码恢复成功不等于可重现发布二进制。
 
 # c4 基础源码恢复
 
-**当前运行包使用冻结的历史 c4 二进制。下面的源码恢复已验证；完整干净编译、链接和新产物 GPU 等价验证尚未完成。** 历史构建曾复用旧目标文件，不能用旧增量构建脚本证明别人能够全量重建。
+**以下是 c4 基础源码的恢复与构建步骤；当前 XXS 版本还需应用上文的附加补丁。完整干净编译、链接和新产物 GPU 等价验证尚未完成。** 历史构建曾复用旧目标文件，不能用旧增量构建脚本证明别人能够全量重建。
 
 ## 固定输入
 

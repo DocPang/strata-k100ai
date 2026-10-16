@@ -20,7 +20,7 @@ BASE_IMAGE=harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18ef
 mkdir -p /srv/packs
 
 docker run --rm --network none \
-  --env-file "$PWD/engines/strata/xxs-exact-sel/environment.env" \
+  --env-file "$PWD/engines/strata/xxs-20261016/environment.env" \
   --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
   --mount type=bind,src=/srv/models/next-iq3xxs/IQ3_XXS,dst=/models,readonly \
   --mount type=bind,src=/srv/packs,dst=/out \
@@ -40,14 +40,14 @@ docker run --rm --network none \
 mkdir -p /srv/mtp-work
 
 docker run --rm -e STRATA_SOURCE=modelscope \
-  --env-file "$PWD/engines/strata/xxs-exact-sel/environment.env" \
+  --env-file "$PWD/engines/strata/xxs-20261016/environment.env" \
   --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
   --mount type=bind,src=/srv/mtp-work,dst=/out \
   --workdir /opt/k100ai/app --entrypoint python3 \
   "$BASE_IMAGE" tools/mtp_fetch.py fetch --out /out/bf16
 ```
 
-保留同样的挂载和环境，依次替换命令部分：
+完整的四条 Docker 命令见[首页 MTP 步骤](../README.md#7-从魔塔准备-mtp-草稿模型)。以下为相同挂载下的容器内命令：
 
 ```bash
 python3 tools/mtp_fetch.py verify --out /out/bf16
@@ -59,7 +59,7 @@ python3 tools/mtp_rt.py --gguf /out/mtp-q2_0.gguf --out /out/runtime
 
 ## 格式与质量
 
-新引擎保留 29 层 exact gate/up，将 19 层 IQ2_XS/IQ2_XXS 交给 fused native int8。Q2_0 与 IQ4_NL down 沿用已有路径，精度政策保持XXS exact+fused 基准引擎（`ad743dbf9cc1`）状态。
+本版增加 IQ2_XS/IQ2_XXS 的 exact gate/up 路径，使该 XXS 权重的 48 层 gate/up 全部具备 exact 路径。selection 分数使用 FP16 缓冲，已测输出对照范围见 [BENCHMARKS.md](BENCHMARKS.md)。该策略不等于恢复量化前权重精度。
 
 下载入口见 [魔塔模型仓库](https://modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/files)，完整直链与断点续传见 [INSTALL.md](INSTALL.md)。MTP 由 [魔塔 Qwen 官方模型](https://modelscope.cn/models/Qwen/Qwen3.8-Flash-Next/files)按需提取。
 

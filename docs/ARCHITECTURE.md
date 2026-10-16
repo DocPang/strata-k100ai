@@ -1,7 +1,7 @@
 # 项目结构
 
 ```text
-engines/strata/xxs-exact-sel/       当前引擎、环境、源码增量与构建记录
+engines/strata/xxs-20261016/       当前引擎、环境、源码增量与构建记录
 engines/strata/c4/                 历史基线和基础源码恢复配方
 profiles/next-iq3s-single/          IQ3_S 历史配置
 profiles/next-iq3xxs-single/        IQ3_XXS 单卡配置
@@ -19,11 +19,11 @@ docs/                             部署、参数、容量规划与验证记录
 - `settings.json`：辅助入口的容量与 MTP 参数覆盖。
 - `deployment.env.example`：辅助入口的宿主路径和设备模板。
 
-推荐 XXS 原生部署的环境来自 `engines/strata/xxs-exact-sel/environment.env`。原生配置与辅助配置独立读取，修改其中一种不会自动更新另一种。
+推荐 XXS 原生部署的环境来自 `engines/strata/xxs-20261016/environment.env`。原生配置与辅助配置独立读取，修改其中一种不会自动更新另一种。
 
 ## 版本管理
 
-项目标签固定部署文件与配置组合；`strata/c4` 固定二进制身份和源码恢复配方；模型以独立来源和文件校验值固定。历史 Release 资产保留原始内容。
+项目标签固定部署文件与配置组合；当前 `strata/xxs-20261016` 和历史 `strata/c4` 分别固定各自二进制身份、校验和源码恢复记录；模型以独立来源和文件校验值固定。历史 Release 资产保留原始内容。
 
 新增量化配置需记录模型来源、pack、格式覆盖、数值策略和运行验证。复用引擎不意味着内核命中比例或性能相同。
 

@@ -1,102 +1,275 @@
 # Strata for K100AI
 
-面向海光 K100AI（gfx928、64 GiB 显存）的 Qwen3.8-Flash-Next 推理优化。当前预发布版本 **v0.1.0-rc.4** 提供 **IQ3_XXS、exact+fused 引擎、256K 全 KV 显存驻留、单槽 FIFO**，多卡并发使用独立实例和网关分发。
+面向海光 K100AI（gfx928、64 GiB 显存）的 **Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS** 推理优化与部署配置。
 
-本版为预发布版本，提供部署配置、运行程序和使用文档。发布附件中的引擎（SHA-256 前缀 `5d87f09e07bb`）已完成增量编译与打包检查，尚未完成该二进制的独立 GPU 质量与性能测试。
+当前版本为 **[v0.1.0-rc.5](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.5)**，分发 2026-10-16 已完成分档性能测试的固定引擎。引擎 SHA-256 为 `d87a4678a21b3c482658e53e6e766f7e54c2033853e6367bbf39e8e088ca4d6b`。后续平台修复和 16 位 topk 实验构建未纳入本版本。
 
-[参考成绩](docs/BENCHMARKS.md) 分别列出已测试的 XXS exact+fused 基准引擎（`ad743dbf9cc1`）和 2026-10-16 长上下文实验引擎（`ecd44f1c900c`）的结果。两者均不同于发布附件中的二进制；实验引擎的全部优化尚未纳入本运行包。
+运行包约 8.5 MiB，包含推理程序、HTTP 服务与模型转换工具；基础镜像、驱动和模型权重单独准备。支持直接复用本机 DTK 镜像，也可将运行包加入基础镜像生成本地派生镜像。
 
-## 下载
+## 本版本优化
 
-| 文件 / 环境 | 国内来源或下载地址 |
+| 优化项 | 实现与作用 |
 | --- | --- |
-| DTK 基础镜像 | [海光国内镜像仓库](https://harbor.sourcefind.cn:5443/)；下方提供固定摘要的 pull 命令 |
-| IQ3_XXS 权重 | [魔塔模型仓库](https://modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/files) |
-| GGUF 分片 1 | [魔塔直链，约 47.04 GB](https://modelscope.cn/api/v1/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/repo?Revision=master&FilePath=IQ3_XXS%2FQwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf) |
-| GGUF 分片 2 | [魔塔直链，约 28.80 GB](https://modelscope.cn/api/v1/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/repo?Revision=master&FilePath=IQ3_XXS%2FQwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf) |
-| MTP 来源 | [魔塔 Qwen 官方模型](https://modelscope.cn/models/Qwen/Qwen3.8-Flash-Next/files)，按需提取方法见 [模型准备](docs/MODELS.md) |
-| 优化运行包与部署文件 | [GitHub Release](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.4) |
+| QSA scores 矩阵计算 | 使用 gfx928 MMAC；通过 LDS 合并装载 query/key，降低零散访存成本 |
+| IQ2 专家计算 | 增加 IQ2_XS、IQ2_XXS exact 展开与 MMAC 路径，使该 XXS 权重的 48 层 gate/up 全部具备 exact 路径 |
+| FP16 scores 缓冲 | 将 selection 中间分数缓冲从 4 字节缩为 2 字节，减少显存占用和 topk 读取量；该步骤会改变中间分数精度，输出一致性范围见成绩说明 |
+| Attention K 暂存 | 合并读取 K 数据，并将暂存路径模板化，降低寄存器开销 |
+| Decode 稠密计算 | 启用已验证有收益的 MMVQ LDS 路径 |
+| 单卡资源配置 | 全部专家和 256K INT8 KV 驻留显存；单槽 FIFO；多卡通过独立实例分发请求 |
 
-DTK 镜像的已核验来源为海光国内仓库，权重由魔塔分发。两者是独立资源；未提供未经验证的魔塔 DTK 镜像副本。运行包约 8.1 MiB，不含驱动和模型。
+## 实测性能
+
+环境：K100AI 单卡、IQ3_XXS、最大上下文 262144、INT8 KV 全显存驻留、expert-cache=24576、prefill=30602、spec=4。每个测试臂运行两次完整 prefill，并在同一批次运行前后参考配置。会话缓存关闭。
+
+| 输入档位 | 实际输入 token | 优化配置平均耗时 | 有效吞吐 | 相对同批参考配置的耗时下降 |
+| --- | ---: | ---: | ---: | ---: |
+| 32K | 30603 | **15.71 秒** | **1948 tok/s** | 约 11.5% |
+| 128K | 126857 | **70.83 秒** | **1791 tok/s** | 约 17.8% |
+| 250K | 249986 | **146.79 秒** | **1703 tok/s** | 约 23.3% |
+
+250K 第二批复测平均为 **146.86 秒**。同一输入改用 prefill=20480 时平均为 **149.75 秒**。这些数字均来自本版本分发的二进制；它们不是不同长度历史请求间的加速比。
+
+Decode 的独立对照使用 32K 输入、128-token 生成：启用 MMVQ LDS 后，窗口平均耗时由 41.98 ms 降为 41.04 ms（约 −2.2%）；四个优化样本的生成速率为 77.33、81.94、77.65、82.23 tok/s。提示内容和草稿接受率影响生成速度，不将最高样本作为通用吞吐保证。
+
+250K 的已测对照输出 SHA 一致。短输入记录存在一个 EOS 后 token 差异；已有结果不构成所有提示或不同量化权重的输出等价证明。多任务质量、长时间稳定性和干净源码重建尚未完成。详见 [成绩与原始汇总](docs/BENCHMARKS.md)、[发布验证](docs/VALIDATION.md)。
+
+## 安装与运行
+
+以下步骤在 **Linux x86_64 算力服务器**执行，采用原生 Docker 命令。按顺序在同一个 Bash 会话中执行；换终端后需重新设置 `PROJECT_DIR`、`DATA_DIR`、`BASE_IMAGE` 和 API key。
+
+### 1. 检查基础环境
+
+宿主机应已安装 Docker Engine、与 K100AI 匹配的驱动和 HyHAL。需要 `git`、`curl`、`openssl`、`tar`、`sha256sum`；Ubuntu 缺少这些工具时可安装：
 
 ```bash
-BASE_IMAGE=harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68
+sudo apt-get update
+sudo apt-get install -y git curl openssl tar coreutils
+
+docker info
+ls -l /dev/kfd /dev/dri/renderD*
+ls -ld /opt/hyhal /opt/hyhal/lib
+df -h .
+free -h
+```
+
+两个 GGUF 分片合计约 75.84 GB；生成专家 pack 还需约 40 GiB，以及 MTP 和转换中间文件的空间。建议为整个工作目录预留至少 200 GiB 可用磁盘；转换与运行还需要充足的主机内存。若数据盘位于其他路径，下一步将 `DATA_DIR` 改到该盘。
+
+### 2. 获取本版本部署文件并建立目录
+
+```bash
+mkdir -p "$HOME/strata-deploy"
+cd "$HOME/strata-deploy"
+git clone --depth 1 --branch v0.1.0-rc.5 \
+  https://github.com/DocPang/strata-k100ai.git strata-k100ai-rc5
+cd strata-k100ai-rc5
+
+export PROJECT_DIR="$PWD"
+export DATA_DIR="$PROJECT_DIR/data"
+mkdir -p "$DATA_DIR/models/IQ3_XXS" "$DATA_DIR/packs" "$DATA_DIR/mtp"
+```
+
+也可从 [Release](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.5) 下载 `deployment-v0.1.0-rc.5.tar.gz` 解压，进入解压目录后设置上述两个变量。
+
+### 3. 准备国内 DTK 基础镜像
+
+```bash
+export BASE_IMAGE=harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68
 docker pull "$BASE_IMAGE"
 ```
 
-本地已有相同内容的镜像时可使用本地 tag。权重下载命令、SHA-256、离线准备见 [下载与环境](docs/INSTALL.md)。
-
-## 推荐配置
-
-| 项目 | 设置 |
-| --- | --- |
-| 权重 / pack | IQ3_XXS；独立生成对应 native pack |
-| --expert-cache | 24576，全部专家驻留 |
-| --max-context | 262144 |
-| --kv | int8 |
-| --kv-resident | 省略，完整 KV 驻留显存 |
-| --prefill | 20480 |
-| --spec / --spec-min-p | 6 / 0.70 |
-| --vram-reserve-mib | 2048 |
-| --batch / --batch-mtp | 均省略，单槽 FIFO |
-| STRATA_PF_FUSED | 1 |
-| STRATA_PF_FUSED_NATIVE_EXACT_SKIP | 1，29 层保持 exact，19 层 IQ2 走 fused |
-| STRATA_SEL_BATCH | 1024，QSA selection 参数；不增加会话槽 |
-
-发布配置显式设置 `SEL_BATCH=1024`。其已测收益来自另一个引擎的 128K 实验；收益随上下文和显存布局变化，不作为所有 256K 请求的速度保证。适用条件见 [参考成绩](docs/BENCHMARKS.md)。
-
-## 原生启动
-
-下载发布文件并解压运行包，校验后会得到 `runtime/`：
+如果本机已经有相同内容的镜像，可直接指定本地名称：
 
 ```bash
-curl -fL --retry 3 -o strata-xxs-exact-sel-linux-amd64.tar.gz \
-  https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.4/strata-xxs-exact-sel-linux-amd64.tar.gz
-sha256sum -c engines/strata/xxs-exact-sel/artifact.sha256
-tar -xzf strata-xxs-exact-sel-linux-amd64.tar.gz
+# 将下面的名称替换为本机已有的 DTK 镜像标签。
+export BASE_IMAGE=my-local-dtk:2604
+docker image inspect "$BASE_IMAGE" --format '{{.Id}}'
+```
+
+以上为两种选择，使用本地镜像时才执行第二段。经过验证的镜像配置 ID 为 `sha256:caeff0e9e6efef918a31359c4764b18bf2d428f2b76e3580c788f4cc8b0e93ad`。镜像来自海光国内仓库；下述模型权重和 MTP 从魔塔下载。
+
+### 4. 下载并校验优化运行包
+
+```bash
+cd "$PROJECT_DIR"
+curl -fL --retry 3 -o strata-xxs-20261016-linux-amd64.tar.gz \
+  https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.5/strata-xxs-20261016-linux-amd64.tar.gz
+sha256sum -c engines/strata/xxs-20261016/artifact.sha256
+tar -xzf strata-xxs-20261016-linux-amd64.tar.gz
 (cd runtime && sha256sum -c FILES.sha256)
+sha256sum runtime/bin/strata
+```
 
-RENDER_DEVICE=/dev/dri/renderD128
+最后一条应显示本页开头的 `d87a4678a21b…` 完整摘要。所有校验通过后再继续。
+
+### 5. 从魔塔下载两个 IQ3_XXS 权重分片
+
+模型页面：[ISTA-DASLab / Qwen3.8-Flash-Next-GSQ-RCO-GGUF](https://modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/files)。以下命令支持断点续传，下载中断后可重新执行同一条命令。
+
+```bash
+curl -fL --retry 5 -C - \
+  -o "$DATA_DIR/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf" \
+  'https://modelscope.cn/api/v1/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/repo?Revision=master&FilePath=IQ3_XXS%2FQwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf'
+
+curl -fL --retry 5 -C - \
+  -o "$DATA_DIR/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf" \
+  'https://modelscope.cn/api/v1/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/repo?Revision=master&FilePath=IQ3_XXS%2FQwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf'
+
+(cd "$DATA_DIR/models/IQ3_XXS" && \
+  sha256sum -c "$PROJECT_DIR/profiles/next-iq3xxs-single/weights.sha256")
+```
+
+两分片必须在同一目录，文件名保持不变。校验表固定了本版本测试使用的文件；魔塔仓库后续更新导致校验失败时，应先确认文件版本。
+
+### 6. 生成与权重匹配的 native pack
+
+转换在 DTK 容器中执行，不需要宿主 Python，也不需要 GPU。此步骤从权重生成索引、专家数据及 tokenizer，不能直接复用 IQ3_S 的 pack。
+
+```bash
+docker run --rm --network none \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016/environment.env" \
+  --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
+  --mount "type=bind,src=$DATA_DIR/models/IQ3_XXS,dst=/models,readonly" \
+  --mount "type=bind,src=$DATA_DIR/packs,dst=/out" \
+  --workdir /opt/k100ai/app --entrypoint python3 \
+  "$BASE_IMAGE" tools/iq_pack.py \
+  --gguf /models/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf \
+  --out /out/next-iq3xxs --experts-bin
+
+ls -lh "$DATA_DIR/packs/next-iq3xxs"
+test -f "$DATA_DIR/packs/next-iq3xxs/native_experts.txt"
+test -d "$DATA_DIR/packs/next-iq3xxs/tokenizer"
+```
+
+`native_experts.txt` 在转换完成时写入。目录不完整或转换退出非零时，不继续启动服务。
+
+### 7. 从魔塔准备 MTP 草稿模型
+
+MTP 来源：[Qwen / Qwen3.8-Flash-Next](https://modelscope.cn/models/Qwen/Qwen3.8-Flash-Next/files)。提供的工具通过 HTTP Range 只下载所需 MTP 张量，无需下载整个 BF16 主模型。以下四条 Docker 命令依次执行。
+
+下载所需张量：
+
+```bash
+docker run --rm --env STRATA_SOURCE=modelscope \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016/environment.env" \
+  --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
+  --mount "type=bind,src=$DATA_DIR/mtp,dst=/out" \
+  --workdir /opt/k100ai/app --entrypoint python3 \
+  "$BASE_IMAGE" tools/mtp_fetch.py fetch --out /out/bf16
+```
+
+验证张量的固定 SHA-256：
+
+```bash
+docker run --rm --network none \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016/environment.env" \
+  --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
+  --mount "type=bind,src=$DATA_DIR/mtp,dst=/out" \
+  --workdir /opt/k100ai/app --entrypoint python3 \
+  "$BASE_IMAGE" tools/mtp_fetch.py verify --out /out/bf16
+```
+
+将 MTP 专家打包为 Q2_0：
+
+```bash
+docker run --rm --network none \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016/environment.env" \
+  --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
+  --mount "type=bind,src=$DATA_DIR/mtp,dst=/out" \
+  --workdir /opt/k100ai/app --entrypoint python3 \
+  "$BASE_IMAGE" tools/mtp_pack.py --src /out/bf16 --experts q2_0 --out /out/mtp-q2_0.gguf
+```
+
+转换为推理引擎使用的 MTP runtime：
+
+```bash
+docker run --rm --network none \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016/environment.env" \
+  --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
+  --mount "type=bind,src=$DATA_DIR/mtp,dst=/out" \
+  --workdir /opt/k100ai/app --entrypoint python3 \
+  "$BASE_IMAGE" tools/mtp_rt.py --gguf /out/mtp-q2_0.gguf --out /out/runtime
+
+ls -lh "$DATA_DIR/mtp/runtime"
+```
+
+若网络代理不支持 Range，下载工具会报错并停止；应更换可正确返回分段内容的网络路径，不能跳过张量校验。已有与上述流程匹配的 MTP runtime 时，可复用该目录。
+
+### 8. 选择显卡并准备 API key
+
+```bash
+ls -l /dev/dri/by-path/
+ls -l /dev/dri/renderD*
+
+# 根据 PCI 地址与供应方设备工具确认目标卡，并检查是否已有任务占用。
+export RENDER_DEVICE=/dev/dri/renderD128
 export STRATA_API_KEY="$(openssl rand -hex 24)"
+(umask 077; printf '%s\n' "$STRATA_API_KEY" > "$PROJECT_DIR/.strata-api-key")
+```
 
-docker run --rm -it --name strata-iq3xxs \
+只映射目标 render 节点，并保留宿主与容器中的相同路径。容器内部使用 `HIP_VISIBLE_DEVICES=0` 和 `ROCR_VISIBLE_DEVICES=0`。`renderD128` 是示例，不能据此假定所有服务器的设备编号相同。
+
+### 9. 启动原生 Strata HTTP 服务
+
+```bash
+docker run --detach --name strata-next-iq3xxs \
   --device /dev/kfd:/dev/kfd --device "$RENDER_DEVICE:$RENDER_DEVICE" \
   --ulimit memlock=-1:-1 --shm-size=2g \
   --security-opt seccomp=unconfined \
   --tmpfs /var/log/hylog:rw,nosuid,nodev,mode=0755 \
   --publish 127.0.0.1:18640:8080 --env STRATA_API_KEY \
-  --env-file "$PWD/engines/strata/xxs-exact-sel/environment.env" \
-  --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
-  --mount type=bind,src=/srv/models/next-iq3xxs/IQ3_XXS,dst=/models,readonly \
-  --mount type=bind,src=/srv/packs/next-iq3xxs,dst=/pack,readonly \
-  --mount type=bind,src=/srv/mtp-runtime,dst=/mtp,readonly \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016/environment.env" \
+  --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
+  --mount "type=bind,src=$DATA_DIR/models/IQ3_XXS,dst=/models,readonly" \
+  --mount "type=bind,src=$DATA_DIR/packs/next-iq3xxs,dst=/pack,readonly" \
+  --mount "type=bind,src=$DATA_DIR/mtp/runtime,dst=/mtp,readonly" \
   --mount type=bind,src=/opt/hyhal,dst=/opt/hyhal,readonly \
-  --mount "type=bind,src=$PWD/profiles/next-iq3xxs-single/strata.json,dst=/config/strata.json,readonly" \
+  --mount "type=bind,src=$PROJECT_DIR/profiles/next-iq3xxs-single/strata.json,dst=/config/strata.json,readonly" \
   --workdir /opt/k100ai/app --entrypoint python3 \
   "$BASE_IMAGE" -m serve.server --engine strata \
   --config /config/strata.json --host 0.0.0.0 --port 8080
 ```
 
-启动前替换模型、pack、MTP 路径，并确认目标卡空闲。服务参数位于原生 `strata.json`，优化环境位于 `environment.env`。选卡、后台运行、日志和直接引擎调用见 [运行与调试](docs/RUNNING.md)。
+初次加载需要读取权重并建立专家缓存。服务仅绑定宿主 `127.0.0.1:18640`；跨机器访问应通过已有网关、反向代理或 SSH 转发接入。配置中的模型标识为 `qwen3.8-flash-next-strata`。
 
-## 参考成绩
+### 10. 检查加载并发送请求
 
-以下为同一张 K100AI 上的历史部署对照，XXS 使用 exact+fused 基准引擎（`ad743dbf9cc1`）：
+```bash
+docker logs --tail 100 strata-next-iq3xxs
+curl --fail http://127.0.0.1:18640/health
 
-| 指标 | IQ3_S | IQ3_XXS + exact/fused |
-| --- | ---: | ---: |
-| 加载显存（32K KV streaming 配置） | 60.71 GiB | 52.46 GiB |
-| Decode，8192 入 / 512 出 | 62.5 tok/s | 60.3 tok/s |
-| Prefill，8192 token | 1388.5 tok/s | 1412.9 tok/s |
-| Prefill，131072 token | 1235.3 tok/s | 1239.9 tok/s |
-| Prefill，261120 token | 745.5 tok/s | 731.7 tok/s |
+# 新终端可从权限受限的本地文件恢复 key。
+export STRATA_API_KEY="$(cat "$PROJECT_DIR/.strata-api-key")"
+curl --fail http://127.0.0.1:18640/v1/models \
+  -H "Authorization: Bearer $STRATA_API_KEY"
 
-XXS 全 KV 驻留历史实验记录为 decode 61.0 tok/s、加载后空闲 8186 MiB。XXS 成绩来自基准引擎（`ad743dbf9cc1`），不代表 rc.4 发布引擎（`5d87f09e07bb`）的独立测试结果。完整成绩、并发对照和正确性范围见 [BENCHMARKS.md](docs/BENCHMARKS.md)。
+curl --fail http://127.0.0.1:18640/v1/chat/completions \
+  -H "Authorization: Bearer $STRATA_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"qwen3.8-flash-next-strata","messages":[{"role":"user","content":"请用一句话介绍你自己。"}],"max_tokens":128,"stream":true}'
+```
 
-## 文档与发布范围
+`/health` 应显示 `loaded=true`。查看引擎日志可执行 `docker exec strata-next-iq3xxs tail -n 100 /tmp/strata-engine.log`。排查步骤、前台启动、停止容器和直接调用 C++ 引擎见 [运行与调试](docs/RUNNING.md)。
 
-[环境准备](docs/INSTALL.md) · [模型准备](docs/MODELS.md) · [参数](docs/PARAMETERS.md) · [显存](docs/MEMORY.md) · [成绩](docs/BENCHMARKS.md) · [源码](docs/SOURCE_BUILD.md) · [验证](docs/VALIDATION.md)
+## 默认参数与调整
 
-新引擎以 XXS exact+fused 基准引擎（`ad743dbf9cc1`）为基础，仅回移植 selection batch 的三处宿主参数/显存记账，编译后的 SHA-256 为 `5d87f09e…`。已完成源码回放和增量编译链接；该二进制的独立 GPU 质量与性能测试尚未完成。IQ3_S/c4 配方作为历史资料保留，TP2 尚未发布。
+| 参数 | 本版本默认值 | 说明 |
+| --- | --- | --- |
+| `--max-context` | 262144 | 原生 256K 上限；输入、历史与输出共同占用上下文 |
+| `--expert-cache` | 24576 | 保持全部专家驻留，避免回退到主机内存影响生成速度 |
+| `--kv` / `--kv-resident` | int8 / 省略 | 完整 KV 驻留显存；不是 32K KV streaming 配置 |
+| `--prefill` | 30602 | 本页三档成绩所用值；显存不足时先降到 20480，再降到 16384 |
+| `--spec` / `--spec-min-p` | 4 / 0.70 | 本页测试使用的 MTP 参数；接受率随提示而变化 |
+| `--vram-reserve-mib` | 2048 | 显存规划预留量；实际峰值仍需看日志与设备工具 |
+| `--batch` / `--batch-mtp` | 省略 | 单槽 FIFO；多卡采用独立实例，不以单卡多槽增加并发 |
+| `--prompt-cache` / `--conversation-cache-mib` | 0 / 0 | 默认关闭以便复现冷 prefill；按业务需要在验证后开启 |
+| `STRATA_SEL_BATCH` | 不设置 | 使用引擎按上下文缓冲尺寸选择的默认值；不沿用旧版 1024 覆盖 |
 
-项目基于 [Strata](https://github.com/Niko1221/Strata) 和 [llama.cpp](https://github.com/ggml-org/llama.cpp)，遵循 [MIT](LICENSE) 并保留[上游许可](engines/strata/LICENSE)。本项目由独立维护者发布。DTK/HyHAL、权重和控制向量遵循各自许可。
+修改原生配置时编辑 `profiles/next-iq3xxs-single/strata.json` 的 `args`；修改优化开关时编辑 `engines/strata/xxs-20261016/environment.env`。停止并删除自己的容器后，重新执行启动命令使参数生效。优先保留全部专家驻留，通过降低 prefill、上下文或关闭额外缓存平衡显存。
+
+需要将运行文件固定到镜像中时，见 [手动构建派生镜像与离线准备](docs/INSTALL.md)。`install.sh`、`start.sh` 和 Compose 保留为可选入口，原生命令不依赖这些脚本。
+
+## 文档与来源
+
+[模型准备](docs/MODELS.md) · [参数参考](docs/PARAMETERS.md) · [显存说明](docs/MEMORY.md) · [完整成绩](docs/BENCHMARKS.md) · [优化说明](docs/OPTIMIZATIONS.md) · [源码恢复](docs/SOURCE_BUILD.md) · [验证范围](docs/VALIDATION.md)
+
+本项目由独立维护者发布，基于 [Strata](https://github.com/Niko1221/Strata) 和 [llama.cpp](https://github.com/ggml-org/llama.cpp)，遵循 [MIT](LICENSE) 并保留[上游许可](engines/strata/LICENSE)。DTK/HyHAL 与模型权重遵循各自许可。

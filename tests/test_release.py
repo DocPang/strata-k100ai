@@ -35,7 +35,7 @@ class ConfigurationTests(unittest.TestCase):
     def test_xxs_keeps_profile_default_spec(self):
         profile = json.loads((ROOT / 'profiles/next-iq3xxs-single/profile.json').read_text())
         config = entrypoint.render(profile, {}, self.env)
-        self.assertEqual(config['args'][config['args'].index('--spec') + 1], '6')
+        self.assertEqual(config['args'][config['args'].index('--spec') + 1], '4')
         config = entrypoint.render(profile, {'spec': 3}, self.env)
         self.assertEqual(config['args'][config['args'].index('--spec') + 1], '3')
 
@@ -114,7 +114,7 @@ esac
         self.assertIn('Unsupported base', result.stderr)
 
     def test_xxs_offline_install_is_available(self):
-        bundle = ROOT / 'local-artifacts/strata-xxs-exact-sel-linux-amd64.tar.gz'
+        bundle = ROOT / 'local-artifacts/strata-xxs-20261016-linux-amd64.tar.gz'
         if not bundle.exists(): self.skipTest('Local release bundle required')
         result = self.run_install('--local-only', '--bundle', str(bundle), '--profile', 'next-iq3xxs-single')
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -128,7 +128,7 @@ esac
         self.assertNotIn('build --', (self.root / 'calls').read_text())
 
     def test_offline_install_contract(self):
-        bundle = ROOT / 'local-artifacts/strata-xxs-exact-sel-linux-amd64.tar.gz'
+        bundle = ROOT / 'local-artifacts/strata-xxs-20261016-linux-amd64.tar.gz'
         if not bundle.exists(): self.skipTest('Release bundle is checked separately on the publishing host')
         result = self.run_install('--local-only', '--bundle', str(bundle))
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -163,7 +163,7 @@ class EnvironmentTests(unittest.TestCase):
 class NativeDeploymentTests(unittest.TestCase):
     def test_native_profiles_and_environment(self):
         for name, quant, draft in [('next-iq3s-single', 'IQ3_S', '4'),
-                                   ('next-iq3xxs-single', 'IQ3_XXS', '6')]:
+                                   ('next-iq3xxs-single', 'IQ3_XXS', '4')]:
             with self.subTest(name=name):
                 native = json.loads((ROOT / 'profiles' / name / 'strata.json').read_text())
                 profile = json.loads((ROOT / 'profiles' / name / 'profile.json').read_text())
@@ -189,12 +189,14 @@ class NativeDeploymentTests(unittest.TestCase):
         result = entrypoint.render(profile, settings, {'SHARD1': 'a.gguf', 'SHARD2': 'b.gguf'})
         for flag in ['--kv-resident', '--batch', '--batch-mtp']:
             self.assertNotIn(flag, result['args'])
-        self.assertEqual(profile['engine'], 'strata/xxs-exact-sel')
+        self.assertEqual(profile['engine'], 'strata/xxs-20261016')
         self.assertEqual(result['env']['STRATA_PF_FUSED'], '1')
         self.assertEqual(result['env']['STRATA_PF_FUSED_NATIVE_EXACT_SKIP'], '1')
-        self.assertEqual(result['env']['STRATA_SEL_BATCH'], '1024')
+        self.assertNotIn('STRATA_SEL_BATCH', result['env'])
+        self.assertEqual(result['env']['STRATA_GATEUP_EXACT_IQ2'], '1')
+        self.assertEqual(result['env']['STRATA_SCORES_MMAC_LDS'], '1')
         args = result['args']
-        for flag, value in [('--expert-cache', '24576'), ('--max-context', '262144'), ('--prefill', '20480'), ('--spec', '6')]:
+        for flag, value in [('--expert-cache', '24576'), ('--max-context', '262144'), ('--prefill', '30602'), ('--spec', '4')]:
             self.assertEqual(args[args.index(flag) + 1], value)
 
     def test_documented_bash_commands_parse(self):

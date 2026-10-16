@@ -1,5 +1,7 @@
 # 环境准备
 
+从权重下载到启动的完整顺序见[首页安装教程](../README.md#安装与运行)。本节补充本地镜像复用、离线传输和手动派生镜像构建。
+
 ## 基础镜像
 
 参考环境为 Linux amd64、Ubuntu 22.04、DTK 2604、Python 3.10：
@@ -16,7 +18,7 @@ BASE_IMAGE=my-local-dtk:2604
 docker image inspect "$BASE_IMAGE" --format '{{.Id}}'
 ```
 
-本版本验证的镜像配置 ID 为：
+本版本使用的固定镜像配置 ID 为：
 
 ```text
 sha256:caeff0e9e6efef918a31359c4764b18bf2d428f2b76e3580c788f4cc8b0e93ad
@@ -29,10 +31,10 @@ sha256:caeff0e9e6efef918a31359c4764b18bf2d428f2b76e3580c788f4cc8b0e93ad
 在项目根目录下载并校验运行包：
 
 ```bash
-curl -fL --retry 3 -o strata-xxs-exact-sel-linux-amd64.tar.gz \
-  https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.4/strata-xxs-exact-sel-linux-amd64.tar.gz
-sha256sum -c engines/strata/xxs-exact-sel/artifact.sha256
-tar -xzf strata-xxs-exact-sel-linux-amd64.tar.gz
+curl -fL --retry 3 -o strata-xxs-20261016-linux-amd64.tar.gz \
+  https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.5/strata-xxs-20261016-linux-amd64.tar.gz
+sha256sum -c engines/strata/xxs-20261016/artifact.sha256
+tar -xzf strata-xxs-20261016-linux-amd64.tar.gz
 (cd runtime && sha256sum -c FILES.sha256)
 ```
 
@@ -100,7 +102,8 @@ cp containers/strata/entrypoint.py "$BUILD_DIR/entrypoint.py"
 docker tag "$BASE_IMAGE" k100ai-base-dtk:2604-caeff0e9
 BUILDX_BUILDER=default docker build --pull=false --network=none \
   --build-arg BASE_IMAGE=k100ai-base-dtk:2604-caeff0e9 \
-  -t k100ai/strata-xxs-exact-sel:v0.1.0-rc.4 "$BUILD_DIR"
+  --build-arg ENGINE_ID=strata/xxs-20261016 \
+  -t k100ai/strata-xxs-20261016:v0.1.0-rc.5 "$BUILD_DIR"
 ```
 
 采用 Docker-backed builder 复用本机镜像。Dockerfile 不执行 apt/pip 安装。仓库保留 `install.sh`、`start.sh` 和 Compose 作为兼容入口；主要运行与调试流程见 [RUNNING.md](RUNNING.md)。

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "engine": "strata/xxs-20261016",
+  "engine_sha256": "d87a4678a21b3c482658e53e6e766f7e54c2033853e6367bbf39e8e088ca4d6b",
+  "engine_bytes": 29129648,
+  "built_at": "2026-10-16T01:51:35+08:00",
+  "binary_kind": "frozen measured historical incremental build",
+  "clean_rebuild_verified": false,
+  "gpu_runtime_validation": "Existing IQ3_XXS prefill A/B/A, repeat and decode records; no new GPU experiments for packaging",
+  "strata_base_commit": "fb58e0dbc8399662c0e47c76578c6e878b14f6cf",
+  "llama_base_commit": "3cf03257f219afbe7334045ff7c6a06ac68c627d",
+  "runtime_files_verified": 174,
+  "runtime_origin": "Unchanged audited c4 Python frontend, conversion tools and auxiliary data",
+  "models_included": false,
+  "vendor_libraries_included": false,
+  "source_snapshot": "Reconstructed from surviving files and pre-change backups; complete clean rebuild and inherited-object provenance not verified",
+  "features": [
+    "SCORES_MMAC_LDS",
+    "GATEUP_EXACT_IQ2",
+    "SEL_SCORES_FP16",
+    "PA_KSTAGE_TEMPLATE",
+    "MMVQ_WV2_LDS"
+  ],
+  "excluded_later_builds": [
+    "115b6acb",
+    "9badc831"
+  ],
+  "artifact": "strata-xxs-20261016-linux-amd64.tar.gz",
+  "artifact_sha256": "42ed5a6ff00d3483641740cd404448f4039ea519e5efceb24aed4b7607f845ce",
+  "artifact_bytes": 8863312
+}

@@ -1,46 +1,16 @@
-# 优化内容与格式覆盖
+# 优化内容
 
-当前引擎在 c4 基础上增加 exact/fused 分派及 selection 参数：29 层保留 exact，19 层 IQ2_XS/IQ2_XXS 走 fused native int8；`STRATA_SEL_BATCH` 同步控制实际批次和两处工作区记账。其余优化沿用XXS exact+fused 基准引擎（`ad743dbf9cc1`）。
+v0.1.0-rc.5 固定使用 `d87a4678a21b` 引擎，针对 Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS 和 gfx928 优化。
 
-c4 累计改动覆盖平台适配、量化计算、MoE 分派、prefill、decode 和工作区管理。源码补丁位于 `engines/strata/c4/replay/patches/`。
+| 优化 | 开关 / 实现 | 已有依据 |
+| --- | --- | --- |
+| MMAC scores 与合并装载 | SCORES_MMAC=2、SCORES_MMAC_LDS=1、SCORES_MMAC_NB=1 | 250K 单项同批整模耗时约 −12.2%；LDS 合并装载是该结果的必要条件 |
+| IQ2_XS / IQ2_XXS exact gate/up | GATEUP_EXACT_IQ2=1 | 补齐 19 层，48 层 gate/up 全部具备 exact 路径；250K 单项整模约 −6.8% |
+| FP16 scores 中间缓冲 | SEL_SCORES_FP16=1 | 250K 单项整模约 −2.3%；改变中间精度，不宣称所有输入逐位等价 |
+| Attention K 暂存模板化 | 编译期分派，PA_KSTAGE 默认开启 | 已有记录中 VGPR 131→119；减少暂存实例的寄存器负担 |
+| MMVQ LDS | MMVQ_WV2_LDS=1 | 指定 decode 负载 A/B/A/B 中，窗口平均耗时约 −2.2% |
+| 显存与调度 | XXS、全专家驻留、256K 全 KV、单槽 FIFO | 避免主机专家访问和额外会话槽挤占显存；多卡使用独立实例 |
 
-## 实现范围
+以上单项收益来自各自同批实验，不应相加得到组合收益。组合实测以 [BENCHMARKS.md](BENCHMARKS.md) 为准。优化服务继续使用 c4 来源的 Python 前端、协议与转换工具；许可和源码恢复见 [SOURCE_BUILD.md](SOURCE_BUILD.md)。
 
-| 范围 | 实现 |
-| --- | --- |
-| gfx928 平台 | HIP 兼容层、wave64、dot4、DTK 编译和链接适配 |
-| ggml / llama.cpp | HIP 通用头、供应商接口及 gfx928 MMQ 配置 |
-| MMVQ | Q6/Q8 packed、Q6 wave packing 与准备路径 |
-| MoE 分派 | 专家布局、resident sort、fused/MMQ 路径调整 |
-| Prefill gate/up | exact 展开、KGU、部分 IQ2_S 专用计算 |
-| Prefill down | down GEMM、Q2_0 staging、IQ4_NL exact preexpand |
-| Dense GEMM | rocBLAS 步长 padding、hipBLASLt 支持 |
-| 工作区 | lazy workspace、条件 scratch、embedding 缓冲复用 |
-| 融合 | SiLU×Mul 与量化融合，减少中间读写 |
-| Decode | GDN head、无用写回消除、HC split、down prefetch |
-| PLE / Attention | prelaunch、lane/cell 与 gfx928 计算路径 |
-| MTP | HIP 分支衔接、独立 runtime、草稿参数配置 |
-
-Strata 补丁包含 21 个修改文件和 4 个新增实现头文件；llama.cpp/ggml 补丁包含 2 个修改文件和 1 个新增配置。源文件回放及构建状态见 [SOURCE_BUILD.md](SOURCE_BUILD.md)。
-
-## 部署调优
-
-INT8 KV、KV streaming、prompt/会话缓存及 MTP 基于上游能力。本项目提供 K100AI 环境下的参数组合与部署记录。prefill 分块、显存预留和专家驻留策略分别管理，容量关系见 [MEMORY.md](MEMORY.md)。
-
-## IQ3_XXS 覆盖
-
-同一发布系列中，IQ3_S 与 IQ3_XXS 的混合量化布局不同：
-
-| 部位 | IQ3_S | IQ3_XXS | c4 适用范围 |
-| --- | --- | --- | --- |
-| gate/up | IQ2_S、IQ3_XXS、IQ3_S、IQ4_XS | 增加 IQ2_XS、IQ2_XXS | 19/48 层使用 fused native int8，29 层保留 exact |
-| down | IQ4_NL 39 层、Q2_0 9 层 | IQ4_NL 18 层、Q2_0 30 层 | 已有两类实现，实际分派仍受形状约束 |
-| 目标输出头 | Q6_K | Q5_K | Q6 packed 优化不直接覆盖 Q5_K 目标头 |
-
-层数为静态类型统计，不代表时间占比。本版包含该分派改动及三处 selection 参数回移植；其他 wv2 实验内核未纳入。
-
-## 数值与性能记录
-
-c4 保留已接受的 FP16 中间结果策略。exact 子路径的性质不代表整套计算位级一致。量化质量差异、实现误差与采样差异应分别评估。
-
-性能比较需固定设备、权重、输入、上下文、缓存和 MTP 接受率条件。组件或 profiler 数据单独记录，整模结果使用无仪器的固定负载测试。本版本不提供跨负载累计加速比。
+本版不包含后续 GDN chunked 平台修复、16 位 topk 或之后的研究构建。`STRATA_SEL_BATCH` 不显式覆盖，沿用引擎按最大上下文缓冲尺寸选择的值。
