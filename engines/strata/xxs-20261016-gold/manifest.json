@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "engine": "strata/xxs-20261016-gold",
+  "engine_sha256": "43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac",
+  "engine_bytes": 29290960,
+  "built_at": "2026-10-16T20:20:24+08:00",
+  "binary_kind": "frozen measured incremental build, deployed to production on 2026-10-16",
+  "clean_rebuild_verified": false,
+  "gpu_runtime_validation": "Live measurements on HCU0 and HCU1 during 2026-10-16; packaging re-verified against the running production engine with a short-prompt decode request and two long-prompt prefill requests (see benchmarks.json)",
+  "parent_build": "strata/xxs-20261016 (d87a4678a21b3c482658e53e6e766f7e54c2033853e6367bbf39e8e088ca4d6b)",
+  "runtime_files_verified": 204,
+  "runtime_origin": "Unchanged audited Python frontend, conversion tools and auxiliary data inherited from strata/xxs-20261016; only bin/strata differs",
+  "models_included": false,
+  "vendor_libraries_included": false,
+  "source_snapshot_included": false,
+  "source_note": "The incremental source changes are not distributed with this package. Do not treat this manifest as proof that the binary can be rebuilt from the published material.",
+  "features": [
+    "GEMM_Y_F16 (qkv, qf, sg, su, sd, z)",
+    "TOPK_H16",
+    "TOPK_REG_MAX=7168",
+    "SCORES_MMAC_NB=2",
+    "Q6_WAVE_PACK_LDS",
+    "MMVQ_WV2_GROUP"
+  ],
+  "changes_from_parent": {
+    "added": [
+      "STRATA_GEMM_Y_F16=qkv|qf|sg|su|sd|z",
+      "STRATA_TOPK_H16=1",
+      "STRATA_TOPK_REG_MAX=7168",
+      "STRATA_Q6_WAVE_PACK_LDS=1",
+      "STRATA_MMVQ_WV2_GROUP=1"
+    ],
+    "changed": [
+      "STRATA_SCORES_MMAC_NB: 1 -> 2"
+    ],
+    "considered_and_rejected": [
+      "STRATA_TOPK_H16_T (topk kernel thread-count scaling): measured +11.96% end-to-end at 250K and +86% in qsa select against a non-regmax baseline, +13.7% against the regmax-only baseline. The key is deliberately left unset and the source keeps the scaled instantiation as a default-off fallback."
+    ]
+  },
+  "artifact": "strata-xxs-20261016-gold-linux-amd64.tar.gz",
+  "artifact_sha256": "241655d69476df9fb4159589bb7399d95daeba190c882544016f16b10d4b3155",
+  "artifact_bytes": 8934284
+}

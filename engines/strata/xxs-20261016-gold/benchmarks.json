@@ -1,0 +1,68 @@
+[
+  {
+    "test": "rc6-packaging-verification",
+    "binary_sha256": "43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac",
+    "status": "PASS",
+    "measured_at": "2026-10-16T23:3x+08:00",
+    "harness": "HTTP /v1/chat/completions against the running production engine on HCU0 (127.0.0.1:18640), temperature=0, model id qwen3.8-flash-next-strata. One client, no concurrency.",
+    "notes": [
+      "Prompt text was generated locally and is not distributed; token counts are the engine-reported usage.prompt_tokens.",
+      "The 65K request ran after the 39K request, so its expert cache was already warm; the two rows are not a controlled A/B.",
+      "Wall time includes the client's own overhead and is not an engine-internal phase measurement."
+    ],
+    "requests": [
+      {
+        "prompt": "generated filler, ~39K tokens",
+        "input_tokens": 38942,
+        "wall_ms": 20376.0,
+        "derived_prefill_tps": 1939.7
+      },
+      {
+        "prompt": "generated filler, ~66K tokens",
+        "input_tokens": 65606,
+        "wall_ms": 25728.4,
+        "derived_prefill_tps": 2580.0
+      }
+    ]
+  },
+  {
+    "test": "rc6-packaging-decode-verification",
+    "binary_sha256": "43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac",
+    "status": "PASS",
+    "measured_at": "2026-10-16T23:3x+08:00",
+    "harness": "Streaming HTTP request, HCU0, temperature=0, max_tokens=300, chat_template_kwargs.enable_thinking toggled.",
+    "requests": [
+      {
+        "thinking": false,
+        "prompt_tokens": 28,
+        "completion_tokens": 113,
+        "ttft_s": 1.06,
+        "wall_s": 3.61,
+        "output_events": 200
+      },
+      {
+        "thinking": true,
+        "prompt_tokens": 68,
+        "completion_tokens": 300,
+        "ttft_s": 0.70,
+        "wall_s": 6.68,
+        "output_events": 480
+      }
+    ]
+  },
+  {
+    "test": "engineering-record-2026-10-16",
+    "binary_sha256": "43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac",
+    "status": "RECORDED",
+    "source": "Optimization worklog for the same binary; reproduced here for reference, not re-measured during packaging.",
+    "notes": [
+      "Measured on the isolated experiment card (HCU5), not on the packaged production engine.",
+      "Reported as an end-to-end prefill wall time with the engine's phase timing enabled."
+    ],
+    "results": [
+      { "tier": "250K context", "prefill_ms": 142119, "prefill_tps": 1759, "output_sha": "08d2c11d70446fe6" },
+      { "tier": "32K context", "prefill_ms": 15597, "prefill_tps": 1962, "output_sha": "84f393bfc11ffe91" },
+      { "tier": "decode (longgen32)", "output_tps": 82, "output_sha": "97e6833014e9deab" }
+    ]
+  }
+]

@@ -1,5 +1,14 @@
 # 更新记录
 
+## v0.1.0-rc.6
+
+- 分发固定引擎 `43002a7262e5`（`engines/strata/xxs-20261016-gold/`），在 rc.5 的 `d87a4678a21b` 基础上继续提升 prefill 与 decode。
+- 新增 `STRATA_GEMM_Y_F16`（qkv/qf/sg/su/sd/z 六个投影族的 16 位 Y 累加器）、`STRATA_TOPK_H16` 与 `STRATA_TOPK_REG_MAX=7168`（h16 topk 核 + 寄存器最大值缓存）、`STRATA_Q6_WAVE_PACK_LDS`、`STRATA_MMVQ_WV2_GROUP`；`STRATA_SCORES_MMAC_NB` 由 1 提至 2。
+- 记录并否决 `STRATA_TOPK_H16_T`（h16 topk 核线程数 256→1024）：250K 下整模 +11.96%、qsa select +86%（相对非 regmax 基线），相对单独 `REG_MAX` 基线为 +13.7%；同批次 6 个臂输出 SHA 一致，回归出在性能侧。该键不设置，源码保留默认关闭实例。
+- 打包时对运行中的生产引擎做了验证请求：约 39K token 输入 20.38 s、约 66K token 输入 25.73 s；短提示 TTFT 0.70–1.06 s。同二进制在实验卡上的工程记录（250K / 32K / decode）单独列出，两组条件不同不可混用。
+- 新增 [卡外 KV 容量扩展](docs/KV_CAPACITY.md)：说明如何用引擎原生的会话存/读接口在 tmpfs 与 SSD 上建立跨卡共享的 KV 池，并给出实测的搬运耗时与容量换算。
+- 本包不含源码快照或增量补丁，`clean_rebuild_verified` 为 `false`；不要据此宣称可从公开材料重建出相同二进制。
+
 ## v0.1.0-rc.5
 
 - 补全首页累计优化范围，恢复早期平台、量化布局、MoE、GDN/HC、数据复用、工作区及 attention 优化说明，区分本次新增、上游能力与未启用实验。

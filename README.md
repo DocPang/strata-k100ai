@@ -2,7 +2,7 @@
 
 面向海光 K100AI（gfx928、64 GiB 显存）的 **Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS** 推理优化与部署配置。
 
-当前版本为 **[v0.1.0-rc.5](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.5)**，分发 2026-10-16 已完成分档性能测试的固定引擎。引擎 SHA-256 为 `d87a4678a21b3c482658e53e6e766f7e54c2033853e6367bbf39e8e088ca4d6b`。后续平台修复和 16 位 topk 实验构建未纳入本版本。
+当前版本为 **[v0.1.0-rc.6](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.6)**，分发 2026-10-16 已完成分档性能测试的固定引擎。引擎 SHA-256 为 `43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac`。本版在上一版基础上新增 16 位 GEMM Y 累加器、h16 topk 核与寄存器最大值缓存、scores 合并批次加倍、Q6K packed-wave LDS 与 MMVQ WV2 分组；已否决的 h16 topk 线程数扩容未纳入。
 
 运行包约 8.5 MiB，包含推理程序、HTTP 服务与模型转换工具；基础镜像、驱动和模型权重单独准备。支持直接复用本机 DTK 镜像，也可将运行包加入基础镜像生成本地派生镜像。
 
@@ -109,10 +109,10 @@ docker image inspect "$BASE_IMAGE" --format '{{.Id}}'
 
 ```bash
 cd "$PROJECT_DIR"
-curl -fL --retry 3 -o strata-xxs-20261016-linux-amd64.tar.gz \
-  https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.5/strata-xxs-20261016-linux-amd64.tar.gz
-sha256sum -c engines/strata/xxs-20261016/artifact.sha256
-tar -xzf strata-xxs-20261016-linux-amd64.tar.gz
+curl -fL --retry 3 -o strata-xxs-20261016-gold-linux-amd64.tar.gz \
+  https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.6/strata-xxs-20261016-gold-linux-amd64.tar.gz
+sha256sum -c engines/strata/xxs-20261016-gold/artifact.sha256
+tar -xzf strata-xxs-20261016-gold-linux-amd64.tar.gz
 (cd runtime && sha256sum -c FILES.sha256)
 sha256sum runtime/bin/strata
 ```
@@ -144,7 +144,7 @@ curl -fL --retry 5 -C - \
 
 ```bash
 docker run --rm --network none \
-  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016/environment.env" \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016-gold/environment.env" \
   --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
   --mount "type=bind,src=$DATA_DIR/models/IQ3_XXS,dst=/models,readonly" \
   --mount "type=bind,src=$DATA_DIR/packs,dst=/out" \
@@ -168,7 +168,7 @@ MTP 来源：[Qwen / Qwen3.8-Flash-Next](https://modelscope.cn/models/Qwen/Qwen3
 
 ```bash
 docker run --rm --env STRATA_SOURCE=modelscope \
-  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016/environment.env" \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016-gold/environment.env" \
   --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
   --mount "type=bind,src=$DATA_DIR/mtp,dst=/out" \
   --workdir /opt/k100ai/app --entrypoint python3 \
@@ -179,7 +179,7 @@ docker run --rm --env STRATA_SOURCE=modelscope \
 
 ```bash
 docker run --rm --network none \
-  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016/environment.env" \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016-gold/environment.env" \
   --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
   --mount "type=bind,src=$DATA_DIR/mtp,dst=/out" \
   --workdir /opt/k100ai/app --entrypoint python3 \
@@ -190,7 +190,7 @@ docker run --rm --network none \
 
 ```bash
 docker run --rm --network none \
-  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016/environment.env" \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016-gold/environment.env" \
   --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
   --mount "type=bind,src=$DATA_DIR/mtp,dst=/out" \
   --workdir /opt/k100ai/app --entrypoint python3 \
@@ -201,7 +201,7 @@ docker run --rm --network none \
 
 ```bash
 docker run --rm --network none \
-  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016/environment.env" \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016-gold/environment.env" \
   --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
   --mount "type=bind,src=$DATA_DIR/mtp,dst=/out" \
   --workdir /opt/k100ai/app --entrypoint python3 \
@@ -235,7 +235,7 @@ docker run --detach --name strata-next-iq3xxs \
   --security-opt seccomp=unconfined \
   --tmpfs /var/log/hylog:rw,nosuid,nodev,mode=0755 \
   --publish 127.0.0.1:18640:8080 --env STRATA_API_KEY \
-  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016/environment.env" \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016-gold/environment.env" \
   --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
   --mount "type=bind,src=$DATA_DIR/models/IQ3_XXS,dst=/models,readonly" \
   --mount "type=bind,src=$DATA_DIR/packs/next-iq3xxs,dst=/pack,readonly" \
@@ -282,7 +282,7 @@ curl --fail http://127.0.0.1:18640/v1/chat/completions \
 | `--prompt-cache` / `--conversation-cache-mib` | 0 / 0 | 默认关闭以便复现冷 prefill；按业务需要在验证后开启 |
 | `STRATA_SEL_BATCH` | 不设置 | 使用引擎按上下文缓冲尺寸选择的默认值；不沿用旧版 1024 覆盖 |
 
-修改原生配置时编辑 `profiles/next-iq3xxs-single/strata.json` 的 `args`；修改优化开关时编辑 `engines/strata/xxs-20261016/environment.env`。停止并删除自己的容器后，重新执行启动命令使参数生效。优先保留全部专家驻留，通过降低 prefill、上下文或关闭额外缓存平衡显存。
+修改原生配置时编辑 `profiles/next-iq3xxs-single/strata.json` 的 `args`；修改优化开关时编辑 `engines/strata/xxs-20261016-gold/environment.env`。停止并删除自己的容器后，重新执行启动命令使参数生效。优先保留全部专家驻留，通过降低 prefill、上下文或关闭额外缓存平衡显存。
 
 需要将运行文件固定到镜像中时，见 [手动构建派生镜像与离线准备](docs/INSTALL.md)。`install.sh`、`start.sh` 和 Compose 保留为可选入口，原生命令不依赖这些脚本。
 
