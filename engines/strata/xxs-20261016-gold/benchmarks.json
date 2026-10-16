@@ -91,7 +91,7 @@
     "notes": [
       "The 32K tier ran on card 4 and the 250K tier on card 5; both cards are the same model and the baseline/candidate pair of each tier ran on the same card.",
       "Input token counts are the engine-reported prompt tokens. Wall time is the engine's own prefill phase, not a client-side measurement.",
-      "128K was not re-measured for this release; see docs/BENCHMARKS.md for the previous version's record."
+      "128K was not part of this freeze batch; the rc.6 128K tier is recorded in release-to-release-same-batch-abba-2026-10-17."
     ]
   },
   {
@@ -103,5 +103,67 @@
       { "instance": "production instance A (card0, prefill 20480)", "input_tokens": 120670, "prefill_ms": 65281, "prefill_tps": 1848.5 },
       { "instance": "production instance B (card1, prefill 20480)", "input_tokens": 32230, "prefill_ms": 17113, "prefill_tps": 1883.4 }
     ]
+  },
+{
+    "test": "release-to-release-same-batch-abba-2026-10-17",
+    "binaries": {
+      "v0.1.0-rc.6": "43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac",
+      "v0.1.0-rc.5": "d87a4678a21b3c482658e53e6e766f7e54c2033853e6367bbf39e8e088ca4d6b"
+    },
+    "status": "PASS",
+    "source": "Same-card, same-batch A/B/A on the isolated experiment card: the rc.5 binary and the rc.6 binary ran in the same batch, each with its own released environment, on the same render node.",
+    "harness": "One engine process per arm, fixed token file per tier, chunk 30602, spec 4, spec-min-p 0.70, max-context 262144, int8 KV fully resident, expert cache 24576, vram-reserve 2048 MiB, prompt/conversation cache off, eos-ids 0, temperature 0. Two requests per arm inside the same process. Every arm's output-token list SHA-256 was compared; fallbacks 0.",
+    "tiers": [
+      {
+        "tier": "32K",
+        "input_tokens": 30603,
+        "rc6_samples_ms": [15047.5, 14722.7],
+        "rc6_mean_ms": 14885.1,
+        "rc6_tps": 2055.9,
+        "rc5_samples_ms": [15764.9, 15466.9, 15755.2, 15492.6],
+        "rc5_mean_ms": 15619.9,
+        "delta_pct": -4.7,
+        "output_sha256_prefix": "84f393bfc11ffe91"
+      },
+      {
+        "tier": "128K",
+        "input_tokens": 126857,
+        "rc6_samples_ms": [65996.9, 65700.0],
+        "rc6_mean_ms": 65848.5,
+        "rc6_tps": 1926.6,
+        "rc5_samples_ms": [70831.2, 70555.3, 70837.2, 70635.4],
+        "rc5_mean_ms": 70714.8,
+        "delta_pct": -6.88,
+        "output_sha256_prefix": "84f393bfc11ffe91"
+      },
+      {
+        "tier": "250K",
+        "input_tokens": 249986,
+        "rc6_samples_ms": [137380.8, 137117.5],
+        "rc6_mean_ms": 137249.2,
+        "rc6_tps": 1821.4,
+        "rc5_samples_ms": [146882.4, 146646.0, 146946.3, 146643.4],
+        "rc5_mean_ms": 146779.5,
+        "delta_pct": -6.49,
+        "output_sha256_prefix": "08d2c11d70446fe6"
+      }
+    ],
+    "notes": ["Both releases produce identical output tokens on every tier (the prefix above is shared by both arms of each tier), so the change did not alter results on this fixed prompt family.", "Arm-to-arm drift of the rc.5 binary was 0.02% (250K), 0.05% (32K) and 0.06% (128K); the rc.5 published record (15.710 / 70.828 / 146.794 s) reproduced inside that band.", "The 128K tier had no rc.6 record before this batch."]
+  },
+{
+    "test": "decode-wv2-group-balanced-abab-2026-10-17",
+    "binary_sha256": "43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac",
+    "status": "PASS",
+    "question": "Does STRATA_MMVQ_WV2_GROUP show a whole-model decode gain? Its isolated microbenchmark measured -24.8% on the wave kernel (nc=5, 300 calls) with bit-identical output.",
+    "harness": "Suite longgen32: 32K prefill followed by 128 generated tokens, engine decoder timing. Arms in on/off/on(/off) order on the same card across two batches, 8 samples with the switch and 6 without; all arms also carry STRATA_MMVQ_WV2_LDS=1 and STRATA_DECODE_TIMING=1. Output tokens bit-identical in every arm (97e6833014e9deab).",
+    "result": {
+      "with_group_samples_tps": [79.71, 83.91, 79.95, 84.12, 79.87, 84.22, 79.77, 84.15],
+      "without_group_samples_tps": [79.74, 84.02, 79.88, 84.41, 79.83, 84.12],
+      "with_group_mean_tps": 81.96,
+      "without_group_mean_tps": 82.0,
+      "delta_pct": -0.05
+    },
+    "conclusion": "The whole-model decode effect is inside the sample drift (samples within one arm differ by about 5%), so the component-level gain does not reproduce end to end. The switch stays enabled because it is bit-identical, but no whole-model gain is claimed for it.",
+    "decode_band_all_batches_tps": "74.6-84.4"
   }
 ]
