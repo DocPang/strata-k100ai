@@ -1,5 +1,12 @@
 # 更新记录
 
+## 2026-10-20 源码审查回应（main）
+
+- 新增 [sources/xxs-20261016-gold/KNOWN_ISSUES.md](sources/xxs-20261016-gold/KNOWN_ISSUES.md)，记录静态审查确认的 4 项：`STRATA_GEMM_F32OUT` 与 `STRATA_GEMM_Y_F16` 在 padr 分支缺互斥（`gemm.cu:1247` 对 `gemm.cu:1019`，当前不可达）；`kernel_hcdown_mmac` 的 LDS 行维越界写（`sA/sB` 声明 64 行、写到第 127 行，因 `(nd+ni)%16` 门禁当前不可达）与 `STRATA_HC_MMAC` 用 `getenv()!=nullptr` 解析导致字符串 0 也算开启；工作区仍按 FP32 容量分配（`m.qkv` / `m.Qf` / `m.z` / `m.shared`）。
+- **修正一处会误导重建的文档错误**：`docs/SOURCE_BUILD.md` 原先让读者按「c4 补丁 + rc.5 补丁 + 4 个 FP16 脚本」重建 rc.6，这是错的——`c4-to-xxs-20261016.patch` 中 `TOPK_H16`、`TOPK_REG_MAX`、`Q6_WAVE_PACK_LDS` 出现次数均为 0。现改为三步：恢复 c4 → 打 rc.5 补丁 → **按路径覆盖 `sources/xxs-20261016-gold/` 的 7 个文件并逐文件校验 SHA-256**。
+- 记录补丁脚本的路径契约差异：`patch_yf16_*.py` 需要 `<workdir>/source/...`，与 `prepared/strata/...` 不同。
+- 快照文件本身未改动；`clean_rebuild_verified` 仍为 `false`（干净重建 + 固定样本输出一致尚未执行）。
+
 ## 2026-10-20 源码公开（main，未打新标签）
 
 - 新增 `sources/` 目录，**一个版本一个文件夹**：首个目录 [sources/xxs-20261016-gold](sources/xxs-20261016-gold/) 存放 rc.6 定版引擎 `43002a72…` 的增量源码。

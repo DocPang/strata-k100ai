@@ -2,6 +2,8 @@
 
 引擎二进制 SHA-256 `43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac`（29,290,960 B），对应 Release [v0.1.0-rc.6](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.6) 的 `strata-xxs-20261016-gold-linux-amd64.tar.gz`。
 
+> 静态审查发现的缺陷与不可达路径记录在 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)。本目录的 7 个源码文件保持与生产二进制对应的原始状态，**不在快照内打补丁**。
+
 ## 这个版本改了什么
 
 父版本 `strata/xxs-20261016`（`d87a4678…`）之上，本版只做一件事：**把 prefill 的 GEMM Y 累加器改成 16 位紧凑图像**，门控变量 `STRATA_GEMM_Y_F16=qkv|qf|sg|su|sd|z`。
