@@ -1,5 +1,12 @@
 # 更新记录
 
+## 2026-10-20 源码公开（main，未打新标签）
+
+- 新增 `sources/` 目录，**一个版本一个文件夹**：首个目录 [sources/xxs-20261016-gold](sources/xxs-20261016-gold/) 存放 rc.6 定版引擎 `43002a72…` 的增量源码。
+- 内容：`GEMM_Y_F16` 补丁链触及的 7 个文件（`include/strata/prefill/{gemm,kernels}.hpp`、`src/prefill/{gemm,kernels}.cu`、`src/prefill/prefill.cpp`、`src/kernels/cuda/{qsa_select,native_mmvq}.cu`）、4 个按序应用的 fail-closed 补丁脚本、逐文件 SHA-256 的 `manifest.json`，以及相对上游 `fb58e0db` 的累计差异 `vs-upstream-fb58e0db.diff`（5,097 行，仅覆盖这 7 个文件）。
+- 边界不变：该目录是**增量**不是完整引擎树；重编译不保证字节一致，`clean_rebuild_verified` 仍为 `false`，字节身份以 `engine_sha256` 为准。
+- `engines/strata/xxs-20261016-gold/manifest.json` 的 `source_snapshot_included` 由 `false` 改为 `true`，并新增 `source_snapshot` 指向该目录；`docs/SOURCE_BUILD.md` 同步更新。
+
 ## v0.1.0-rc.6
 
 - 分发固定引擎 `43002a7262e5`（`engines/strata/xxs-20261016-gold/`），在 rc.5 的 `d87a4678a21b` 基础上继续提升 prefill 与 decode。

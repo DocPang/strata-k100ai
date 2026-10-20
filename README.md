@@ -4,6 +4,8 @@
 
 当前版本为 **[v0.1.0-rc.6](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.6)**，分发 2026-10-16 的固定引擎：32K / 128K / 250K 三档均已做同批 A/B/A 复测。引擎 SHA-256 为 `43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac`。本版在上一版基础上新增 16 位 GEMM Y 累加器、h16 topk 核与寄存器最大值缓存、scores 合并批次加倍、Q6K packed-wave LDS 与 MMVQ WV2 分组；已否决的 h16 topk 线程数扩容未纳入。其中 MMVQ WV2 分组只有组件级收益（核级逐位一致、孤立微基准 −24.8%），整模 decode 实测未复现，成绩区按实测区间标注。
 
+源码按版本分目录公开在 [`sources/`](sources/)，当前版本见 [`sources/xxs-20261016-gold/`](sources/xxs-20261016-gold/)（增量源码 + 补丁链 + 逐文件校验值）；重编译不保证字节一致，二进制身份以 Release 资产与 `engine_sha256` 为准。
+
 运行包约 8.5 MiB，包含推理程序、HTTP 服务与模型转换工具；基础镜像、驱动和模型权重单独准备。支持直接复用本机 DTK 镜像，也可将运行包加入基础镜像生成本地派生镜像。
 
 ## 累计优化内容

@@ -12,8 +12,8 @@
   "runtime_origin": "Unchanged audited Python frontend, conversion tools and auxiliary data inherited from strata/xxs-20261016; only bin/strata differs",
   "models_included": false,
   "vendor_libraries_included": false,
-  "source_snapshot_included": false,
-  "source_note": "The incremental source changes are not distributed with this package. Do not treat this manifest as proof that the binary can be rebuilt from the published material.",
+  "source_snapshot_included": true,
+  "source_note": "The incremental source for this build is published in sources/xxs-20261016-gold/: the seven changed files, the four fail-closed patch scripts in apply order, and a manifest with per-file SHA-256. It is an incremental snapshot, not the complete engine tree; the earlier cumulative work is in engines/strata/xxs-20261016/patches/c4-to-xxs-20261016.patch. Rebuilding from these materials is not guaranteed to reproduce this exact binary, so clean_rebuild_verified stays false.",
   "features": [
     "GEMM_Y_F16 (qkv, qf, sg, su, sd, z)",
     "TOPK_H16",
@@ -39,5 +39,7 @@
   },
   "artifact": "strata-xxs-20261016-gold-linux-amd64.tar.gz",
   "artifact_sha256": "241655d69476df9fb4159589bb7399d95daeba190c882544016f16b10d4b3155",
-  "artifact_bytes": 8934284
+  "artifact_bytes": 8934284,
+  "source_snapshot": "sources/xxs-20261016-gold/",
+  "source_snapshot_files": 12
 }

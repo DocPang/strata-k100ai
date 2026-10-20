@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "engine": "strata/xxs-20261016-gold",
+  "engine_sha256": "43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac",
+  "engine_bytes": 29290960,
+  "release": "v0.1.0-rc.6",
+  "kind": "incremental source snapshot (changed files only)",
+  "parent_engine": "strata/xxs-20261016",
+  "parent_build_sha256": "d87a4678a21b3c482658e53e6e766f7e54c2033853e6367bbf39e8e088ca4d6b",
+  "upstream_reference": {
+    "repo": "https://github.com/Niko1221/Strata.git",
+    "commit": "fb58e0dbc8399662c0e47c76578c6e878b14f6cf"
+  },
+  "scope_note": "Only the files touched by the GEMM_Y_F16 patch chain are included. This is NOT the complete engine tree. The cumulative delta from upstream for these files is vs-upstream-fb58e0db.diff; the earlier platform/kernel work lives in engines/strata/xxs-20261016/patches/c4-to-xxs-20261016.patch.",
+  "apply_order": [
+    "patches/patch_yf16_qkv.py",
+    "patches/patch_yf16_more.py",
+    "patches/patch_yf16_fix.py",
+    "patches/patch_yf16_z.py"
+  ],
+  "files": [
+    {
+      "path": "include/strata/prefill/gemm.hpp",
+      "bytes": 5669,
+      "sha256": "c0306fc03551556383bcd7908ec79ad040f3e8bee4efc5ac29d65320dac5c9e9"
+    },
+    {
+      "path": "include/strata/prefill/kernels.hpp",
+      "bytes": 13011,
+      "sha256": "e4c82486d6e4f3aebe793a73ec1e18e2b086654328ac774233d0aa70eaf442b4"
+    },
+    {
+      "path": "patches/patch_yf16_fix.py",
+      "bytes": 6113,
+      "sha256": "aebc5e3ba3239a5b5a6f462fbecdd4c4f44f7ef0ced2fcc7a8f96808d2605e5f"
+    },
+    {
+      "path": "patches/patch_yf16_more.py",
+      "bytes": 18812,
+      "sha256": "edd5972e2cc6cf75e676436c99b7a128314d57d2c4718b517e7093fb10266e0a"
+    },
+    {
+      "path": "patches/patch_yf16_qkv.py",
+      "bytes": 15328,
+      "sha256": "322dc281c5b882fe326511e493fbf90b3908afa2b2e09462d2b8ff738eaa628d"
+    },
+    {
+      "path": "patches/patch_yf16_z.py",
+      "bytes": 10966,
+      "sha256": "53cc30e7c66e62edd428b22cbccc27a759cedbfeaf965c8f2ac494eafc4d1450"
+    },
+    {
+      "path": "src/kernels/cuda/native_mmvq.cu",
+      "bytes": 145338,
+      "sha256": "d93fd9ebc8e88d900efccb9b9747a234360ef16b222765397d35ff8d863fde6c"
+    },
+    {
+      "path": "src/kernels/cuda/qsa_select.cu",
+      "bytes": 130898,
+      "sha256": "6839faf71f3c9eec3139a832816eb0ddd31886082d7e724f3d36676f6f71f7a9"
+    },
+    {
+      "path": "src/prefill/gemm.cu",
+      "bytes": 75042,
+      "sha256": "0ab7168bbfc9015781fd93f6cd6ccf189d3ccb3b530b513250a9b853f3534a20"
+    },
+    {
+      "path": "src/prefill/kernels.cu",
+      "bytes": 168827,
+      "sha256": "4ad32864e5fbfec308e38e0f566b63dc671f6e09d2086746b6a9bcc489d0001b"
+    },
+    {
+      "path": "src/prefill/prefill.cpp",
+      "bytes": 301710,
+      "sha256": "c532288ac64ae379ba7ad5988a9ddc89618a5a9be4963f6f76ea589ec3bb6989"
+    },
+    {
+      "path": "vs-upstream-fb58e0db.diff",
+      "bytes": 325446,
+      "sha256": "eb7c0505bbd644f9148a4c87b8bde516e3cd7ae5a44d13fbcae1b7762c7d7b3d"
+    }
+  ],
+  "file_count": 12,
+  "total_bytes": 1217160
+}
