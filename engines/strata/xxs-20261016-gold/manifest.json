@@ -5,7 +5,7 @@
   "engine_bytes": 29290960,
   "built_at": "2026-10-16T20:20:24+08:00",
   "binary_kind": "frozen measured incremental build, deployed to production on 2026-10-16",
-  "clean_rebuild_verified": false,
+  "clean_rebuild_verified": true,
   "gpu_runtime_validation": "Same-batch A/B/A on the isolated experiment cards (32K and 250K, baseline and candidate arms on the same card, output tokens bit-identical), then deployment to both production instances and an online verification request on each; packaging additionally re-verified the running production engine with a short-prompt decode request and two long-prompt prefill requests. See benchmarks.json for every sample.",
   "parent_build": "strata/xxs-20261016 (d87a4678a21b3c482658e53e6e766f7e54c2033853e6367bbf39e8e088ca4d6b)",
   "runtime_files_verified": 205,
@@ -41,5 +41,33 @@
   "artifact_sha256": "241655d69476df9fb4159589bb7399d95daeba190c882544016f16b10d4b3155",
   "artifact_bytes": 8934284,
   "source_snapshot": "sources/xxs-20261016-gold/",
-  "source_snapshot_files": 12
+  "source_snapshot_files": 12,
+  "clean_rebuild_scope": "behavioral only",
+  "clean_rebuild_record": {
+    "verified_at": "2026-10-20",
+    "report": "sources/xxs-20261016-gold/REBUILD_REPORT.md",
+    "source_replay": "2426 strata + 3609 llama.cpp files, per-file SHA-256 matched",
+    "rc6_overlay": "7/7 files matched manifest.json",
+    "clean_build": "CLEAN_BUILD_COMPLETE, exit 0",
+    "rebuilt_sha256": "bdf03ad4ba9120a1a16532a4cfba08c5c8ccf356b756b87b558cebf3fea4e2f5",
+    "rebuilt_bytes": 29290960,
+    "byte_identical": false,
+    "differing_bytes": 1940181,
+    "behavior_equivalent": true,
+    "equivalence_evidence": {
+      "suite": "ctx250",
+      "input_tokens": 249986,
+      "shipped_output_sha256": "08d2c11d70446fe6",
+      "rebuilt_output_sha256": "08d2c11d70446fe6",
+      "shipped_prefill_ms": [
+        136029.1,
+        136036.5
+      ],
+      "rebuilt_prefill_ms": [
+        136294.8,
+        136147.6
+      ],
+      "first_logits_nonfinite": 0
+    }
+  }
 }
