@@ -4,14 +4,72 @@ v0.1.0-rc.6 直接分发已测的 `43002a7262e5` 冻结二进制；上一版 rc.
 
 **rc.6 相对 rc.5 的增量源码已公开**，见 [sources/xxs-20261016-gold](../sources/xxs-20261016-gold/)：7 个变更文件、4 个 fail-closed 补丁脚本（按 manifest 顺序应用）、逐文件 SHA-256，以及相对上游 `fb58e0db` 的累计差异。该目录只是增量，不是完整引擎树；更早的平台与内核累计工作见 [c4→xxs-20261016 补丁](../engines/strata/xxs-20261016/patches/c4-to-xxs-20261016.patch)。从这些材料重编译**不保证**得到逐字节相同的二进制，因此 `clean_rebuild_verified` 仍为 `false`（见 [rc.6 引擎清单](../engines/strata/xxs-20261016-gold/manifest.json)）。
 
-先按下文恢复 c4 源码，再应用下列 rc.5 快照补丁：
+## 重建 rc.6 的正确顺序（三步，缺一不可）
+
+> **注意：只应用补丁是重建不出 rc.6 的。** `c4-to-xxs-20261016.patch` 里 `TOPK_H16`、`TOPK_REG_MAX`、`Q6_WAVE_PACK_LDS` 的出现次数都是 **0**——rc.6 这三个开关的实现只存在于 `sources/xxs-20261016-gold/` 公开的源码文件里。4 个 `patch_yf16_*.py` 只是 `GEMM_Y_F16` 的历史成因，**不是**重建手段。
+
+### 第一步：恢复 c4 基础源码
+
+按本文件下半部分（[c4 基础源码恢复](#c4-基础源码恢复)）执行 `prepare.py`，得到 `prepared/strata` 与 `prepared/llama`。
+
+### 第二步：打上 rc.5 快照补丁
 
 ```bash
-git -C prepared/strata apply --check /absolute/path/strata-k100ai/engines/strata/xxs-20261016/patches/c4-to-xxs-20261016.patch
-git -C prepared/strata apply /absolute/path/strata-k100ai/engines/strata/xxs-20261016/patches/c4-to-xxs-20261016.patch
+R=/absolute/path/strata-k100ai
+git -C prepared/strata apply --check "$R/engines/strata/xxs-20261016/patches/c4-to-xxs-20261016.patch"
+git -C prepared/strata apply         "$R/engines/strata/xxs-20261016/patches/c4-to-xxs-20261016.patch"
 ```
 
-补丁恢复 10 个变更文件，依据保留的源码和后续改动前备份，逐文件摘要见 [恢复清单](../engines/strata/xxs-20261016/source-recovery.json)。历史构建继承了已有静态对象；完整干净编译、全部对象来源与重新构建产物的 GPU 等价性尚未完成。因此，源码恢复成功不等于可重现发布二进制。
+该补丁恢复 10 个变更文件，逐文件摘要见 [恢复清单](../engines/strata/xxs-20261016/source-recovery.json)。
+
+### 第三步：按路径覆盖 rc.6 的 7 个源码文件，并逐个校验
+
+```bash
+R=/absolute/path/strata-k100ai
+V="$R/sources/xxs-20261016-gold"
+for f in \
+  include/strata/prefill/gemm.hpp \
+  include/strata/prefill/kernels.hpp \
+  src/prefill/gemm.cu \
+  src/prefill/kernels.cu \
+  src/prefill/prefill.cpp \
+  src/kernels/cuda/qsa_select.cu \
+  src/kernels/cuda/native_mmvq.cu ; do
+  install -m 644 "$V/$f" "prepared/strata/$f"
+done
+
+# 逐文件校验：必须与 manifest.json 完全一致
+python3 - <<'PYEOF'
+import hashlib, json, pathlib
+V = pathlib.Path("/absolute/path/strata-k100ai/sources/xxs-20261016-gold")
+man = json.loads((V / "manifest.json").read_text())
+bad = 0
+for e in man["files"]:
+    if not e["path"].startswith(("include/", "src/")):
+        continue
+    p = pathlib.Path("prepared/strata") / e["path"]
+    got = hashlib.sha256(p.read_bytes()).hexdigest()
+    ok = got == e["sha256"]
+    bad += 0 if ok else 1
+    print(("OK  " if ok else "FAIL"), e["path"], got[:16])
+raise SystemExit(1 if bad else 0)
+PYEOF
+```
+
+7 个文件全部 `OK` 才继续；任何一个 `FAIL` 说明前两步的输入或补丁版本不对。
+
+### 关于 4 个 `patch_yf16_*.py`
+
+它们的路径契约是 `<workdir>/source/{include,src}/...`（`W = argv[1]`，然后拼 `W/"source/..."`），与本文件的 `prepared/strata/...` 布局不同。若要复跑这些脚本，必须传入一个含有 `source/` 子目录的 workdir，例如 `ln -s prepared/strata workdir/source`。它们的存在是为了说明 `GEMM_Y_F16` 是怎么一步步改出来的（含 `f16_inplace` 漏改导致的 NaN 修复），**重建时不需要执行**。
+
+### 编译与验收
+
+```bash
+bash <build-script>            # 全量编译、链接
+# 之后必须做：模型加载 + 固定样本输出比对（不是只看编译通过）
+```
+
+历史构建曾复用已有静态对象；**从源码重编译不保证得到逐字节相同的二进制**（编译器、DTK 版本、构建目录都会影响）。字节身份以 `manifest.json` 的 `engine_sha256` 核对发布包，而不是核对重编译产物。在完成"干净编译 + 固定样本输出一致"之前，`clean_rebuild_verified` 保持 `false`。
 
 # c4 基础源码恢复
 
