@@ -19,7 +19,7 @@ docker run --rm -it --name strata-iq3xxs \
   --security-opt seccomp=unconfined \
   --tmpfs /var/log/hylog:rw,nosuid,nodev,mode=0755 \
   --publish 127.0.0.1:18640:8080 --env STRATA_API_KEY \
-  --env-file "$PWD/engines/strata/xxs-20261016-gold/environment.env" \
+  --env-file "$PWD/engines/strata/xxs-20261022-sol/environment.env" \
   --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
   --mount type=bind,src=/srv/models/next-iq3xxs/IQ3_XXS,dst=/models,readonly \
   --mount type=bind,src=/srv/packs/next-iq3xxs,dst=/pack,readonly \
@@ -85,7 +85,7 @@ docker run --rm -it --name strata-iq3xxs-engine \
   --ulimit memlock=-1:-1 --shm-size=2g \
   --security-opt seccomp=unconfined \
   --tmpfs /var/log/hylog:rw,nosuid,nodev,mode=0755 \
-  --env-file "$PWD/engines/strata/xxs-20261016-gold/environment.env" \
+  --env-file "$PWD/engines/strata/xxs-20261022-sol/environment.env" \
   --mount "type=bind,src=$PWD/runtime,dst=/opt/k100ai,readonly" \
   --mount type=bind,src=/srv/models/next-iq3xxs/IQ3_XXS,dst=/models,readonly \
   --mount type=bind,src=/srv/packs/next-iq3xxs,dst=/pack,readonly \

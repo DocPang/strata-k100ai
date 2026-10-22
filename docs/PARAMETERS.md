@@ -1,6 +1,6 @@
 # 参数参考
 
-当前推荐使用 `profiles/next-iq3xxs-single/strata.json`；IQ3_S 列为历史参考。编辑 `args` 中的参数及对应值后，停止并重建目标容器。优化环境通过 `engines/strata/xxs-20261016-gold/environment.env` 传入；配置文件的 `env` 可覆盖指定变量。
+当前推荐使用 `profiles/next-iq3xxs-single/strata.json`；IQ3_S 列为历史参考。编辑 `args` 中的参数及对应值后，停止并重建目标容器。优化环境通过 `engines/strata/xxs-20261022-sol/environment.env` 传入；配置文件的 `env` 可覆盖指定变量。
 
 ## 模型与设备
 
@@ -64,7 +64,7 @@ XXS 使用新引擎环境文件，IQ3_S 历史配方使用 c4 环境。新增推
 | STRATA_PF_FUSED_NATIVE_EXACT_SKIP | 1，保留已支持的 exact 路径；本版通过 GATEUP_EXACT_IQ2 扩展到全部 48 层 |
 | STRATA_SEL_BATCH | 不显式设置，使用引擎按缓冲尺寸选择的默认值；不是会话 batch |
 
-本版（rc.6）在基础优化环境上启用 GEMM_Y_F16=qkv\|qf\|sg\|su\|sd\|z、TOPK_H16=1、TOPK_REG_MAX=7168、SCORES_MMAC=2、SCORES_MMAC_LDS=1、SCORES_MMAC_NB=2、SEL_SCORES_FP16=1、GATEUP_EXACT_IQ2=1、MMVQ_WV2_LDS=1、MMVQ_WV2_GROUP=1 和 Q6_WAVE_PACK_LDS=1。`STRATA_SEL_BATCH` 不覆盖；`STRATA_TOPK_H16_T` 已测为显著回归，同样不设置（见 [优化环境说明](OPTIMIZATIONS.md)）。完整环境文件位于 `engines/strata/xxs-20261016-gold/environment.env`；上一版为 `engines/strata/xxs-20261016/environment.env`。其他主要变量如下：
+本版（rc.6）在基础优化环境上启用 GEMM_Y_F16=qkv\|qf\|sg\|su\|sd\|z、TOPK_H16=1、TOPK_REG_MAX=7168、SCORES_MMAC=2、SCORES_MMAC_LDS=1、SCORES_MMAC_NB=2、SEL_SCORES_FP16=1、GATEUP_EXACT_IQ2=1、MMVQ_WV2_LDS=1、MMVQ_WV2_GROUP=1 和 Q6_WAVE_PACK_LDS=1。`STRATA_SEL_BATCH` 不覆盖；`STRATA_TOPK_H16_T` 已测为显著回归，同样不设置（见 [优化环境说明](OPTIMIZATIONS.md)）。完整环境文件位于 `engines/strata/xxs-20261022-sol/environment.env`；上一版为 `engines/strata/xxs-20261016/environment.env`。其他主要变量如下：
 
 | 范围 | 主要变量 |
 | --- | --- |
@@ -73,6 +73,7 @@ XXS 使用新引擎环境文件，IQ3_S 历史配方使用 c4 环境。新增推
 | GR / GDN | STRATA_GR_DOWN_PREFETCH=2、STRATA_HC_SPLIT=2、STRATA_GDN_HEAD=1、STRATA_GDN_NOY=1 |
 | MoE | STRATA_MMQ_RESIDENT_SORT_NE=1、STRATA_MMQ_RESIDENT_SORT_NATIVE=1、STRATA_EXPERT_V2=1、STRATA_DOWN_MT=1、STRATA_MMQ_EXACT_ALL=1 |
 | Prefill / GEMM | STRATA_HIP_WMMA=1、STRATA_HIP_PROMPT_F16=1、STRATA_PF_PAD_ROCBLAS=1、STRATA_PREFILL_RING=8；rc.6 增加 STRATA_GEMM_Y_F16=qkv\|qf\|sg\|su\|sd\|z（六个投影族的 16 位 Y 累加器） |
+| Prefill / GEMM（rc.7） | 新增 `STRATA_GEMM_SOL=2560x6144=20377,10240x2560=20385`：按形状锁定 rocBLAS Tensile solution；与 `STRATA_DENSE_TN` 互斥 |
 | QSA / scores / topk | STRATA_SCORES_MMAC=2、STRATA_SCORES_MMAC_LDS=1、STRATA_SCORES_MMAC_NB=2、STRATA_TOPK_H16=1、STRATA_TOPK_REG_MAX=7168 |
 | Decode 稠密 | STRATA_MMVQ_WV2_LDS=1、STRATA_MMVQ_WV2_GROUP=1 |
 | 工作区与融合 | STRATA_PF_GATED_IN_REGION=1、STRATA_EMB_REUSE_ACCOUNT=1、STRATA_PF_DMSCRATCH_COND=1、STRATA_PF_FUSED_SQ=1 |

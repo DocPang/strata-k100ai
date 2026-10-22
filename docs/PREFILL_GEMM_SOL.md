@@ -78,9 +78,9 @@
 | `1502d407`（重编基线） | 12.055 | −9.15% |
 | `19b367e0`（本版 + pin） | 11.785 | −11.19% |
 
-⇒ **生产上跑了一个落后约 9% 的二进制**。原因不是构建配置：`prepared-gq8` 的 `CMakeCache.txt` 与 [engines/strata/c4/replay/build-in-container.sh](../../engines/strata/c4/replay/build-in-container.sh) 的编译选项逐项一致（`Release`/`-O3`、`--gpu-max-threads-per-block=1024`、`-DSTRATA_GFX928_DOT4=1`、两个 `-mllvm` 开关、`gfx928`）。真实原因是**相对 `sources/xxs-20261016-gold` 存在 7 个文件的未归档源码增量**，其中 5 个（`gemm.hpp`、`dequant_bf16.cu`、`gateup_exact.hpp`、`kernels.cu`、`moe_mmq.cu`）的逐项补丁来源未归档。清单与 SHA-256 记在 [引擎 manifest](../../engines/strata/xxs-20261022-sol/manifest.json) 的 `source_delta_vs_gold`。
+⇒ **生产上跑了一个落后约 9% 的二进制**。原因不是构建配置：`prepared-gq8` 的 `CMakeCache.txt` 与 [engines/strata/c4/replay/build-in-container.sh](../../engines/strata/c4/replay/build-in-container.sh) 的编译选项逐项一致（`Release`/`-O3`、`--gpu-max-threads-per-block=1024`、`-DSTRATA_GFX928_DOT4=1`、两个 `-mllvm` 开关、`gfx928`）。真实原因是**相对 `sources/xxs-20261016-gold` 存在 7 个文件的源码增量**。这 7 个文件已全部归档在 [`sources/xxs-20261022-sol/`](../../sources/xxs-20261022-sol/)，并且已验证：纯净重放 + 覆盖这 7 个文件后与部署源码树 `diff -rq` 零差异，干净编译产物 SHA-256 与发布二进制完全相同（见 [REBUILD_REPORT](../../sources/xxs-20261022-sol/REBUILD_REPORT.md)）。其中 5 个文件目前以整文件快照归档，**逐项补丁来源仍未拆分**，因此逐项收益归因仍缺。
 
-**待办**：把这 5 个文件的增量拆回逐项补丁，才能宣称可从公开材料重建。
+**待办**：把这 5 个文件的增量拆回逐项补丁（重建已不依赖它，但逐项收益归因需要）。
 
 ## 复现口径
 
