@@ -5,18 +5,43 @@
   "engine_bytes": 29327416,
   "reference": "sources/xxs-20261016-gold",
   "kind": "增量快照，不是完整引擎树",
-  "incremental_completeness": "partial",
-  "note": "本目录只收录与 rocBLAS solution pin 直接相关的两个文件（含本次新增 hook 与 -lrocblas）。相对 gold 还存在另外 5 个文件的增量（gemm.hpp / dequant_bf16.cu / gateup_exact.hpp / kernels.cu / moe_mmq.cu），其逐项补丁来源未归档，见 engines/strata/xxs-20261022-sol/manifest.json 的 source_delta_vs_gold。",
+  "incremental_completeness": "complete",
+  "note": "本目录的 7 个文件即 rc.7 相对 sources/xxs-20261016-gold 的全部增量。按 docs/SOURCE_BUILD.md 覆盖这 7 个文件后，prepared/strata 与发布二进制对应的源码树逐字节一致（本次验证：与部署树 diff -rq 零差异；干净编译产物 SHA-256 与发布资产完全相同）。",
   "files": [
+    {
+      "path": "CMakeLists.txt",
+      "sha256": "f95884b08543e607d9fd23332b08900d7bbf8ebc6f30196d32bbac638a86c3e6",
+      "bytes": 103379
+    },
+    {
+      "path": "include/strata/prefill/gemm.hpp",
+      "sha256": "70650d4a51757310c238d662b4bae0a7293d081a9781e327f58a253b1eb604be",
+      "bytes": 6271
+    },
+    {
+      "path": "src/kernels/cuda/dequant_bf16.cu",
+      "sha256": "6c50aa45aeaf782c6d151083fbfe5e691021bcc72f0919e10d015b97aa27d51d",
+      "bytes": 13518
+    },
+    {
+      "path": "src/prefill/gateup_exact.hpp",
+      "sha256": "808afefff74c6f9bb8c186667ab1085f6c980768ab218c1189fdbb3bddd2204c",
+      "bytes": 82188
+    },
     {
       "path": "src/prefill/gemm.cu",
       "sha256": "a12eb5fa889198b352ce8c4a0520f60933dc0eb914039f3262f17d0a77e6f5ed",
       "bytes": 86527
     },
     {
-      "path": "CMakeLists.txt",
-      "sha256": "f95884b08543e607d9fd23332b08900d7bbf8ebc6f30196d32bbac638a86c3e6",
-      "bytes": 103379
+      "path": "src/prefill/kernels.cu",
+      "sha256": "b00b1b94da168295da21936ecca5947fc56046323b19f18724c8da2bcf71fbbe",
+      "bytes": 169434
+    },
+    {
+      "path": "src/prefill/moe_mmq.cu",
+      "sha256": "f990b91abe919cbc22f85b9adff015d12269baaa8dd3e36991dae605d7421037",
+      "bytes": 60703
     }
   ],
   "patches_in_order": [
@@ -42,5 +67,12 @@
       "effect": "显式链接 -lrocblas"
     }
   ],
-  "fail_closed": true
+  "fail_closed": true,
+  "clean_rebuild": {
+    "verified": true,
+    "scope": "byte-identical",
+    "rebuilt_sha256": "19b367e015d006694737ba067f0a4ac25da09c40be19b0d669fc1e09444152a3",
+    "released_sha256": "19b367e015d006694737ba067f0a4ac25da09c40be19b0d669fc1e09444152a3",
+    "report": "REBUILD_REPORT.md"
+  }
 }

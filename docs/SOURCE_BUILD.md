@@ -58,6 +58,38 @@ PYEOF
 
 7 个文件全部 `OK` 才继续；任何一个 `FAIL` 说明前两步的输入或补丁版本不对。
 
+### 叠加 rc.7 增量（`sources/xxs-20261022-sol/`）
+
+在 rc.6 的 7 个文件覆盖完成、校验通过之后，再覆盖 rc.7 的 7 个文件（其中 `gemm.hpp`、`gemm.cu`、`kernels.cu` 与 rc.6 同名，覆盖即替换）：
+
+```bash
+S=sources/xxs-20261022-sol
+for f in CMakeLists.txt include/strata/prefill/gemm.hpp \
+         src/kernels/cuda/dequant_bf16.cu src/prefill/gateup_exact.hpp \
+         src/prefill/gemm.cu src/prefill/kernels.cu src/prefill/moe_mmq.cu; do
+  install -D -m 644 "$S/$f" "prepared/strata/$f"
+done
+
+# 逐文件校验（与 rc.6 同一套逻辑，换目录即可）
+python3 - <<'PYEOF'
+import hashlib, json, pathlib
+V = pathlib.Path("/absolute/path/strata-k100ai/sources/xxs-20261022-sol")
+man = json.loads((V / "manifest.json").read_text())
+bad = 0
+for e in man["files"]:
+    p = pathlib.Path("prepared/strata") / e["path"]
+    got = hashlib.sha256(p.read_bytes()).hexdigest()
+    ok = got == e["sha256"]
+    bad += 0 if ok else 1
+    print(("OK  " if ok else "FAIL"), e["path"], got[:16])
+raise SystemExit(1 if bad else 0)
+PYEOF
+```
+
+7 个文件全部 `OK` 后，`prepared/strata` 与发布二进制对应的源码树即**逐字节一致**（本次已验证：与部署树 `diff -rq` 零差异），随后干净编译产物的 SHA-256 与发布资产**完全相同**。见 [REBUILD_REPORT.md](../sources/xxs-20261022-sol/REBUILD_REPORT.md)。
+
+> 注意：`sources/xxs-20261022-sol/patches/` 的三个脚本（`patch_gemsol.py`、`patch_gemsol2.py`、`patch_cmake_rocblas.py`）**不需要执行**——它们的作用是说明 pin hook 是怎么加进去的；直接覆盖上面 7 个文件即可得到等价结果。
+
 ### 关于 4 个 `patch_yf16_*.py`
 
 它们的路径契约是 `<workdir>/source/{include,src}/...`（`W = argv[1]`，然后拼 `W/"source/..."`），与本文件的 `prepared/strata/...` 布局不同。若要复跑这些脚本，必须传入一个含有 `source/` 子目录的 workdir，例如 `ln -s prepared/strata workdir/source`。它们的存在是为了说明 `GEMM_Y_F16` 是怎么一步步改出来的（含 `f16_inplace` 漏改导致的 NaN 修复），**重建时不需要执行**。

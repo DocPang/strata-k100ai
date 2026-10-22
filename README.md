@@ -2,9 +2,9 @@
 
 面向海光 K100AI（gfx928、64 GiB 显存）的 **Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS** 推理优化与部署配置。
 
-当前版本为 **[v0.1.0-rc.6](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.6)**，分发 2026-10-16 的固定引擎：32K / 128K / 250K 三档均已做同批 A/B/A 复测。引擎 SHA-256 为 `43002a7262e50d836f01642d1a5846565d8cd0734ec1d0ef67f534aeb11aafac`。本版在上一版基础上新增 16 位 GEMM Y 累加器、h16 topk 核与寄存器最大值缓存、scores 合并批次加倍、Q6K packed-wave LDS 与 MMVQ WV2 分组；已否决的 h16 topk 线程数扩容未纳入。其中 MMVQ WV2 分组只有组件级收益（核级逐位一致、孤立微基准 −24.8%），整模 decode 实测未复现，成绩区按实测区间标注。
+当前版本为 **[v0.1.0-rc.7](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.7)**，引擎 SHA-256 为 `19b367e015d006694737ba067f0a4ac25da09c40be19b0d669fc1e09444152a3`（29,327,416 B）。本版在 rc.6 之上做两件事：一是并入 2026-10-20~22 实验链的累积源码增量（7 个文件，最大项为 gate/up 与稠密 GEMM 相关改动），二是新增 rocBLAS Tensile solution 按形状锁定 `STRATA_GEMM_SOL`。固定负载 ctx128（126,857 token）交叉 A/B：**61,271.7 → 60,265.7 ms（−1.64%）**，控制组两次相差 1.6 ms；生产实例同 prompt 阶梯实测：**23K −11.2%、126K 约 −8.9%**。本版从公开材料**字节级可复现**（干净重建产物 SHA-256 与发布二进制完全一致）。
 
-源码按版本分目录公开在 [`sources/`](sources/)，当前版本见 [`sources/xxs-20261016-gold/`](sources/xxs-20261016-gold/)（增量源码 + 补丁链 + 逐文件校验值）；重编译不保证字节一致，二进制身份以 Release 资产与 `engine_sha256` 为准。
+源码按版本分目录公开在 [`sources/`](sources/)，当前版本见 [`sources/xxs-20261022-sol/`](sources/xxs-20261022-sol/)（7 个增量文件 + 补丁链 + 逐文件校验值 + [复现报告](sources/xxs-20261022-sol/REBUILD_REPORT.md)）；本版已达成字节级可重建，二进制身份仍以 Release 资产与 `engine_sha256` 为准。
 
 运行包约 8.5 MiB，包含推理程序、HTTP 服务与模型转换工具；基础镜像、驱动和模型权重单独准备。支持直接复用本机 DTK 镜像，也可将运行包加入基础镜像生成本地派生镜像。
 
@@ -84,16 +84,16 @@ free -h
 ```bash
 mkdir -p "$HOME/strata-deploy"
 cd "$HOME/strata-deploy"
-git clone --depth 1 --branch v0.1.0-rc.6 \
-  https://github.com/DocPang/strata-k100ai.git strata-k100ai-rc6
-cd strata-k100ai-rc6
+git clone --depth 1 --branch v0.1.0-rc.7 \
+  https://github.com/DocPang/strata-k100ai.git strata-k100ai-rc7
+cd strata-k100ai-rc7
 
 export PROJECT_DIR="$PWD"
 export DATA_DIR="$PROJECT_DIR/data"
 mkdir -p "$DATA_DIR/models/IQ3_XXS" "$DATA_DIR/packs" "$DATA_DIR/mtp"
 ```
 
-也可从 [Release](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.6) 下载 `deployment-v0.1.0-rc.6.tar.gz` 解压，进入解压目录后设置上述两个变量。
+也可从 [Release](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.7) 下载 `deployment-v0.1.0-rc.7.tar.gz` 解压，进入解压目录后设置上述两个变量。
 
 ### 3. 准备国内 DTK 基础镜像
 
@@ -116,15 +116,15 @@ docker image inspect "$BASE_IMAGE" --format '{{.Id}}'
 
 ```bash
 cd "$PROJECT_DIR"
-curl -fL --retry 3 -o strata-xxs-20261016-gold-linux-amd64.tar.gz \
-  https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.6/strata-xxs-20261016-gold-linux-amd64.tar.gz
-sha256sum -c engines/strata/xxs-20261016-gold/artifact.sha256
-tar -xzf strata-xxs-20261016-gold-linux-amd64.tar.gz
+curl -fL --retry 3 -o strata-xxs-20261022-sol-linux-amd64.tar.gz \
+  https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.7/strata-xxs-20261022-sol-linux-amd64.tar.gz
+sha256sum -c engines/strata/xxs-20261022-sol/artifact.sha256
+tar -xzf strata-xxs-20261022-sol-linux-amd64.tar.gz
 (cd runtime && sha256sum -c FILES.sha256)
 sha256sum runtime/bin/strata
 ```
 
-最后一条应显示本页开头的 `43002a7262e5…` 完整摘要。所有校验通过后再继续。
+最后一条应显示本页开头的 `19b367e0…` 完整摘要。所有校验通过后再继续。
 
 ### 5. 从魔塔下载两个 IQ3_XXS 权重分片
 

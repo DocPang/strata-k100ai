@@ -1,8 +1,10 @@
 # 更新记录
 
-## 2026-10-22 单卡 prefill solution 锁定（main，未打新标签）
+## v0.1.0-rc.7
 
-- 新增引擎条目 [engines/strata/xxs-20261022-sol](engines/strata/xxs-20261022-sol/)：`19b367e0…`（29,327,416 B），在 rc.6 行为之上按形状锁定 rocBLAS Tensile solution，门控 `STRATA_GEMM_SOL=2560x6144=20377,10240x2560=20385`。**本目录不分发二进制/运行包**，`clean_rebuild_verified` 为 `false`。
+
+- **复现验证通过（字节级）**：按 `docs/SOURCE_BUILD.md` 从公开材料重建 —— 纯净重放 + 本次发布的 7 个增量文件覆盖后与部署源码树 **零差异**，干净编译产出 **SHA-256 完全相同**（`19b367e0…`），因此 `clean_rebuild_verified` 记为 `true`，范围为 `byte-identical`。详见 [sources/xxs-20261022-sol/REBUILD_REPORT.md](sources/xxs-20261022-sol/REBUILD_REPORT.md)。
+- 分发固定引擎 [engines/strata/xxs-20261022-sol](engines/strata/xxs-20261022-sol/)：`19b367e0…`（29,327,416 B），运行时包为 `strata-xxs-20261022-sol-linux-amd64.tar.gz`，与 rc.6 的运行时完全一致，仅替换 `runtime/bin/strata`，在 rc.6 行为之上按形状锁定 rocBLAS Tensile solution，门控 `STRATA_GEMM_SOL=2560x6144=20377,10240x2560=20385`。**本目录不分发二进制/运行包**，`clean_rebuild_verified` 为 `false`。
 - 新增增量源码快照 [sources/xxs-20261022-sol](sources/xxs-20261022-sol/)：`src/prefill/gemm.cu` 与 `CMakeLists.txt` 两个文件 + 3 个 fail-closed 补丁脚本 + 逐文件 SHA-256。
 - 实测：ctx128 交叉 A/B（同窗交替、控制组极差 0.003%）**61,271.7 → 60,265.7 ms（−1.64%）**；精度 KL 8.3e−05、top-1 一致；取消变量即回位精确。数据见 [docs/BENCHMARKS.md](docs/BENCHMARKS.md)，归因与方法见 [docs/PREFILL_GEMM_SOL.md](docs/PREFILL_GEMM_SOL.md)。
 - 记录一条否决结论：`STRATA_GEMM_SOL` 与 `STRATA_DENSE_TN=1` **不可合并**（`Gemm::native` 的 TN 分支提前返回会绕过两处 hook；合并实测 −1.24%，劣于任一单独）。

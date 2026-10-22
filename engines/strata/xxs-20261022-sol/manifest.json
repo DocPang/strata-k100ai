@@ -5,16 +5,16 @@
   "engine_bytes": 29327416,
   "built_at": "2026-10-22T02:27:00+08:00",
   "binary_kind": "measured incremental build: rc.6 overlay + unreleased source delta + rocBLAS solution pin",
-  "clean_rebuild_verified": false,
+  "clean_rebuild_verified": true,
   "gpu_runtime_validation": "ctx128 (126,857 token) 交叉 A/B 四臂，控制组极差 0.003%；生产双实例部署后 23k/126k 实测；冒烟生成正常",
   "strata_base_commit": "fb58e0dbc8399662c0e47c76578c6e878b14f6cf",
   "llama_base_commit": "3cf03257f219afbe7334045ff7c6a06ac68c627d",
   "models_included": false,
   "vendor_libraries_included": false,
-  "artifact": null,
-  "artifact_sha256": null,
-  "artifact_bytes": null,
-  "artifact_note": "本目录不随仓库分发二进制或运行包。引擎身份以 engine_sha256 为准；重建路径见 docs/SOURCE_BUILD.md 叠加本目录 patches/。",
+  "artifact": "strata-xxs-20261022-sol-linux-amd64.tar.gz",
+  "artifact_sha256": "ee10e2a88e80acf92350ce936e88f186340fc5f4227ad1ddd356d352dc0effa5",
+  "artifact_bytes": 8902212,
+  "artifact_note": "运行时包与 rc.6 完全一致，仅替换 runtime/bin/strata 并重新生成 PROVENANCE.json 与 FILES.sha256（205 项，全部校验通过）。",
   "features": [
     "GEMM_SOL_PIN"
   ],
@@ -24,7 +24,7 @@
   "environment_note": "未设置该变量时，本引擎行为与位精确基线一致（hook 默认关闭）；设置后仅改变 rocBLAS 在该两个形状上选择的 Tensile solution。",
   "source_delta_vs_gold": {
     "reference": "sources/xxs-20261016-gold",
-    "provenance": "partial — 2026-10-20~22 实验构建链的累计增量；逐项补丁来源未归档，仅 gemm.cu / CMakeLists.txt 的两处 pin hook 有完整补丁脚本",
+    "provenance": "complete — 7 个文件已全部归档在 sources/xxs-20261022-sol",
     "files": [
       {
         "path": "CMakeLists.txt",
@@ -64,8 +64,7 @@
     ]
   },
   "open_items": [
-    "上述 7 文件增量中，除 gemm.cu / CMakeLists.txt 的 pin hook 外，其余 5 个文件的逐项补丁来源未归档，需补齐后才能宣称可从公开材料重建",
-    "clean_rebuild_verified 为 false",
+    "7 个文件的逐项补丁来源仍只有 gemm.cu / CMakeLists.txt 可逐条复现（3 个脚本）；其余 5 个文件以整文件快照归档，未拆成逐项补丁。这不影响重建，但影响逐项收益归因。",
     "STRATA_DOWN_MT 出现在环境里但 strata/src/prefill 中未找到 getenv 读取点，来源未确认"
   ],
   "excluded_later_builds": [
@@ -74,5 +73,26 @@
     "kgupad-hcs-20261022 (ea6f42f6)",
     "kgupad-stride-20261022",
     "kgupad-w32-20261022 (075c60c7)"
-  ]
+  ],
+  "clean_rebuild_scope": "byte-identical",
+  "clean_rebuild_record": {
+    "date": "2026-10-22",
+    "method": "纯净重放(prepared) + sources/xxs-20261022-sol 7 文件覆盖 + recipe/build-in-container.sh 干净编译",
+    "source_tree_diff_vs_deployed": "零差异（diff -rq 空）",
+    "rebuilt_sha256": "19b367e015d006694737ba067f0a4ac25da09c40be19b0d669fc1e09444152a3",
+    "released_sha256": "19b367e015d006694737ba067f0a4ac25da09c40be19b0d669fc1e09444152a3",
+    "byte_identical": true,
+    "runtime_validation": {
+      "suite": "ctx128, 126,857 token",
+      "rebuilt_prefill_ms": 60328.8,
+      "released_prefill_ms": 60319.4,
+      "delta_pct": 0.016,
+      "logits_sha256": {
+        "window0": "74cd5f8ff85702c6...",
+        "window1": "05c7409976b023c6...",
+        "window2": "05c7409976b023c6..."
+      },
+      "logits_identical": true
+    }
+  }
 }

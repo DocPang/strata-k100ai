@@ -217,3 +217,7 @@ XXS exact+fused 基准引擎（`ad743dbf9cc1`）、INT8 KV。不同上下文和�
 
 126k token 生产档：70.78 → 64.47 s（≈−8.9%，两臂均有向上漂移，仅作量级参考）。
 阶梯中的 −9.15% 来自相对 `sources/xxs-20261016-gold` 的**未归档源码增量**，不是编译选项差异，见 [PREFILL_GEMM_SOL.md](PREFILL_GEMM_SOL.md)。
+
+### 复现验证（2026-10-22）
+
+按 `docs/SOURCE_BUILD.md` 从公开材料重建：源码树与部署树 `diff -rq` 零差异，干净编译产物 **SHA-256 与发布资产完全相同**（`19b367e0…`）。运行期两臂同一二进制，ctx128 下 prefill 60,328.8 / 60,319.4 ms（差 0.016%），三窗 logits 逐位一致。详见 [REBUILD_REPORT](../sources/xxs-20261022-sol/REBUILD_REPORT.md)。
