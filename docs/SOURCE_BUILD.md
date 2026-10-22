@@ -65,7 +65,7 @@ PYEOF
 ### 编译与验收
 
 ```bash
-bash <build-script>            # 全量编译、链接
+bash engines/strata/c4/replay/build-in-container.sh /work   # 全量编译、链接（容器内）
 # 之后必须做：模型加载 + 固定样本输出比对（不是只看编译通过）
 ```
 

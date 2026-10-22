@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "engine": "strata/xxs-20261022-sol",
+  "engine_sha256": "19b367e015d006694737ba067f0a4ac25da09c40be19b0d669fc1e09444152a3",
+  "engine_bytes": 29327416,
+  "built_at": "2026-10-22T02:27:00+08:00",
+  "binary_kind": "measured incremental build: rc.6 overlay + unreleased source delta + rocBLAS solution pin",
+  "clean_rebuild_verified": false,
+  "gpu_runtime_validation": "ctx128 (126,857 token) 交叉 A/B 四臂，控制组极差 0.003%；生产双实例部署后 23k/126k 实测；冒烟生成正常",
+  "strata_base_commit": "fb58e0dbc8399662c0e47c76578c6e878b14f6cf",
+  "llama_base_commit": "3cf03257f219afbe7334045ff7c6a06ac68c627d",
+  "models_included": false,
+  "vendor_libraries_included": false,
+  "artifact": null,
+  "artifact_sha256": null,
+  "artifact_bytes": null,
+  "artifact_note": "本目录不随仓库分发二进制或运行包。引擎身份以 engine_sha256 为准；重建路径见 docs/SOURCE_BUILD.md 叠加本目录 patches/。",
+  "features": [
+    "GEMM_SOL_PIN"
+  ],
+  "environment_required": {
+    "STRATA_GEMM_SOL": "2560x6144=20377,10240x2560=20385"
+  },
+  "environment_note": "未设置该变量时，本引擎行为与位精确基线一致（hook 默认关闭）；设置后仅改变 rocBLAS 在该两个形状上选择的 Tensile solution。",
+  "source_delta_vs_gold": {
+    "reference": "sources/xxs-20261016-gold",
+    "provenance": "partial — 2026-10-20~22 实验构建链的累计增量；逐项补丁来源未归档，仅 gemm.cu / CMakeLists.txt 的两处 pin hook 有完整补丁脚本",
+    "files": [
+      {
+        "path": "CMakeLists.txt",
+        "sha256": "见 sources/xxs-20261022-sol/manifest.json",
+        "note": "-lrocblas"
+      },
+      {
+        "path": "include/strata/prefill/gemm.hpp",
+        "sha256": "70650d4a51757310c238d662b4bae0a7293d081a9781e327f58a253b1eb604be",
+        "bytes": 6271
+      },
+      {
+        "path": "src/kernels/cuda/dequant_bf16.cu",
+        "sha256": "6c50aa45aeaf782c6d151083fbfe5e691021bcc72f0919e10d015b97aa27d51d",
+        "bytes": 13518
+      },
+      {
+        "path": "src/prefill/gateup_exact.hpp",
+        "sha256": "808afefff74c6f9bb8c186667ab1085f6c980768ab218c1189fdbb3bddd2204c",
+        "bytes": 82188
+      },
+      {
+        "path": "src/prefill/gemm.cu",
+        "sha256": "见 sources/xxs-20261022-sol/manifest.json",
+        "note": "含 pin hook"
+      },
+      {
+        "path": "src/prefill/kernels.cu",
+        "sha256": "b00b1b94da168295da21936ecca5947fc56046323b19f18724c8da2bcf71fbbe",
+        "bytes": 169434
+      },
+      {
+        "path": "src/prefill/moe_mmq.cu",
+        "sha256": "f990b91abe919cbc22f85b9adff015d12269baaa8dd3e36991dae605d7421037",
+        "bytes": 60703
+      }
+    ]
+  },
+  "open_items": [
+    "上述 7 文件增量中，除 gemm.cu / CMakeLists.txt 的 pin hook 外，其余 5 个文件的逐项补丁来源未归档，需补齐后才能宣称可从公开材料重建",
+    "clean_rebuild_verified 为 false",
+    "STRATA_DOWN_MT 出现在环境里但 strata/src/prefill 中未找到 getenv 读取点，来源未确认"
+  ],
+  "excluded_later_builds": [
+    "kgupad-gsol-20261022 (15668606)",
+    "kgupad-mt2-20261022 (3843f8f5)",
+    "kgupad-hcs-20261022 (ea6f42f6)",
+    "kgupad-stride-20261022",
+    "kgupad-w32-20261022 (075c60c7)"
+  ]
+}

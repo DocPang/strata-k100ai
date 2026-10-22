@@ -1,0 +1,161 @@
+[
+  {
+    "test": "prefill-sol-pin-interleaved-ctx128",
+    "binary_sha256": "19b367e015d006694737ba067f0a4ac25da09c40be19b0d669fc1e09444152a3",
+    "control_binary_sha256": "1502d407054e6d3bb62f9e9eff49bf51f8c2e2c88f6c0233e634d0efdc109f16",
+    "status": "PASS",
+    "date": "2026-10-22",
+    "device": "/dev/dri/renderD132 (K100_AI, gfx928, 120CU@1.4GHz)",
+    "suite": "ctx128",
+    "input_tokens": 126857,
+    "prefill_chunk": 30602,
+    "method": "同一时间窗内交替执行 c1/n1/c2/n2，控制组极差 0.003%",
+    "control_ms": [
+      61272.5,
+      61270.9
+    ],
+    "experiment_ms": [
+      60224.8,
+      60306.5
+    ],
+    "control_mean_ms": 61271.7,
+    "experiment_mean_ms": 60265.65,
+    "delta_pct": -1.6423,
+    "accuracy": {
+      "kl": 8.3e-05,
+      "top1_same": true,
+      "maxabsdiff": 1.74572,
+      "n": 248320
+    },
+    "env": {
+      "HIP_VISIBLE_DEVICES": "0",
+      "ROCR_VISIBLE_DEVICES": "0",
+      "HSA_FORCE_FINE_GRAIN_PCIE": "1",
+      "LD_LIBRARY_PATH": "/opt/hyhal/lib:/opt/dtk/lib:/opt/dtk/llvm/lib:/opt/dtk/.hyhal/lib",
+      "STRATA_PREFILL_CPU_SHARE": "0",
+      "STRATA_SH_STREAM": "0",
+      "STRATA_PLE_PRELAUNCH": "1",
+      "STRATA_ATTN_LANECELL": "1",
+      "STRATA_Q6_PACKED": "1",
+      "STRATA_Q6_WAVE_PACK_PREP": "1",
+      "STRATA_Q6_WAVE_PACK": "1",
+      "STRATA_GR_DOWN_PREFETCH": "2",
+      "STRATA_HC_SPLIT": "2",
+      "STRATA_MMQ_RESIDENT_SORT_NE": "1",
+      "STRATA_MMQ_RESIDENT_SORT_NATIVE": "1",
+      "STRATA_HIP_WMMA": "1",
+      "STRATA_HIP_PROMPT_F16": "1",
+      "STRATA_GDN_HEAD": "1",
+      "STRATA_Q8_PACKED": "1",
+      "STRATA_EXPERT_V2": "1",
+      "STRATA_DOWN_MT": "1",
+      "STRATA_GDN_NOY": "1",
+      "STRATA_PF_PAD_ROCBLAS": "1",
+      "STRATA_PREFILL_RING": "8",
+      "STRATA_PF_GATED_IN_REGION": "1",
+      "STRATA_EMB_REUSE_ACCOUNT": "1",
+      "STRATA_PF_DMSCRATCH_COND": "1",
+      "STRATA_PF_FUSED_SQ": "1",
+      "STRATA_MMQ_EXACT_ALL": "1",
+      "STRATA_KV_PREFETCH": "1",
+      "STRATA_PF_FUSED": "1",
+      "STRATA_PF_FUSED_NATIVE_EXACT_SKIP": "1",
+      "STRATA_SCORES_MMAC": "2",
+      "STRATA_SCORES_MMAC_LDS": "1",
+      "STRATA_SCORES_MMAC_NB": "2",
+      "STRATA_SEL_SCORES_FP16": "1",
+      "STRATA_GATEUP_EXACT_IQ2": "1",
+      "STRATA_TOPK_H16": "1",
+      "STRATA_TOPK_REG_MAX": "7168",
+      "STRATA_MMVQ_WV2_LDS": "1",
+      "STRATA_MMVQ_WV2_GROUP": "1",
+      "STRATA_Q6_WAVE_PACK_LDS": "1",
+      "STRATA_GEMM_Y_F16": "qkv|qf|sg|su|sd|z",
+      "STRATA_GEMM_SOL": "2560x6144=20377,10240x2560=20385"
+    }
+  },
+  {
+    "test": "production-ladder-23k",
+    "status": "PASS",
+    "date": "2026-10-22",
+    "device": "prod hcu0 /dev/dri/renderD128, hcu1 /dev/dri/renderD129",
+    "input_tokens": 23096,
+    "metric": "TTFT (max_tokens=1, prompt 每次加 nonce 避免 prompt cache)",
+    "arms": [
+      {
+        "binary": "43002a72 (rc.6 定版，原生产)",
+        "ms": [
+          13.21,
+          13.34,
+          13.29,
+          13.18,
+          13.27,
+          13.29,
+          13.32
+        ],
+        "mean_ms": 13.27
+      },
+      {
+        "binary": "43002a72 重启后复测（对照）",
+        "ms": [
+          13.18,
+          13.29,
+          13.29,
+          13.32
+        ],
+        "mean_ms": 13.27,
+        "note": "排除重启效应"
+      },
+      {
+        "binary": "1502d407 (重编基线)",
+        "ms": [
+          11.98,
+          12.04,
+          12.09,
+          12.11
+        ],
+        "mean_ms": 12.055,
+        "delta_pct": -9.15
+      },
+      {
+        "binary": "19b367e0 (本版 + pin)",
+        "ms": [
+          11.79,
+          11.78,
+          11.78,
+          11.79
+        ],
+        "mean_ms": 11.785,
+        "delta_pct": -11.19
+      }
+    ]
+  },
+  {
+    "test": "production-ctx126k",
+    "status": "PARTIAL",
+    "date": "2026-10-22",
+    "device": "prod hcu0 /dev/dri/renderD128",
+    "input_tokens": 125447,
+    "arms": [
+      {
+        "binary": "43002a72 (原生产)",
+        "ms": [
+          69.25,
+          71.23,
+          71.87
+        ],
+        "mean_ms": 70.78
+      },
+      {
+        "binary": "19b367e0 (本版 + pin)",
+        "ms": [
+          63.38,
+          65.55
+        ],
+        "mean_ms": 64.47,
+        "delta_pct": -8.91
+      }
+    ],
+    "caveat": "该轮两臂均出现向上漂移，样本数少；仅作量级参考，权威口径见 ctx128 交叉 A/B"
+  }
+]

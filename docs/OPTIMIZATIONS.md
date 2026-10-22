@@ -16,6 +16,7 @@ v0.1.0-rc.6 固定分发 `43002a7262e5` 引擎；上一版 v0.1.0-rc.5 分发 `d
 | Down 展开与计算 | IQ4_NL exact preexpand、Q2_0 展开、int8 MMAC、staging、DOWN_MT | 保留 `iq4_preexpand_exact.hpp` 与相关 MMQ 分派；按格式、行数和形状命中 |
 | GEMM 形状自适应 | `moe_mmq.cu` 按专家组 max_rows 选择 tile | 编译入分派逻辑，不对应一个额外的环境变量 |
 | 稠密 GEMM 布局与接口 | PF_PAD_ROCBLAS、DTK rocBLAS/hipBLASLt 适配 | 发布配置启用步长 padding；不表示所有投影均走 hipBLASLt，也不沿用失败候选路径的性能估计 |
+| 稠密 GEMM solution 锁定 | `STRATA_GEMM_SOL=<N>x<K>=<solution>`，见 [PREFILL_GEMM_SOL.md](PREFILL_GEMM_SOL.md) | 仅对命中形状换 Tensile solution，未命中走上游默认；与 `STRATA_DENSE_TN` 互斥（TN 分支提前返回会绕过 hook），不可合并 |
 
 ## GDN、Hyper-connection 与数据复用
 

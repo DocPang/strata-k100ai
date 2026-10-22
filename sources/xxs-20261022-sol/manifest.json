@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "snapshot": "xxs-20261022-sol",
+  "engine_sha256": "19b367e015d006694737ba067f0a4ac25da09c40be19b0d669fc1e09444152a3",
+  "engine_bytes": 29327416,
+  "reference": "sources/xxs-20261016-gold",
+  "kind": "增量快照，不是完整引擎树",
+  "incremental_completeness": "partial",
+  "note": "本目录只收录与 rocBLAS solution pin 直接相关的两个文件（含本次新增 hook 与 -lrocblas）。相对 gold 还存在另外 5 个文件的增量（gemm.hpp / dequant_bf16.cu / gateup_exact.hpp / kernels.cu / moe_mmq.cu），其逐项补丁来源未归档，见 engines/strata/xxs-20261022-sol/manifest.json 的 source_delta_vs_gold。",
+  "files": [
+    {
+      "path": "src/prefill/gemm.cu",
+      "sha256": "a12eb5fa889198b352ce8c4a0520f60933dc0eb914039f3262f17d0a77e6f5ed",
+      "bytes": 86527
+    },
+    {
+      "path": "CMakeLists.txt",
+      "sha256": "f95884b08543e607d9fd23332b08900d7bbf8ebc6f30196d32bbac638a86c3e6",
+      "bytes": 103379
+    }
+  ],
+  "patches_in_order": [
+    {
+      "order": 1,
+      "file": "patches/patch_gemsol.py",
+      "target": "src/prefill/gemm.cu",
+      "anchors": 2,
+      "effect": "在 Gemm::f16_inplace 与 Gemm::native padr 分支插入 solution 查表 hook"
+    },
+    {
+      "order": 2,
+      "file": "patches/patch_gemsol2.py",
+      "target": "src/prefill/gemm.cu",
+      "anchors": 1,
+      "effect": "补 10240x2560 形状的第二处 hook"
+    },
+    {
+      "order": 3,
+      "file": "patches/patch_cmake_rocblas.py",
+      "target": "CMakeLists.txt",
+      "anchors": 1,
+      "effect": "显式链接 -lrocblas"
+    }
+  ],
+  "fail_closed": true
+}

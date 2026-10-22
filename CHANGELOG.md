@@ -1,5 +1,14 @@
 # 更新记录
 
+## 2026-10-22 单卡 prefill solution 锁定（main，未打新标签）
+
+- 新增引擎条目 [engines/strata/xxs-20261022-sol](engines/strata/xxs-20261022-sol/)：`19b367e0…`（29,327,416 B），在 rc.6 行为之上按形状锁定 rocBLAS Tensile solution，门控 `STRATA_GEMM_SOL=2560x6144=20377,10240x2560=20385`。**本目录不分发二进制/运行包**，`clean_rebuild_verified` 为 `false`。
+- 新增增量源码快照 [sources/xxs-20261022-sol](sources/xxs-20261022-sol/)：`src/prefill/gemm.cu` 与 `CMakeLists.txt` 两个文件 + 3 个 fail-closed 补丁脚本 + 逐文件 SHA-256。
+- 实测：ctx128 交叉 A/B（同窗交替、控制组极差 0.003%）**61,271.7 → 60,265.7 ms（−1.64%）**；精度 KL 8.3e−05、top-1 一致；取消变量即回位精确。数据见 [docs/BENCHMARKS.md](docs/BENCHMARKS.md)，归因与方法见 [docs/PREFILL_GEMM_SOL.md](docs/PREFILL_GEMM_SOL.md)。
+- 记录一条否决结论：`STRATA_GEMM_SOL` 与 `STRATA_DENSE_TN=1` **不可合并**（`Gemm::native` 的 TN 分支提前返回会绕过两处 hook；合并实测 −1.24%，劣于任一单独）。
+- 记录一组方法论结论：独立微基准与引擎内实测可差 30%（同一调用 72.07 vs 95.6 TF/s），微基准只能证伪方向；只有"同 kernel 换 solution"可跨形状迁移（9 个形状里 2 个成功）。
+- **生产部署时发现**：rc.6 定版 `43002a72…` 在 23k token 档比同源重编慢 **9.15%**，且把 `43002a72` 重新部署复测仍为同一数值，排除重启效应；`CMakeCache` 编译选项与发布配方逐项一致，因此差异来自相对 `sources/xxs-20261016-gold` 的 **7 个文件未归档源码增量**。其中 5 个（`gemm.hpp`、`dequant_bf16.cu`、`gateup_exact.hpp`、`kernels.cu`、`moe_mmq.cu`）的逐项补丁来源未归档，列为待办；在补齐前不要宣称该引擎可从公开材料重建。
+
 ## 2026-10-20 源码审查回应（main）
 
 - 新增 [sources/xxs-20261016-gold/KNOWN_ISSUES.md](sources/xxs-20261016-gold/KNOWN_ISSUES.md)，记录静态审查确认的 4 项：`STRATA_GEMM_F32OUT` 与 `STRATA_GEMM_Y_F16` 在 padr 分支缺互斥（`gemm.cu:1247` 对 `gemm.cu:1019`，当前不可达）；`kernel_hcdown_mmac` 的 LDS 行维越界写（`sA/sB` 声明 64 行、写到第 127 行，因 `(nd+ni)%16` 门禁当前不可达）与 `STRATA_HC_MMAC` 用 `getenv()!=nullptr` 解析导致字符串 0 也算开启；工作区仍按 FP32 容量分配（`m.qkv` / `m.Qf` / `m.z` / `m.shared`）。
