@@ -2,9 +2,9 @@
 
 面向海光 K100AI（gfx928、64 GiB 显存）的 **Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS** 推理优化与部署配置。
 
-当前版本为 **[v0.1.0-rc.7](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.7)**，引擎 SHA-256 为 `19b367e015d006694737ba067f0a4ac25da09c40be19b0d669fc1e09444152a3`（29,327,416 B）。本版在 rc.6 之上做两件事：一是并入 2026-10-20~22 实验链的累积源码增量（7 个文件，最大项为 gate/up 与稠密 GEMM 相关改动），二是新增 rocBLAS Tensile solution 按形状锁定 `STRATA_GEMM_SOL`。固定负载 ctx128（126,857 token）交叉 A/B：**61,271.7 → 60,265.7 ms（−1.64%）**，控制组两次相差 1.6 ms；生产实例同 prompt 阶梯实测：**23K −11.2%、126K 约 −8.9%**。本版从公开材料**字节级可复现**（干净重建产物 SHA-256 与发布二进制完全一致）。
+当前版本为 **[v0.2.0](https://github.com/DocPang/strata-k100ai/releases/tag/v0.2.0)**，引擎 SHA-256 为 `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9`（45,674,152 B）。本版把优化集**重基到上游 strata 0.2.2（`011c9e60`）**，与 rc.1–rc.7 的 `fb58e0db` 谱系不是同一条基线，因此不与 rc.7 逐位对比。相对同卡上游 0.2.2 构建：预填 30,603 token **0.988 / 0.985**、126,857 token **0.986 / 0.986**，decode 9/9 格持平或领先（**0.941–0.998**）。源码增量为 36 个文件（30 改 / 6 增），逐文件校验与复现记录见 [`sources/xxs-20261023-k100ai022/`](sources/xxs-20261023-k100ai022/)；`clean_rebuild_verified` 为 `false`（同目录可复现、换目录不复现，原因见复现报告）。
 
-源码按版本分目录公开在 [`sources/`](sources/)，当前版本见 [`sources/xxs-20261022-sol/`](sources/xxs-20261022-sol/)（7 个增量文件 + 补丁链 + 逐文件校验值 + [复现报告](sources/xxs-20261022-sol/REBUILD_REPORT.md)）；本版已达成字节级可重建，二进制身份仍以 Release 资产与 `engine_sha256` 为准。
+源码按版本分目录公开在 [`sources/`](sources/)，当前版本见 [`sources/xxs-20261023-k100ai022/`](sources/xxs-20261023-k100ai022/)（36 个增量文件 + 逐文件校验值 + [复现报告](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)）；本版未附运行包，二进制身份以 `engine_sha256` 为准。
 
 运行包约 8.5 MiB，包含推理程序、HTTP 服务与模型转换工具；基础镜像、驱动和模型权重单独准备。支持直接复用本机 DTK 镜像，也可将运行包加入基础镜像生成本地派生镜像。
 
