@@ -103,5 +103,5 @@
     "STRATA_K100AI_HC_FUSE（默认开）改变 hc read 一处投影的累加序，是与上游唯一的数值差异；=0 可逐位还原。"
   ],
   "artifact_sha256": "359baf7032c8b9c4684956036462d68f025841fd90f5c88f753a5b494cfdbe57",
-  "artifact_bytes": 13604000
+  "artifact_bytes": 13002122
 }
