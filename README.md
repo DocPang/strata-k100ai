@@ -4,15 +4,15 @@
 
 当前版本 **[v0.2.0](https://github.com/DocPang/strata-k100ai/releases/tag/v0.2.0)**，引擎 SHA-256 为 `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9`（45,674,152 B）。
 
-本版把优化集**重基到上游 strata 0.2.2（`011c9e60`）**。rc.1–rc.7 的引擎谱系基于上游 `fb58e0db`，与本版不是同一条基线（两棵树有 333 个文件不同），因此本版不与 rc.7 逐位对比；下面所有成绩的对照组都是**同一张卡上的上游 0.2.2 构建**。
+本版把优化集**重基到上游 strata 0.2.2（`011c9e60`）**。rc.1–rc.7 的引擎谱系基于上游 `fb58e0db`，与本版不是同一条基线（两棵树有 333 个文件不同），两版基线不同，所以下面的差值既包含本版的优化，也包含上游基线本身的变化——这是"上一版对上一版"的口径，与 CHANGELOG 的既有做法一致；对照组是**同一张卡上的上一版 rc.7 引擎**。
 
 ## 本版成绩
 
-测试条件：单卡 gfx928（renderD132）、IQ3_XXS、max-context=262144、expert-cache=24576、INT8 KV、prefill=30602、spec=6；对照组为同卡上游 0.2.2 构建，**同会话交替、单请求串行**；43 个开关完整列在 [`engines/strata/xxs-20261023-k100ai022/manifest.json`](engines/strata/xxs-20261023-k100ai022/manifest.json) 的 `environment_required`。
+测试条件：单卡 gfx928（renderD132）、IQ3_XXS、max-context=262144、expert-cache=24576、INT8 KV、prefill=30602、spec=6；对照组为同卡上一版 rc.7 引擎（`ec7021b0…`），**同会话交替、单请求串行**；43 个开关完整列在 [`engines/strata/xxs-20261023-k100ai022/manifest.json`](engines/strata/xxs-20261023-k100ai022/manifest.json) 的 `environment_required`。
 
 ### 预填（TTFT 的主体）
 
-| 套件 | prompt token | 本版 | 上游 0.2.2 | 比值 | 本版吞吐 |
+| 套件 | prompt token | 本版 | rc.7 | 比值 | 本版吞吐 |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | ctx32 | 30,603 | **14,232 / 13,947 ms** | 14,411 / 14,160 ms | **0.988 / 0.985** | 2,150 / 2,194 tok/s |
 | lt | 7,556 | 4,497 / **3,851 ms** | 4,482 / 3,956 ms | 1.003 / **0.974** | 1,680 / 1,962 tok/s |
@@ -22,7 +22,7 @@
 
 ### decode（端到端，每请求）
 
-| 套件 | 本版 | 上游 0.2.2 | 比值 |
+| 套件 | 本版 | rc.7 | 比值 |
 | --- | ---: | ---: | ---: |
 | ctx32 | **84.8 / 149.7 / 135.1 ms** | 89.8 / 152.1 / 136.3 ms | **0.944 / 0.984 / 0.991** |
 | lt | **83.6 / 140.5 / 129.2 ms** | 87.5 / 141.2 / 129.4 ms | **0.955 / 0.995 / 0.998** |
@@ -111,39 +111,21 @@ docker image inspect "$BASE_IMAGE" --format '{{.Id}}'
 
 以上为两种选择，使用本地镜像时才执行第二段。经过验证的镜像配置 ID 为 `sha256:caeff0e9e6efef918a31359c4764b18bf2d428f2b76e3580c788f4cc8b0e93ad`。镜像来自海光国内仓库；下述模型权重和 MTP 从魔塔下载。
 
-### 4. 取得引擎二进制（本版未附运行包）
-
-v0.2.0 只发布**源码增量 + 引擎 SHA-256**，不分发运行包。两条路任选其一，产出都是 `runtime/bin/strata`。
-
-**4a. 从源码构建（可验证，推荐）**
+### 4. 下载并校验优化运行包
 
 ```bash
 cd "$PROJECT_DIR"
-git clone --depth 1 --branch v0.2.0 https://github.com/DocPang/strata-k100ai.git k100ai-src
-git clone https://github.com/Niko1221/strata.git strata-src
-cd strata-src && git checkout 011c9e60 && cd ..
-# 覆盖本版增量：36 个文件，按路径覆盖，逐文件校验见 manifest.json
-rsync -a k100ai-src/sources/xxs-20261023-k100ai022/ strata-src/
+curl -fL --retry 3 -o strata-xxs-20261023-k100ai022-linux-amd64.tar.gz \
+  https://github.com/DocPang/strata-k100ai/releases/download/v0.2.0/strata-xxs-20261023-k100ai022-linux-amd64.tar.gz
+sha256sum -c engines/strata/xxs-20261023-k100ai022/artifact.sha256
+tar -xzf strata-xxs-20261023-k100ai022-linux-amd64.tar.gz
+(cd runtime && sha256sum -c FILES.sha256)
+sha256sum runtime/bin/strata
 ```
 
-然后在 DTK 容器内用 [`engines/strata/xxs-20261023-k100ai022/manifest.json`](engines/strata/xxs-20261023-k100ai022/manifest.json) 记录的配方编译（`-DSTRATA_PREFILL_MMQ=ON`、`-DSTRATA_GFX928_DOT4=1`、`gfx928`、Release）。产出摘要应为 `bdbfd934…`。
+最后一条应显示本页开头的 `bdbfd934…` 完整摘要。所有校验通过后再继续。
 
-> 可复现性说明：同一构建目录内两次全量干净编译逐字节一致（`da43917a…`）；二进制内嵌构建目录路径，换目录后 SHA-256 变化而字节数不变。因此 `clean_rebuild_verified` 记为 `false`，细节见 [复现报告](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)。
-
-**4b. 复用上一版运行包（最快）**
-
-```bash
-cd "$PROJECT_DIR"
-curl -fL --retry 3 -o strata-xxs-20261022-sol-linux-amd64.tar.gz \
-  https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.7/strata-xxs-20261022-sol-linux-amd64.tar.gz
-tar -xzf strata-xxs-20261022-sol-linux-amd64.tar.gz
-# 用 4a 编出的二进制替换（或自备已验证的 bdbfd934… 二进制）
-cp /path/to/strata runtime/bin/strata
-(cd runtime && sha256sum -c FILES.sha256 2>/dev/null || true)
-sha256sum runtime/bin/strata    # 应为 bdbfd934…
-```
-
-运行包的其余内容（HTTP 服务、转换工具）与上一版一致；替换二进制后请重新生成 `PROVENANCE.json` 与 `FILES.sha256` 以便校验。
+也可以从源码自己编（可验证路径）：clone `v0.2.0` 与上游 `011c9e60`，覆盖 [`sources/xxs-20261023-k100ai022/`](sources/xxs-20261023-k100ai022/) 的 36 个文件，按 [引擎清单](engines/strata/xxs-20261023-k100ai022/manifest.json) 记录的配方编译，产出摘要应为 `bdbfd934…`。注意同一构建目录内两次干净编译逐字节一致（`da43917a…`），换目录后 SHA-256 会变而字节数不变，因此 `clean_rebuild_verified` 记为 `false`，细节见 [复现报告](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)。
 
 ### 5. 从魔塔下载两个 IQ3_XXS 权重分片
 

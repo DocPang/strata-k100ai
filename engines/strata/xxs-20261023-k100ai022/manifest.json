@@ -25,15 +25,15 @@
       "note": "发布二进制即实测二进制，三套件结果见 docs/BENCHMARKS.md 的 v0.2.0 一节"
     }
   },
-  "gpu_runtime_validation": "单卡 gfx928（renderD132），与上游 0.2.2 构建同会话交替；ctx32/lt/ctx128 三套件各 3 个请求；输出 SHA-256 与上游逐字节一致（唯一例外是 hc 融合，可用 STRATA_K100AI_HC_FUSE=0 还原）",
+  "gpu_runtime_validation": "单卡 gfx928（renderD132），与**上一版 rc.7 引擎**（ec7021b0）同会话交替；ctx32/lt/ctx128 三套件各 3 个请求；输出 SHA-256 与 rc.7 逐字节一致（唯一例外是 hc 融合，可用 STRATA_K100AI_HC_FUSE=0 还原）",
   "strata_base_commit": "011c9e600a93bbc9fd451c563501b5831c32bbca",
   "strata_base_tag": "v0.2.2",
   "llama_base_commit": null,
   "llama_note": "本构建环境中的 llama 源码目录不是 git 工作树，提交号未记录；构建使用镜像内 /work/llama 快照。",
   "models_included": false,
   "vendor_libraries_included": false,
-  "artifact": null,
-  "artifact_note": "本版未附运行包，二进制身份以 engine_sha256 为准；如需运行包，可在 rc.7 运行包基础上只替换 runtime/bin/strata 后重新生成 PROVENANCE.json 与 FILES.sha256。",
+  "artifact": "strata-xxs-20261023-k100ai022-linux-amd64.tar.gz",
+  "artifact_note": "运行时包与 rc.7 包同构：只替换 runtime/bin/strata，并重新生成 PROVENANCE.json 与 FILES.sha256（205 项，全部校验通过）。",
   "features": [
     "GR_DOWN_PREFETCH",
     "HC_FUSE_WIDE_GEMM",
@@ -101,5 +101,7 @@
     "换构建目录不复现字节：如需与发布资产逐字节相同，构建目录必须是 /work/build。",
     "llama 侧提交号未记录，重建只能保证 strata 侧源码一致。",
     "STRATA_K100AI_HC_FUSE（默认开）改变 hc read 一处投影的累加序，是与上游唯一的数值差异；=0 可逐位还原。"
-  ]
+  ],
+  "artifact_sha256": "359baf7032c8b9c4684956036462d68f025841fd90f5c88f753a5b494cfdbe57",
+  "artifact_bytes": 13604000
 }

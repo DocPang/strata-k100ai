@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION=v0.1.0-rc.7
+VERSION=v0.2.0
 BASE_DEFAULT='harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68'
 BASE_ID='sha256:caeff0e9e6efef918a31359c4764b18bf2d428f2b76e3580c788f4cc8b0e93ad'
 base="$BASE_DEFAULT"; local_only=0; bundle=''; profile=next-iq3xxs-single
@@ -36,8 +36,8 @@ fi
 actual_id="$(docker image inspect --format '{{.Id}}' "$base")"
 [[ "$actual_id" == "$BASE_ID" ]] || { echo "Unsupported base image content: $actual_id. See docs/INSTALL.md." >&2; exit 1; }
 if [[ "$profile" == next-iq3xxs-single ]]; then
-  artifact=strata-xxs-20261022-sol-linux-amd64.tar.gz
-  engine_id=xxs-20261022-sol
+  artifact=strata-xxs-20261023-k100ai022-linux-amd64.tar.gz
+  engine_id=xxs-20261023-k100ai022
 else
   artifact=strata-c4-linux-amd64.tar.gz
   engine_id=c4

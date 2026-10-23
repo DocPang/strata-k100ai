@@ -1,0 +1,101 @@
+[
+  {
+    "test": "prefill-decode-vs-rc7-ctx32",
+    "binary_sha256": "bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9",
+    "control_binary_sha256": "ec7021b01716e224a9fd457c7c993b5449bac31365c92ef47b1a7f45114743ec",
+    "status": "PASS",
+    "date": "2026-10-23",
+    "device": "/dev/dri/renderD132 (K100_AI, gfx928)",
+    "suite": "ctx32",
+    "input_tokens": 30603,
+    "prefill_chunk": 30602,
+    "method": "同一会话内交替执行本版与 rc.7 引擎，单卡串行；每档两个不同 prompt",
+    "control_ms": [
+      14410.7,
+      14160.4
+    ],
+    "experiment_ms": [
+      14232.2,
+      13946.8
+    ],
+    "control_mean_ms": 14285.55,
+    "experiment_mean_ms": 14089.5,
+    "delta_pct": -1.37,
+    "decode_control_ms": [
+      89.8,
+      152.1,
+      136.3
+    ],
+    "decode_experiment_ms": [
+      84.8,
+      149.7,
+      135.1
+    ]
+  },
+  {
+    "test": "prefill-decode-vs-rc7-lt",
+    "binary_sha256": "bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9",
+    "control_binary_sha256": "ec7021b01716e224a9fd457c7c993b5449bac31365c92ef47b1a7f45114743ec",
+    "status": "PASS",
+    "date": "2026-10-23",
+    "device": "/dev/dri/renderD132 (K100_AI, gfx928)",
+    "suite": "lt",
+    "input_tokens": 7556,
+    "prefill_chunk": 30602,
+    "method": "同一会话内交替执行本版与 rc.7 引擎，单卡串行；每档两个不同 prompt（第二个为抖动格）",
+    "control_ms": [
+      4482.4,
+      3956.0
+    ],
+    "experiment_ms": [
+      4497.4,
+      3851.2
+    ],
+    "control_mean_ms": 4219.2,
+    "experiment_mean_ms": 4174.3,
+    "delta_pct": -1.06,
+    "decode_control_ms": [
+      87.5,
+      141.2,
+      129.4
+    ],
+    "decode_experiment_ms": [
+      83.6,
+      140.5,
+      129.2
+    ]
+  },
+  {
+    "test": "prefill-decode-vs-rc7-ctx128",
+    "binary_sha256": "bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9",
+    "control_binary_sha256": "ec7021b01716e224a9fd457c7c993b5449bac31365c92ef47b1a7f45114743ec",
+    "status": "PASS",
+    "date": "2026-10-23",
+    "device": "/dev/dri/renderD132 (K100_AI, gfx928)",
+    "suite": "ctx128",
+    "input_tokens": 126857,
+    "prefill_chunk": 30602,
+    "method": "同一会话内交替执行本版与 rc.7 引擎，单卡串行；每档两个不同 prompt",
+    "control_ms": [
+      68356.4,
+      68280.4
+    ],
+    "experiment_ms": [
+      67401.1,
+      67350.2
+    ],
+    "control_mean_ms": 68318.4,
+    "experiment_mean_ms": 67375.65,
+    "delta_pct": -1.38,
+    "decode_control_ms": [
+      88.5,
+      379.0,
+      332.4
+    ],
+    "decode_experiment_ms": [
+      85.5,
+      369.5,
+      321.7
+    ]
+  }
+]

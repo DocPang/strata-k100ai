@@ -17,7 +17,7 @@ done
 [[ -d "$PACK_DIR/tokenizer" ]] || { echo 'PACK_DIR/tokenizer is missing.' >&2; exit 1; }
 [[ -d "$EXTRAS_DIR" ]] || { echo 'EXTRAS_DIR must exist.' >&2; exit 1; }
 extras="$(cd "$EXTRAS_DIR" && pwd)"
-if [[ "$PROFILE" == next-iq3xxs-single ]]; then image=k100ai/strata-xxs-20261016-gold:v0.1.0-rc.6; else image=k100ai/strata-c4:v0.1.0-rc.6; fi
+if [[ "$PROFILE" == next-iq3xxs-single ]]; then image=k100ai/strata-xxs-20261023-k100ai022:v0.2.0; else image=k100ai/strata-c4:v0.1.0-rc.6; fi
 docker image inspect "$image" >/dev/null
 args=(run --detach --name "k100ai-$INSTANCE" --restart=no
   --publish "$BIND_HOST:$PORT:8080" --env-file "$PWD/deployment.env"

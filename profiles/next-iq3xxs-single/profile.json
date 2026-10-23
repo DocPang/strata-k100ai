@@ -85,9 +85,11 @@
     "STRATA_MMVQ_WV2_GROUP": "1",
     "STRATA_GEMM_Y_F16": "qkv|qf|sg|su|sd|z",
     "STRATA_TOPK_H16": "1",
-    "STRATA_TOPK_REG_MAX": "7168"
+    "STRATA_TOPK_REG_MAX": "7168",
+    "STRATA_HC_UPMIX_GROUPS": "8",
+    "STRATA_MMQ_GATEUP_MINROWS": "32"
   },
-  "notes": "Frozen 43002a72 engine (rc.6); IQ3_XXS; 256K full-resident INT8 KV; 24576 expert slots; single-slot FIFO; 30602 prefill and spec=4. No manual SEL_BATCH override; STRATA_TOPK_H16_T deliberately unset.",
+  "notes": "v0.2.0 engine bdbfd934 (upstream strata 0.2.2 base + sources/xxs-20261023-k100ai022); IQ3_XXS; 256K full-resident INT8 KV; 24576 expert slots; single-slot FIFO; 30602 prefill and spec=4. No manual SEL_BATCH override; STRATA_TOPK_H16_T deliberately unset.",
   "topology": "single",
-  "engine": "strata/xxs-20261016-gold"
+  "engine": "strata/xxs-20261023-k100ai022"
 }

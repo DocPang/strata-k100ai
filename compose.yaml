@@ -1,6 +1,6 @@
 services:
   inference:
-    image: k100ai/strata-xxs-20261016-gold:v0.1.0-rc.6
+    image: k100ai/strata-xxs-20261023-k100ai022:v0.2.0
     pull_policy: never
     restart: "no"
     ports:

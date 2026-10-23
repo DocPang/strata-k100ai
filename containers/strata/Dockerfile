@@ -1,10 +1,10 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
-ARG ENGINE_ID=strata/xxs-20261016-gold
+ARG ENGINE_ID=strata/xxs-20261023-k100ai022
 LABEL org.opencontainers.image.title="Strata for K100AI" \
       org.strata.engine="${ENGINE_ID}" \
       org.opencontainers.image.source="https://github.com/DocPang/strata-k100ai" \
-      org.opencontainers.image.version="v0.1.0-rc.6"
+      org.opencontainers.image.version="v0.2.0"
 COPY runtime/ /opt/k100ai/
 COPY entrypoint.py /opt/k100ai/entrypoint.py
 COPY profiles/ /opt/k100ai/profiles/

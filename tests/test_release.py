@@ -114,7 +114,7 @@ esac
         self.assertIn('Unsupported base', result.stderr)
 
     def test_xxs_offline_install_is_available(self):
-        bundle = ROOT / 'local-artifacts/strata-xxs-20261016-gold-linux-amd64.tar.gz'
+        bundle = ROOT / 'local-artifacts/strata-xxs-20261023-k100ai022-linux-amd64.tar.gz'
         if not bundle.exists(): self.skipTest('Local release bundle required')
         result = self.run_install('--local-only', '--bundle', str(bundle), '--profile', 'next-iq3xxs-single')
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -128,7 +128,7 @@ esac
         self.assertNotIn('build --', (self.root / 'calls').read_text())
 
     def test_offline_install_contract(self):
-        bundle = ROOT / 'local-artifacts/strata-xxs-20261016-gold-linux-amd64.tar.gz'
+        bundle = ROOT / 'local-artifacts/strata-xxs-20261023-k100ai022-linux-amd64.tar.gz'
         if not bundle.exists(): self.skipTest('Release bundle is checked separately on the publishing host')
         result = self.run_install('--local-only', '--bundle', str(bundle))
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -189,7 +189,7 @@ class NativeDeploymentTests(unittest.TestCase):
         result = entrypoint.render(profile, settings, {'SHARD1': 'a.gguf', 'SHARD2': 'b.gguf'})
         for flag in ['--kv-resident', '--batch', '--batch-mtp']:
             self.assertNotIn(flag, result['args'])
-        self.assertEqual(profile['engine'], 'strata/xxs-20261016-gold')
+        self.assertEqual(profile['engine'], 'strata/xxs-20261023-k100ai022')
         self.assertEqual(result['env']['STRATA_PF_FUSED'], '1')
         self.assertEqual(result['env']['STRATA_PF_FUSED_NATIVE_EXACT_SKIP'], '1')
         self.assertNotIn('STRATA_SEL_BATCH', result['env'])
