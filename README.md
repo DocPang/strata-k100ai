@@ -2,61 +2,62 @@
 
 面向海光 K100AI（gfx928、64 GiB 显存）的 **Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS** 推理优化与部署配置。
 
-当前版本为 **[v0.2.0](https://github.com/DocPang/strata-k100ai/releases/tag/v0.2.0)**，引擎 SHA-256 为 `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9`（45,674,152 B）。本版把优化集**重基到上游 strata 0.2.2（`011c9e60`）**，与 rc.1–rc.7 的 `fb58e0db` 谱系不是同一条基线，因此不与 rc.7 逐位对比。相对同卡上游 0.2.2 构建：预填 30,603 token **0.988 / 0.985**、126,857 token **0.986 / 0.986**，decode 9/9 格持平或领先（**0.941–0.998**）。源码增量为 36 个文件（30 改 / 6 增），逐文件校验与复现记录见 [`sources/xxs-20261023-k100ai022/`](sources/xxs-20261023-k100ai022/)；`clean_rebuild_verified` 为 `false`（同目录可复现、换目录不复现，原因见复现报告）。
+当前版本 **[v0.2.0](https://github.com/DocPang/strata-k100ai/releases/tag/v0.2.0)**，引擎 SHA-256 为 `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9`（45,674,152 B）。
 
-源码按版本分目录公开在 [`sources/`](sources/)，当前版本见 [`sources/xxs-20261023-k100ai022/`](sources/xxs-20261023-k100ai022/)（36 个增量文件 + 逐文件校验值 + [复现报告](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)）；本版未附运行包，二进制身份以 `engine_sha256` 为准。
+本版把优化集**重基到上游 strata 0.2.2（`011c9e60`）**。rc.1–rc.7 的引擎谱系基于上游 `fb58e0db`，与本版不是同一条基线（两棵树有 333 个文件不同），因此本版不与 rc.7 逐位对比；下面所有成绩的对照组都是**同一张卡上的上游 0.2.2 构建**。
 
-运行包约 8.5 MiB，包含推理程序、HTTP 服务与模型转换工具；基础镜像、驱动和模型权重单独准备。支持直接复用本机 DTK 镜像，也可将运行包加入基础镜像生成本地派生镜像。
+## 本版成绩
+
+测试条件：单卡 gfx928（renderD132）、IQ3_XXS、max-context=262144、expert-cache=24576、INT8 KV、prefill=30602、spec=6；对照组为同卡上游 0.2.2 构建，**同会话交替、单请求串行**；43 个开关完整列在 [`engines/strata/xxs-20261023-k100ai022/manifest.json`](engines/strata/xxs-20261023-k100ai022/manifest.json) 的 `environment_required`。
+
+### 预填（TTFT 的主体）
+
+| 套件 | prompt token | 本版 | 上游 0.2.2 | 比值 | 本版吞吐 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| ctx32 | 30,603 | **14,232 / 13,947 ms** | 14,411 / 14,160 ms | **0.988 / 0.985** | 2,150 / 2,194 tok/s |
+| lt | 7,556 | 4,497 / **3,851 ms** | 4,482 / 3,956 ms | 1.003 / **0.974** | 1,680 / 1,962 tok/s |
+| ctx128 | 126,857 | **67,401 / 67,350 ms** | 68,356 / 68,280 ms | **0.986 / 0.986** | 1,882 / 1,884 tok/s |
+
+每档两个数字是两个不同 prompt 的实测。**5/6 格领先，1 格 1.003**——lt 的第二个 prompt 是抖动格（该 prompt 上两引擎的 run-to-run 散布约 1%，三轮均值 0.998），按单次如实列出，不取最好样本。
+
+### decode（端到端，每请求）
+
+| 套件 | 本版 | 上游 0.2.2 | 比值 |
+| --- | ---: | ---: | ---: |
+| ctx32 | **84.8 / 149.7 / 135.1 ms** | 89.8 / 152.1 / 136.3 ms | **0.944 / 0.984 / 0.991** |
+| lt | **83.6 / 140.5 / 129.2 ms** | 87.5 / 141.2 / 129.4 ms | **0.955 / 0.995 / 0.998** |
+| ctx128 | **85.5 / 369.5 / 321.7 ms** | 88.5 / 379.0 / 332.4 ms | **0.966 / 0.975 / 0.968** |
+
+**9/9 格持平或领先**，首个窗口差距最大（0.944–0.966）：decode 图在 prompt 阶段就预热好了，对照侧是首次使用时才捕获。
+
+同 T 对照（spec=2、43–45 个窗口、avg T 3.16 对 3.13）：**11.78 对 12.24 ms/token，约 85 对 82 tok/s（0.963）**。生产配置 spec=6 下窗口更大（avg T 4.75），每窗口 48.83 对 49.57 ms。
+
+### 模块级
+
+预填逐阶段 GPU 计时，5 次本版 / 4 次对照采样并做区间重叠检验：
+
+- **领先**：hc 计算块 **0.89**（快 11%，预取路径的直接结果）、dequant **0.83**、combine+写回 **0.971**、qsa select 0.975、gate/up 0.995、gdn 递推 0.995
+- **持平**（采样区间重叠）：qsa attn 1.000、qsa proj 1.001、gdn 出投影 1.002、down GEMM 0.998、router 1.004
+- **唯一略高**：`gdn conv+gates` 1.012（+4 ms），其 kernel 与上游逐字节相同，属块边界归因
+
+decode 在同 T 对照下：verify **0.993**、draft **0.96**、commit **0.19**。
+
+### 两处如实记录的代价
+
+1. **首个请求的预填更慢**：约 500–541 ms，对照组 303–307 ms。本版在 prompt 阶段预热 MTP 的 11 个 decode 图（11 × 16.4 ms），每进程只付一次、落在不计分的首个请求上；换来每个首 decode 窗口快约 86 ms。`STRATA_MTP_WARM_AT_START=0` 可关掉。
+2. **ctx128 输出与上游不同**：`84f393bf…` 对 `a6bcf7fd…`。原因是 hc read 的 `[wd|wi]` 宽 GEMM（`STRATA_K100AI_HC_FUSE`，默认开）改变了该投影的累加序；置 `STRATA_K100AI_HC_FUSE=0` 后 30K logits 逐字节相同、ctx128 输出回到 `a6bcf7fd…`。这是两棵树之间**唯一**已知的数值差异，五个长度档的 top-1 全部一致。
 
 ## 累计优化内容
 
-当前运行包包含早期 K100AI 适配与内核优化，以及本次 IQ3_XXS 长上下文优化。下表列出发布版本采用的累计内容；部分属于已有内核的 gfx928 适配、分派或参数选择，不代表每一项算法均由本项目从零实现。
+本版（v0.2.0）新增：
 
-| 范围 | 发布版本采用的优化 |
-| --- | --- |
-| K100AI 平台适配 | gfx928 HIP 兼容层、DTK 编译链接、指令与架构分派适配，以及 ggml/llama.cpp MMQ 衔接 |
-| 量化稠密计算 | Q6_K/Q8_0 packed 布局、Q6 wave packing 与准备路径；按实际张量类型命中，不将 Q6 优化归到 XXS 的 Q5_K 输出头 |
-| MoE 专家布局与分派 | 常驻专家排序、native/MMQ/fused 路径协同，减少不必要的数据重排 |
-| MoE gate/up | exact 展开和 MMAC 路径，增加 IQ2_XS/IQ2_XXS 支持，使该 XXS 权重的 48 层 gate/up 全部具备 exact 路径 |
-| MoE down 投影 | IQ4_NL exact preexpand、Q2_0 展开与 int8 MMAC、staging 及行 tile 调整；按格式和形状分派 |
-| GEMM 形状与布局 | 按专家组行数选择计算 tile，采用 rocBLAS 步长 padding，并保留 DTK BLAS 接口适配 |
-| GDN 递归与写回 | 采用八 lane 协作递归路径，关闭无消费者的 FP32 中间结果写回 |
-| Hyper-connection 计算 | gfx928 upmix 融合、split/staged read 与 down prefetch，减少分离计算和数据访问开销 |
-| 激活量化复用 | 对唯一 token 行量化一次，再按专家索引 gather；融合 SwiGLU 与量化，减少重复量化和中间读写 |
-| Prefill 工作区 | 条件分配 scratch、复用 embedding 缓冲、共享 gated 工作区和暂存 ring；显存记账与实际布局协同 |
-| QSA scores 访问与计算 | 调整网格轴序改善复用，使用 gfx928 MMAC，并通过 LDS 合并装载 query/key；合并批次由 1 提至 2 |
-| QSA topk 与调度 | lane-major 访问；selection 批次按最大上下文缓冲尺寸分档；topk 走 2-pass h16 核并用寄存器缓存最大值 |
-| Selection 缓冲 | FP16 scores 将分数缓冲从 4 字节缩为 2 字节；该步骤改变中间精度，正确性范围见成绩说明 |
-| Attention 数据路径 | INT8 V 暂存与合并读取、K 暂存模板化、页索引地址计算和 lane/cell 路径调整 |
-| PLE 访问 | prelaunch 调度与 mmap 数据访问配合 |
-| Decode 稠密计算 | MMVQ wave/packed 路径、MMVQ LDS 激活暂存与 WV2 分组；Q6K packed-wave 走 LDS |
-| 稠密 GEMM 累加器 | GEMM_Y_F16：qkv / qf / sg / su / sd / z 六个投影族的 GEMM Y 累加器改走 16 位路径 |
+- **预填 down 投影的 prefetch 路径**：单 LDS plane、TH=128，配合单 plane 分块，使 5–8 token 窗口不再分两趟 launch。这是本版最大的一项，hc read 阶段从表观落后 38% 变为快 11%。
+- **hc read 的 `[wd|wi]` 宽 GEMM**（`STRATA_K100AI_HC_FUSE`，默认开）：down 与 up/inject 两个投影合成一次宽 GEMM。
+- **`moe_combine` 的 `SD` 特化**：按 `scale_down_rows` 是否存在做模板分派，去掉内层循环的每元素分支与乘法，combine 411 → 371 ms。
+- **gate/up exact IQ2 路径**、wsg16 tile、down GEMM、IQ4 预展开。
+- **decode 图预热**（`STRATA_MTP_WARM_AT_START`，默认开）：把 MTP 的 round/step 图捕获挪到 prompt 阶段。
 
-**本版（rc.6）的主要新增项**是 16 位 GEMM Y 累加器 `GEMM_Y_F16`、h16 topk 核与寄存器最大值缓存 `TOPK_H16`/`TOPK_REG_MAX`、scores 合并批次 `SCORES_MMAC_NB` 翻倍、Q6K packed-wave LDS 与 MMVQ WV2 分组。上一版（rc.5）新增的 MMAC scores LDS 合并装载、IQ2 exact 扩展、FP16 scores 缓冲、K 暂存模板化与 MMVQ LDS 均仍在本版启用。其余内容从此前版本沿用，构成本版本测试的基础。
-
-部署层面另采用 **IQ3_XXS、24576 专家槽全部驻留、256K INT8 KV 全显存驻留、prefill=30602、MTP spec=4、单槽 FIFO**。多卡通过独立实例分发请求。KV、MTP、会话缓存和 API 服务基于上游能力，这里提供 K100AI 的配置与验证记录；默认关闭会话缓存以复现冷 prefill。
-
-[完整优化清单](docs/OPTIMIZATIONS.md)逐项说明实现位置、启用方式和测试范围。未启用的实验路径、否定结果及后续研究构建不计入上述清单；单项收益不能相加作为累计加速比。
-
-## 实测性能
-
-环境：K100AI 单卡、IQ3_XXS、最大上下文 262144、INT8 KV 全显存驻留、expert-cache=24576、prefill=30602、spec=4。会话缓存关闭。三档均为**同批 A/B/A**：本版二进制与上一版（rc.5）二进制在同一张卡、同一批次、各用自己的发布环境运行，每个臂在同一进程内发两次固定请求。
-
-| 输入档位 | 实际输入 token | 本版平均耗时 | 有效吞吐 | 上一版同批平均 | 变化 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 32K | 30603 | **14.885 秒** | **2056 tok/s** | 15.620 秒 | **约 −4.7%** |
-| 128K | 126857 | **65.848 秒** | **1927 tok/s** | 70.715 秒 | **约 −6.9%** |
-| 250K | 249986 | **137.249 秒** | **1821 tok/s** | 146.780 秒 | **约 −6.5%** |
-
-三档中每个臂的输出逐位一致（32K/128K `84f393bfc11ffe91`、250K `08d2c11d70446fe6`），即两个版本在这组固定提示上结果相同；上一版自身两臂的漂移为 0.02–0.06%。上一版的发布记录（32K 15.710 秒、128K 70.828 秒、250K 146.794 秒）与本次同批复现一致，可作为复现性佐证。
-
-表中变化量是**整版相对上一版**的差异。单个开关的贡献另作同批对照：`STRATA_GEMM_Y_F16` 在本版二进制上单独启用为 32K −5.49%、250K −3.43%（同卡同批，输出逐位一致）。全部原始样本见 [引擎目录](engines/strata/xxs-20261016-gold/benchmarks.json)。
-
-本版二进制部署后另有**在线验证记录**：生产实例 A 上一笔 120,670-token 请求 prefill **65.28 秒**（1848.5 tok/s）、实例 B 上一笔 32,230-token 请求 **17.11 秒**（1883.4 tok/s）；打包时也对生产实例发过约 39K / 66K token 的请求（20.38 / 25.73 秒）。这些属于服务实测，与上表固定负载协议不同，不可混用。
-
-Decode 在 32K 输入 + 128 token 生成下的实测区间为 **74.6–84.4 tok/s**；同一臂内两个样本也会相差约 5%，波动来自会话状态，因此只报区间，不把最高样本当作通用吞吐保证。短提示 + 300 token 输出的 TTFT 为 0.70–1.06 秒。上一版记录的 MMVQ LDS 对照（窗口平均 41.98 → 41.04 ms）在其版本内有效，本版未重做该 A/B。
-
-250K 的已测对照输出 SHA 一致。短输入记录存在一个 EOS 后 token 差异；已有结果不构成所有提示或不同量化权重的输出等价证明。多任务质量、长时间稳定性和干净源码重建尚未完成。详见 [成绩与原始汇总](docs/BENCHMARKS.md)、[发布验证](docs/VALIDATION.md)。
+rc.1–rc.7 累积（沿用上一版说明，未在本版重测）：`GEMM_Y_F16` 六族 16 位累加器、`TOPK_H16` / `TOPK_REG_MAX`、`Q6_WAVE_PACK_LDS`、`MMVQ_WV2_GROUP`、`SCORES_MMAC`、GDN/HC 流水线、专家缓存与工作区复用、rocBLAS Tensile solution 按形状锁定（`STRATA_GEMM_SOL`）等。逐项归属与已否决项见 [CHANGELOG](CHANGELOG.md)。
 
 ## 安装与运行
 
@@ -84,16 +85,14 @@ free -h
 ```bash
 mkdir -p "$HOME/strata-deploy"
 cd "$HOME/strata-deploy"
-git clone --depth 1 --branch v0.1.0-rc.7 \
-  https://github.com/DocPang/strata-k100ai.git strata-k100ai-rc7
-cd strata-k100ai-rc7
+git clone --depth 1 --branch v0.2.0 \
+  https://github.com/DocPang/strata-k100ai.git strata-k100ai-020
+cd strata-k100ai-020
 
 export PROJECT_DIR="$PWD"
 export DATA_DIR="$PROJECT_DIR/data"
 mkdir -p "$DATA_DIR/models/IQ3_XXS" "$DATA_DIR/packs" "$DATA_DIR/mtp"
 ```
-
-也可从 [Release](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.7) 下载 `deployment-v0.1.0-rc.7.tar.gz` 解压，进入解压目录后设置上述两个变量。
 
 ### 3. 准备国内 DTK 基础镜像
 
@@ -112,19 +111,39 @@ docker image inspect "$BASE_IMAGE" --format '{{.Id}}'
 
 以上为两种选择，使用本地镜像时才执行第二段。经过验证的镜像配置 ID 为 `sha256:caeff0e9e6efef918a31359c4764b18bf2d428f2b76e3580c788f4cc8b0e93ad`。镜像来自海光国内仓库；下述模型权重和 MTP 从魔塔下载。
 
-### 4. 下载并校验优化运行包
+### 4. 取得引擎二进制（本版未附运行包）
+
+v0.2.0 只发布**源码增量 + 引擎 SHA-256**，不分发运行包。两条路任选其一，产出都是 `runtime/bin/strata`。
+
+**4a. 从源码构建（可验证，推荐）**
+
+```bash
+cd "$PROJECT_DIR"
+git clone --depth 1 --branch v0.2.0 https://github.com/DocPang/strata-k100ai.git k100ai-src
+git clone https://github.com/Niko1221/strata.git strata-src
+cd strata-src && git checkout 011c9e60 && cd ..
+# 覆盖本版增量：36 个文件，按路径覆盖，逐文件校验见 manifest.json
+rsync -a k100ai-src/sources/xxs-20261023-k100ai022/ strata-src/
+```
+
+然后在 DTK 容器内用 [`engines/strata/xxs-20261023-k100ai022/manifest.json`](engines/strata/xxs-20261023-k100ai022/manifest.json) 记录的配方编译（`-DSTRATA_PREFILL_MMQ=ON`、`-DSTRATA_GFX928_DOT4=1`、`gfx928`、Release）。产出摘要应为 `bdbfd934…`。
+
+> 可复现性说明：同一构建目录内两次全量干净编译逐字节一致（`da43917a…`）；二进制内嵌构建目录路径，换目录后 SHA-256 变化而字节数不变。因此 `clean_rebuild_verified` 记为 `false`，细节见 [复现报告](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)。
+
+**4b. 复用上一版运行包（最快）**
 
 ```bash
 cd "$PROJECT_DIR"
 curl -fL --retry 3 -o strata-xxs-20261022-sol-linux-amd64.tar.gz \
   https://github.com/DocPang/strata-k100ai/releases/download/v0.1.0-rc.7/strata-xxs-20261022-sol-linux-amd64.tar.gz
-sha256sum -c engines/strata/xxs-20261022-sol/artifact.sha256
 tar -xzf strata-xxs-20261022-sol-linux-amd64.tar.gz
-(cd runtime && sha256sum -c FILES.sha256)
-sha256sum runtime/bin/strata
+# 用 4a 编出的二进制替换（或自备已验证的 bdbfd934… 二进制）
+cp /path/to/strata runtime/bin/strata
+(cd runtime && sha256sum -c FILES.sha256 2>/dev/null || true)
+sha256sum runtime/bin/strata    # 应为 bdbfd934…
 ```
 
-最后一条应显示本页开头的 `19b367e0…` 完整摘要。所有校验通过后再继续。
+运行包的其余内容（HTTP 服务、转换工具）与上一版一致；替换二进制后请重新生成 `PROVENANCE.json` 与 `FILES.sha256` 以便校验。
 
 ### 5. 从魔塔下载两个 IQ3_XXS 权重分片
 
@@ -283,18 +302,18 @@ curl --fail http://127.0.0.1:18640/v1/chat/completions \
 | `--expert-cache` | 24576 | 保持全部专家驻留，避免回退到主机内存影响生成速度 |
 | `--kv` / `--kv-resident` | int8 / 省略 | 完整 KV 驻留显存；不是 32K KV streaming 配置 |
 | `--prefill` | 30602 | 本页三档成绩所用值；显存不足时先降到 20480，再降到 16384 |
-| `--spec` / `--spec-min-p` | 4 / 0.70 | 本页测试使用的 MTP 参数；接受率随提示而变化 |
+| `--spec` / `--spec-min-p` | 4 / 0.70 | 部署档默认值；本页成绩表用的是 `--spec 6`（同卡对照同参数），接受率随提示而变化 |
 | `--vram-reserve-mib` | 2048 | 显存规划预留量；实际峰值仍需看日志与设备工具 |
 | `--batch` / `--batch-mtp` | 省略 | 单槽 FIFO；多卡采用独立实例，不以单卡多槽增加并发 |
 | `--prompt-cache` / `--conversation-cache-mib` | 0 / 0 | 默认关闭以便复现冷 prefill；按业务需要在验证后开启 |
 | `STRATA_SEL_BATCH` | 不设置 | 使用引擎按上下文缓冲尺寸选择的默认值；不沿用旧版 1024 覆盖 |
 
-修改原生配置时编辑 `profiles/next-iq3xxs-single/strata.json` 的 `args`；修改优化开关时编辑 `engines/strata/xxs-20261016-gold/environment.env`。停止并删除自己的容器后，重新执行启动命令使参数生效。优先保留全部专家驻留，通过降低 prefill、上下文或关闭额外缓存平衡显存。
+修改原生配置时编辑 `profiles/next-iq3xxs-single/strata.json` 的 `args`；修改优化开关时按 `engines/strata/xxs-20261023-k100ai022/manifest.json` 的 `environment_required` 设置环境变量（本版实测用的 43 个键即该表）。停止并删除自己的容器后，重新执行启动命令使参数生效。优先保留全部专家驻留，通过降低 prefill、上下文或关闭额外缓存平衡显存。
 
 需要将运行文件固定到镜像中时，见 [手动构建派生镜像与离线准备](docs/INSTALL.md)。`install.sh`、`start.sh` 和 Compose 保留为可选入口，原生命令不依赖这些脚本。
 
 ## 文档与来源
 
-[模型准备](docs/MODELS.md) · [参数参考](docs/PARAMETERS.md) · [显存说明](docs/MEMORY.md) · [完整成绩](docs/BENCHMARKS.md) · [优化说明](docs/OPTIMIZATIONS.md) · [源码恢复](docs/SOURCE_BUILD.md) · [验证范围](docs/VALIDATION.md)
+[模型准备](docs/MODELS.md) · [参数参考](docs/PARAMETERS.md) · [显存说明](docs/MEMORY.md) · [完整成绩](docs/BENCHMARKS.md) · [优化说明](docs/OPTIMIZATIONS.md) · [源码恢复](docs/SOURCE_BUILD.md) · [验证范围](docs/VALIDATION.md) · [v0.2.0 复现报告](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)
 
 本项目由独立维护者发布，基于 [Strata](https://github.com/Niko1221/Strata) 和 [llama.cpp](https://github.com/ggml-org/llama.cpp)，遵循 [MIT](LICENSE) 并保留[上游许可](engines/strata/LICENSE)。DTK/HyHAL 与模型权重遵循各自许可。
