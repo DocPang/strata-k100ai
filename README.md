@@ -49,15 +49,51 @@ decode 在同 T 对照下：verify **0.993**、draft **0.96**、commit **0.19**�
 
 ## 累计优化内容
 
-本版（v0.2.0）新增：
+当前运行包包含早期 K100AI 适配与内核优化，以及本次 IQ3_XXS 长上下文优化。下表列出发布版本采用的累计内容；部分属于已有内核的 gfx928 适配、分派或参数选择，不代表每一项算法均由本项目从零实现。标注版本号的是该项的引入版本，未标注的是 rc.1 之前既已存在。
 
-- **预填 down 投影的 prefetch 路径**：单 LDS plane、TH=128，配合单 plane 分块，使 5–8 token 窗口不再分两趟 launch。这是本版最大的一项，hc read 阶段从表观落后 38% 变为快 11%。
-- **hc read 的 `[wd|wi]` 宽 GEMM**（`STRATA_K100AI_HC_FUSE`，默认开）：down 与 up/inject 两个投影合成一次宽 GEMM。
-- **`moe_combine` 的 `SD` 特化**：按 `scale_down_rows` 是否存在做模板分派，去掉内层循环的每元素分支与乘法，combine 411 → 371 ms。
-- **gate/up exact IQ2 路径**、wsg16 tile、down GEMM、IQ4 预展开。
-- **decode 图预热**（`STRATA_MTP_WARM_AT_START`，默认开）：把 MTP 的 round/step 图捕获挪到 prompt 阶段。
+| 范围 | 发布版本采用的优化 |
+| --- | --- |
+| K100AI 平台适配 | gfx928 HIP 兼容层、DTK 编译链接、指令与架构分派适配，以及 ggml/llama.cpp MMQ 衔接 |
+| 量化稠密计算 | Q6_K/Q8_0 packed 布局、Q6 wave packing 与准备路径；按实际张量类型命中，不将 Q6 优化归到 XXS 的 Q5_K 输出头 |
+| MoE 专家布局与分派 | 常驻专家排序、native/MMQ/fused 路径协同，减少不必要的数据重排 |
+| MoE gate/up | exact 展开和 MMAC 路径，增加 IQ2_XS/IQ2_XXS 支持，使该 XXS 权重的 48 层 gate/up 全部具备 exact 路径；**v0.2.0** 归入 wsg16 tile 分派 |
+| MoE down 投影 | IQ4_NL exact preexpand、Q2_0 展开与 int8 MMAC、staging 及行 tile 调整；按格式和形状分派；**v0.2.0** 改为按单 LDS plane 分块（5–8 token 窗口不再分两趟 launch） |
+| MoE 结果合并 | **v0.2.0**：`moe_combine` 按 `scale_down_rows` 是否存在做模板特化，内层循环去掉每元素分支与乘法 |
+| GEMM 形状与布局 | 按专家组行数选择计算 tile，采用 rocBLAS 步长 padding，并保留 DTK BLAS 接口适配；**v0.1.0-rc.7** 增加按形状锁定 Tensile solution（`STRATA_GEMM_SOL`） |
+| GDN 递归与写回 | 采用八 lane 协作递归路径，关闭无消费者的 FP32 中间结果写回 |
+| Hyper-connection 计算 | gfx928 upmix 融合、split/staged read 与 down prefetch，减少分离计算和数据访问开销；**v0.2.0** 增加 down 投影的 prefetch kernel（单 plane、TH=128）与 hc read 的 `[wd|wi]` 宽 GEMM |
+| 激活量化复用 | 对唯一 token 行量化一次，再按专家索引 gather；融合 SwiGLU 与量化，减少重复量化和中间读写 |
+| Prefill 工作区 | 条件分配 scratch、复用 embedding 缓冲、共享 gated 工作区和暂存 ring；显存记账与实际布局协同 |
+| QSA scores 访问与计算 | 调整网格轴序改善复用，使用 gfx928 MMAC，并通过 LDS 合并装载 query/key；合并批次由 1 提至 2（rc.6） |
+| QSA topk 与调度 | lane-major 访问；selection 批次按最大上下文缓冲尺寸分档；topk 走 2-pass h16 核并用寄存器缓存最大值（rc.6） |
+| Selection 缓冲 | FP16 scores 将分数缓冲从 4 字节缩为 2 字节；该步骤改变中间精度，正确性范围见成绩说明 |
+| Attention 数据路径 | INT8 V 暂存与合并读取、K 暂存模板化、页索引地址计算和 lane/cell 路径调整 |
+| PLE 访问 | prelaunch 调度与 mmap 数据访问配合 |
+| Decode 稠密计算 | MMVQ wave/packed 路径、MMVQ LDS 激活暂存与 WV2 分组；Q6K packed-wave 走 LDS |
+| 稠密 GEMM 累加器 | GEMM_Y_F16：qkv / qf / sg / su / sd / z 六个投影族的 GEMM Y 累加器改走 16 位路径（rc.6） |
+| MTP 图调度 | **v0.2.0**：round/step 图在 prompt 阶段预热（`STRATA_MTP_WARM_AT_START`），把 11 次图上传挪出首个 decode 窗口 |
 
-rc.1–rc.7 累积（沿用上一版说明，未在本版重测）：`GEMM_Y_F16` 六族 16 位累加器、`TOPK_H16` / `TOPK_REG_MAX`、`Q6_WAVE_PACK_LDS`、`MMVQ_WV2_GROUP`、`SCORES_MMAC`、GDN/HC 流水线、专家缓存与工作区复用、rocBLAS Tensile solution 按形状锁定（`STRATA_GEMM_SOL`）等。逐项归属与已否决项见 [CHANGELOG](CHANGELOG.md)。
+### 各版本新增项
+
+- **v0.2.0（当前）**：down 投影 prefetch 路径与单 plane 分块、hc read 的 `[wd|wi]` 宽 GEMM、`moe_combine` 的 `SD` 特化、decode 图预热。前两项合计把 hc read 阶段从相对 rc.7 的表观落后 38% 变成快 11%。
+- **v0.1.0-rc.7**：rocBLAS Tensile solution 按形状锁定（`STRATA_GEMM_SOL`），以及与 `STRATA_DENSE_TN` 的互斥约束。
+- **v0.1.0-rc.6**：16 位 GEMM Y 累加器 `GEMM_Y_F16`、h16 topk 核与寄存器最大值缓存 `TOPK_H16`/`TOPK_REG_MAX`、scores 合并批次 `SCORES_MMAC_NB` 翻倍、Q6K packed-wave LDS、MMVQ WV2 分组。
+- **v0.1.0-rc.5**：MMAC scores LDS 合并装载、IQ2 exact 扩展、FP16 scores 缓冲、K 暂存模板化、MMVQ LDS。
+- **更早（c4 → rc.4）**：平台适配、量化布局、MoE 布局与分派、GDN/HC 递归、工作区与 attention 数据路径等，以上表未标注版本的行。
+
+部署层面另采用 **IQ3_XXS、24576 专家槽全部驻留、256K INT8 KV 全显存驻留、prefill=30602、MTP spec=4、单槽 FIFO**。多卡通过独立实例分发请求。KV、MTP、会话缓存和 API 服务基于上游能力，这里提供 K100AI 的配置与验证记录；默认关闭会话缓存以复现冷 prefill。
+
+### 历代成绩
+
+各版本口径不同（prefill chunk、spec、测试协议都不一样），**不可跨行直接相减**；每行只与它自己的对照组比较。
+
+| 版本 | 对照 | 负载 | 变化 | 口径 |
+| --- | --- | --- | --- | --- |
+| v0.1.0-rc.6 | rc.5 | 32K / 128K / 250K | −4.70% / −6.88% / −6.49% | 同批 A/B/A，各用自己的发布环境 |
+| v0.1.0-rc.7 | rc.6 | ctx128（126,857 token） | −1.64% | 交叉 A/B，控制组极差 0.003% |
+| **v0.2.0** | **rc.7** | 30,603 / 7,556 / 126,857 | 预填 **0.988 / 0.974–1.003 / 0.986**；decode **0.941–0.998** | 同卡同会话交替，单请求串行 |
+
+[完整优化清单](docs/OPTIMIZATIONS.md)逐项说明实现位置、启用方式和测试范围，[完整成绩](docs/BENCHMARKS.md)保留各版本原始记录。未启用的实验路径、否定结果及后续研究构建不计入上述清单；单项收益不能相加作为累计加速比。
 
 ## 安装与运行
 
