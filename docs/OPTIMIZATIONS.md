@@ -30,6 +30,9 @@ v0.1.0-rc.6 固定分发 `43002a7262e5` 引擎；上一版 v0.1.0-rc.5 分发 `d
 | 无用中间写回消除 | GDN_NOY=1 | 适用路径不再写出无消费者的 FP32 结果；保留后续所需数据 |
 | HC upmix 融合 | HC_UPMIX 未设置时默认开启 | gfx928 up 投影与混合步骤融合，位于 prefill 数据路径 |
 | HC split / staged read 与预取 | HC_SPLIT=2、GR_DOWN_PREFETCH=2 | decode/验证相关路径按设备检查与实际分派执行；与未启用的 prefill HC_SPLIT2 实验开关不同 |
+| HC down 预取内核（v0.2.0） | GR_DOWN_PREFETCH=2：单 LDS plane、TH=128，按单 plane 定 chunk | 5–8 token 窗口不再分两趟 launch；per-token 独立，输出逐位不变。移植前 hc read 相对 rc.7 落后 38%，移植后该块为 rc.7 的 0.89 |
+| HC read 宽 GEMM（v0.2.0） | K100AI_HC_FUSE（默认开）：down 与 up/inject 合成一次 `[wd|wi]` 宽 GEMM | 30K 上 hc 块 1,653 → 1,506 ms、预填 −125 ms（约 −0.9%）；宽 GEMM 改变 tiling，是两棵树之间唯一已知的数值差异，`=0` 可逐位还原 |
+| MoE combine 特化（v0.2.0） | `moe_combine_kernel` 增加 `SD` 模板参数，按 `scale_down_rows` 是否存在分派 | 无 tail offset 的层去掉内层每元素分支与乘法：30K 上 combine 411 → 371 ms；两条路径算术等价，输出逐位不变 |
 | 唯一行量化后 gather | GATHER_QONCE 未设置时默认开启 | MMQ 数据准备中先量化 T 行，再按专家索引复制，避免对重复的 T×K 槽重新量化 |
 | SwiGLU 与量化融合 | PF_FUSED_SQ=1 | 用融合计算减少中间 H 的读写及单独量化启动 |
 | 工作区布局与记账 | PF_GATED_IN_REGION、EMB_REUSE_ACCOUNT、PF_DMSCRATCH_COND、PREFILL_RING | gated 共享工作区、embedding 别名复用、按需 scratch 与暂存 ring；降低无必要的分配或保守重复记账 |
@@ -51,6 +54,23 @@ v0.1.0-rc.6 固定分发 `43002a7262e5` 引擎；上一版 v0.1.0-rc.5 分发 `d
 环境变量表中省略的 `STRATA_` 前缀适用于所有开关。默认开启的实现无需在环境文件中重复声明；未见变量不等于缺失优化。
 
 ## 按版本的新增项单项记录
+
+### v0.2.0
+
+| 项目 | 已有测试记录 |
+| --- | --- |
+| HC down 预取内核（`GR_DOWN_PREFETCH=2` + 单 plane 分块） | 与 rc.7 同卡同会话的逐阶段计时：hc 计算块 **1,506 对 1,586 ms（0.950）**，ctx128 为 5,477 对 5,827（0.940）；移植前该块相对 rc.7 落后约 38%。输出逐位不变 |
+| HC read 宽 GEMM（`K100AI_HC_FUSE`） | 同卡同会话、只切该开关：30K 预填 14,238.3 / 13,990.7（开）对 14,388.6 / 14,102.7（关），hc 块 1,506 对 1,653 ms；关掉后 30K logits 与 rc.7 **逐字节相同**、ctx128 输出回到 rc.7 的 `a6bcf7fd…` |
+| `moe_combine` 的 `SD` 特化 | 30K：combine 411 → 371 ms、combine+写回块 1,005 → 961 ms；输出逐字节不变（`6fcfdfac…` / `a868a40c…`） |
+| MTP 图预热（`STRATA_MTP_WARM_AT_START`，默认开） | 首 decode 窗口快约 86 ms（code-1 84.0 对 170 量级）；代价是首个不计分请求的预填 +190 ms 左右（约 500 对 305 ms），每进程一次。`=0` 恢复懒捕获 |
+| `STRATA_VERIFY_WARM` | **默认必须为 0**：`=1` 使 ctx128 decode 727 / 619 ms（对照 379 / 331）且输出改变；`=6` 更差。保留为诊断开关 |
+
+### v0.1.0-rc.7
+
+| 项目 | 已有测试记录 |
+| --- | --- |
+| `STRATA_GEMM_SOL` 按形状锁定 Tensile solution | 交叉 A/B（同窗交替，控制组极差 0.003%）：ctx128 61,271.7 → 60,265.7 ms（−1.64%）；精度 KL 8.3e−05、top-1 一致 |
+| 与 `STRATA_DENSE_TN` 的互斥 | **已否决合并**：`Gemm::native` 的 TN 分支提前返回会绕过两处 hook，合并实测 −1.24%，劣于任一单独 |
 
 ### v0.1.0-rc.6
 
