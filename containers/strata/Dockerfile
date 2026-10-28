@@ -4,7 +4,7 @@ ARG ENGINE_ID=strata/xxs-20261023-k100ai022
 LABEL org.opencontainers.image.title="Strata for K100AI" \
       org.strata.engine="${ENGINE_ID}" \
       org.opencontainers.image.source="https://github.com/DocPang/strata-k100ai" \
-      org.opencontainers.image.version="v0.2.0"
+      org.opencontainers.image.version="v0.2.1"
 COPY runtime/ /opt/k100ai/
 COPY entrypoint.py /opt/k100ai/entrypoint.py
 COPY profiles/ /opt/k100ai/profiles/
@@ -15,7 +15,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /opt/k100ai/app
 # No apt/pip/network installation: the pinned base provides the tested dependencies.
 RUN cd /opt/k100ai && sha256sum -c FILES.sha256 >/dev/null \
-    && chmod 755 bin/strata \
+    && chmod 755 bin/strata bin/strata-vision \
     && cd /opt/k100ai/app \
     && python3 -c "import numpy,jinja2,regex,yaml,tqdm,requests,PIL,psutil; import serve.server"
 ENTRYPOINT ["python3", "/opt/k100ai/entrypoint.py"]

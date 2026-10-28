@@ -33,7 +33,7 @@
   "models_included": false,
   "vendor_libraries_included": false,
   "artifact": "strata-xxs-20261023-k100ai022-linux-amd64.tar.gz",
-  "artifact_note": "运行时包与 rc.7 包同构：只替换 runtime/bin/strata，并重新生成 PROVENANCE.json 与 FILES.sha256（205 项，全部校验通过）。",
+  "artifact_note": "v0.2.1 运行包在 v0.2.0 基础上加入 runtime/bin/strata-vision（HIP 图片编码器），重新生成 PROVENANCE.json 与 FILES.sha256（206 项，全部校验通过）；文本引擎 runtime/bin/strata 未变。",
   "features": [
     "GR_DOWN_PREFETCH",
     "HC_FUSE_WIDE_GEMM",
@@ -42,8 +42,24 @@
     "KGU_WSG16",
     "KDN_DOWN_GEMM",
     "IQ4_PREEXPAND_EXACT",
-    "MTP_WARM_AT_START"
+    "MTP_WARM_AT_START",
+    "VISION_HIP",
+    "VISION_GPU",
+    "IMAGE_INPUT_1024"
   ],
+  "multimodal": {
+    "encoder": "runtime/bin/strata-vision",
+    "encoder_sha256": "9c4dc14303e508c0c45814d886d56456a0b0b70a8732e04f9555c0491fdb41d4",
+    "encoder_bytes": 119439216,
+    "backend": "hip",
+    "gpu": true,
+    "image_max_tokens": 1024,
+    "mmproj": "mmproj-Qwen3.8-Flash-Next-BF16.gguf",
+    "mmproj_sha256": "b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0",
+    "mmproj_bytes": 907543008,
+    "source_snapshot": "sources/vision-20261028 in the deployment repository",
+    "validation": "475 image tokens: 1.72 s GPU encode (18.0 s CPU), cosine 0.999293 vs CPU; 1800x1200 at 1024 tokens: 12.5 s end-to-end"
+  },
   "environment_required": {
     "HIP_VISIBLE_DEVICES": "0",
     "HSA_FORCE_FINE_GRAIN_PCIE": "1",
@@ -102,6 +118,7 @@
     "llama 侧提交号未记录，重建只能保证 strata 侧源码一致。",
     "STRATA_K100AI_HC_FUSE（默认开）改变 hc read 一处投影的累加序，是与上游唯一的数值差异；=0 可逐位还原。"
   ],
-  "artifact_sha256": "359baf7032c8b9c4684956036462d68f025841fd90f5c88f753a5b494cfdbe57",
-  "artifact_bytes": 13002122
+  "artifact_sha256": "dc6a0e969e3d92c1ba54de5545f6a97f37cd62492297e50ad3d3b02356ef9aba",
+  "artifact_bytes": 29472859,
+  "runtime_files_verified": 206
 }

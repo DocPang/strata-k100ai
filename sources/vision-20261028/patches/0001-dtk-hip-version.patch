@@ -1,0 +1,14 @@
+--- a/ggml/src/ggml-hip/CMakeLists.txt
++++ b/ggml/src/ggml-hip/CMakeLists.txt
+@@ -51,8 +51,10 @@
+     find_package(rccl REQUIRED)
+ endif()
+ 
++# Local port for DTK 25.10 (2026-10-28): its hip-config-version.cmake reports
++# 5.3.26113 while hipconfig --version reports 6.3.26113dcc.  Warn instead of stop.
+ if (${hip_VERSION} VERSION_LESS 6.1)
+-    message(FATAL_ERROR "At least ROCM/HIP V6.1 is required")
++    message(WARNING "hip_VERSION ${hip_VERSION} < 6.1 (DTK package version); continuing")
+ endif()
+ 
+ message(STATUS "HIP and hipBLAS found")

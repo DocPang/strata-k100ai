@@ -33,6 +33,29 @@ docker run --rm -it --name strata-iq3xxs \
 
 只开放一个 render 节点，并保留其原路径；容器内使用 GPU 0。`environment.env` 是优化环境，`strata.json` 是原生服务配置，可直接编辑 `args`，重建容器后生效。
 
+## 多模态（v0.2.1）
+
+运行包内已包含 GPU 图片编码器 `/opt/k100ai/bin/strata-vision`。推荐用 `start.sh` 启动，并在 `deployment.env` 打开：
+
+```bash
+VISION_ENABLED=1
+VISION_MAX_TOKENS=1024
+```
+
+entrypoint 会自动把下面这段写入生成的配置（`/models` 已挂载模型目录）：
+
+```json
+"vision": {
+  "exe": "/opt/k100ai/bin/strata-vision",
+  "mmproj": "/models/mmproj-Qwen3.8-Flash-Next-BF16.gguf",
+  "model": "/models/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf",
+  "gpu": true,
+  "max_tokens": 1024
+}
+```
+
+用上面的原生 `docker run` 时不会经过 entrypoint：把这段加进 `strata.json`，并确认 `MODEL_DIR` 内有 mmproj。`/health` 返回 `"images": true` 即加载成功。API 示例、显存与性能见 [MULTIMODAL.md](MULTIMODAL.md)。
+
 ## 调试与生命周期
 
 `--rm -it` 为前台运行；替换成 `--detach` 可在后台运行并保留容器。原生实例的服务日志和引擎日志分别查看：

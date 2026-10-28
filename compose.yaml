@@ -1,6 +1,6 @@
 services:
   inference:
-    image: k100ai/strata-xxs-20261023-k100ai022:v0.2.0
+    image: k100ai/strata-xxs-20261023-k100ai022:v0.2.1
     pull_policy: never
     restart: "no"
     ports:
@@ -11,6 +11,10 @@ services:
       SHARD1: ${SHARD1:?Set SHARD1}
       SHARD2: ${SHARD2:?Set SHARD2}
       CONTROL_VECTOR: ${CONTROL_VECTOR:-}
+      VISION_ENABLED: ${VISION_ENABLED:-0}
+      VISION_MAX_TOKENS: ${VISION_MAX_TOKENS:-1024}
+      VISION_EXE: ${VISION_EXE:-/opt/k100ai/bin/strata-vision}
+      VISION_MMPROJ: ${VISION_MMPROJ:-mmproj-Qwen3.8-Flash-Next-BF16.gguf}
     devices:
       - /dev/kfd:/dev/kfd
       - ${RENDER_DEVICE:?Set one render device}:${RENDER_DEVICE:?Set one render device}

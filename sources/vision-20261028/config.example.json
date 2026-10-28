@@ -1,0 +1,9 @@
+{
+  "vision": {
+    "exe": "/opt/k100ai/bin/strata-vision",
+    "mmproj": "/models/mmproj-Qwen3.8-Flash-Next-BF16.gguf",
+    "model": "/models/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf",
+    "gpu": true,
+    "max_tokens": 1024
+  }
+}

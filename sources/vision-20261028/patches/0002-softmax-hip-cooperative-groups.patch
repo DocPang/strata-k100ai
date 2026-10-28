@@ -1,0 +1,68 @@
+--- a/ggml/src/ggml-cuda/softmax.cu
++++ b/ggml/src/ggml-cuda/softmax.cu
+@@ -2,9 +2,11 @@
+ #include "ggml.h"
+ #include "softmax.cuh"
+ 
+-#ifdef GGML_USE_HIP
+-#include <hip/hip_cooperative_groups.h>
+-#else
++// DTK 25.10 (2026-10-28): its HIP cooperative-groups headers do not compile with
++// clang 17 (redefinition of __any; invalid asm constraint l).  The grid-wide
++// softmax path is not used by the vision encoder (ncols is small) and is
++// compiled out for HIP below, so the headers are only needed for CUDA.
++#ifndef GGML_USE_HIP
+ #include <cooperative_groups.h>
+ #include <cooperative_groups/reduce.h>
+ #endif // GGML_USE_HIP
+@@ -142,6 +144,7 @@
+     }
+ }
+ 
++#ifndef GGML_USE_HIP
+ // TODO: Template to allow keeping ncols in registers if they fit
+ static __device__ void soft_max_f32_parallelize_cols_single_row(const float * __restrict__ x,
+                                                                 float * __restrict__ dst,
+@@ -248,6 +251,7 @@
+         col += step_size * n_elem_per_thread;
+     }
+ }
++#endif // !GGML_USE_HIP
+ 
+ #ifdef __clang__
+ #pragma clang diagnostic pop
+@@ -305,6 +309,7 @@
+     soft_max_f32<true, 0, 0><<<block_nums, block_dims, nbytes_shared, stream>>>(x, mask, sinks, dst, p);
+ }
+ 
++#ifndef GGML_USE_HIP
+ __launch_bounds__(8*WARP_SIZE, 1) static __global__ void soft_max_f32_parallelize_cols(const float * __restrict__ x,
+                                                      float * __restrict__ dst,
+                                                      float * __restrict__ tmp_maxs,
+@@ -323,6 +328,7 @@
+                                                  tmp_sums, shared_vals[0], shared_vals[1], p);
+     }
+ }
++#endif // !GGML_USE_HIP
+ 
+ template <typename T>
+ static void soft_max_f32_cuda(const float *                                x,
+@@ -352,6 +358,7 @@
+         // Parallelize across SMs for top-p/dist-sampling
+         // The heuristic for parallelizing rows across SMs vs parallelizing single row & looping over all rows was done on the basis of a B6000 GPU and
+         // Can be adapted further for lower-SM-count GPUs, though keeping data in registers should be implemented first as that is the optimal solution.
++#ifndef GGML_USE_HIP
+         if (ggml_cuda_info().devices[id].supports_cooperative_launch &&
+             ncols_x / (params.ne01 * params.ne02 * params.ne03) > 8192 && mask == nullptr && sinks == nullptr &&
+             params.scale == 1.0f && params.max_bias == 0.0f) {
+@@ -363,7 +370,9 @@
+             CUDA_CHECK(cudaLaunchCooperativeKernel((void *) soft_max_f32_parallelize_cols,
+                                                    dim3(ggml_cuda_info().devices[id].nsm, 1, 1),
+                                                    dim3(WARP_SIZE * 8, 1, 1), kernel_args, 0, stream));
+-        } else {
++        } else
++#endif // !GGML_USE_HIP
++        {
+             const size_t nbytes_shared_low = WARP_SIZE * sizeof(float);
+             soft_max_f32<false, 0, 0>
+                 <<<block_nums, block_dims, nbytes_shared_low, stream>>>(x, mask, sinks, dst, params);

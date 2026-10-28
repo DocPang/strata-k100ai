@@ -32,7 +32,7 @@ sha256:caeff0e9e6efef918a31359c4764b18bf2d428f2b76e3580c788f4cc8b0e93ad
 
 ```bash
 curl -fL --retry 3 -o strata-xxs-20261023-k100ai022-linux-amd64.tar.gz \
-  https://github.com/DocPang/strata-k100ai/releases/download/v0.2.0/strata-xxs-20261023-k100ai022-linux-amd64.tar.gz
+  https://github.com/DocPang/strata-k100ai/releases/download/v0.2.1/strata-xxs-20261023-k100ai022-linux-amd64.tar.gz
 sha256sum -c engines/strata/xxs-20261023-k100ai022/artifact.sha256
 tar -xzf strata-xxs-20261023-k100ai022-linux-amd64.tar.gz
 (cd runtime && sha256sum -c FILES.sha256)
@@ -103,10 +103,12 @@ docker tag "$BASE_IMAGE" k100ai-base-dtk:2604-caeff0e9
 BUILDX_BUILDER=default docker build --pull=false --network=none \
   --build-arg BASE_IMAGE=k100ai-base-dtk:2604-caeff0e9 \
   --build-arg ENGINE_ID=strata/xxs-20261023-k100ai022 \
-  -t k100ai/strata-xxs-20261023-k100ai022:v0.2.0 "$BUILD_DIR"
+  -t k100ai/strata-xxs-20261023-k100ai022:v0.2.1 "$BUILD_DIR"
 ```
 
 采用 Docker-backed builder 复用本机镜像。Dockerfile 不执行 apt/pip 安装。仓库保留 `install.sh`、`start.sh` 和 Compose 作为兼容入口；主要运行与调试流程见 [RUNNING.md](RUNNING.md)。
+
+v0.2.1 运行包内已包含 `bin/strata-vision`。需要图片输入时，把 `mmproj-Qwen3.8-Flash-Next-BF16.gguf` 放进模型目录，并在 `deployment.env` 设置 `VISION_ENABLED=1`；字段、API 与显存说明见 [MULTIMODAL.md](MULTIMODAL.md)。
 
 ## 魔塔权重下载
 

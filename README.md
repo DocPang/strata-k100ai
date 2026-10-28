@@ -2,11 +2,13 @@
 
 面向海光 K100AI（gfx928、64 GiB 显存）的 **Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS** 推理优化与部署配置。
 
-当前版本 **[v0.2.0](https://github.com/DocPang/strata-k100ai/releases/tag/v0.2.0)**，引擎 SHA-256 为 `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9`（45,674,152 B）。
+当前版本 **[v0.2.1](https://github.com/DocPang/strata-k100ai/releases/tag/v0.2.1)**，文本引擎 SHA-256 为 `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9`（45,674,152 B），运行包 SHA-256 为 `dc6a0e969e3d92c1ba54de5545f6a97f37cd62492297e50ad3d3b02356ef9aba`（29,472,859 B）。
 
-本版把优化集**重基到上游 strata 0.2.2（`011c9e60`）**。rc.1–rc.7 的引擎谱系基于上游 `fb58e0db`，与本版不是同一条基线（两棵树有 333 个文件不同），两版基线不同，所以下面的差值既包含本版的优化，也包含上游基线本身的变化——这是"上一版对上一版"的口径，与 CHANGELOG 的既有做法一致；对照组是**同一张卡上的上一版 rc.7 引擎**。
+v0.2.0 把优化集**重基到上游 strata 0.2.2（`011c9e60`）**；rc.1–rc.7 的引擎谱系基于 `fb58e0db`，与该版不是同一条基线。下面的文本成绩是 v0.2.0 的同卡对照结果，v0.2.1 未改文本路径，因此继续适用。
 
-## 本版成绩
+v0.2.1 在 v0.2.0 的文本引擎之上增加 **GPU 多模态视觉**：新增 HIP 图片编码器 `runtime/bin/strata-vision`，图片先编码成 embeddings 再进入文本模型。启用方式、性能与验证见 [多模态视觉](docs/MULTIMODAL.md)。
+
+## 文本成绩（v0.2.0 引擎，v0.2.1 同）
 
 测试条件：单卡 gfx928（renderD132）、IQ3_XXS、max-context=262144、expert-cache=24576、INT8 KV、prefill=30602、spec=6；对照组为同卡上一版 rc.7 引擎（`ec7021b0…`），**同会话交替、单请求串行**；43 个开关完整列在 [`engines/strata/xxs-20261023-k100ai022/manifest.json`](engines/strata/xxs-20261023-k100ai022/manifest.json) 的 `environment_required`。
 
@@ -47,6 +49,32 @@ decode 在同 T 对照下：verify **0.993**、draft **0.96**、commit **0.19**�
 1. **首个请求的预填更慢**：约 500–541 ms，对照组 303–307 ms。本版在 prompt 阶段预热 MTP 的 11 个 decode 图（11 × 16.4 ms），每进程只付一次、落在不计分的首个请求上；换来每个首 decode 窗口快约 86 ms。`STRATA_MTP_WARM_AT_START=0` 可关掉。
 2. **ctx128 输出与上游不同**：`84f393bf…` 对 `a6bcf7fd…`。原因是 hc read 的 `[wd|wi]` 宽 GEMM（`STRATA_K100AI_HC_FUSE`，默认开）改变了该投影的累加序；置 `STRATA_K100AI_HC_FUSE=0` 后 30K logits 逐字节相同、ctx128 输出回到 `a6bcf7fd…`。这是两棵树之间**唯一**已知的数值差异，五个长度档的 top-1 全部一致。
 
+## 多模态（v0.2.1）
+
+v0.2.1 新增 GPU 图片编码器 `runtime/bin/strata-vision`（HIP，gfx928），文本引擎 `runtime/bin/strata` 不变。编码器是独立常驻进程，约 2.1 GiB 显存；单卡加载后仍余约 5.27 GiB。
+
+| 项目 | 实测 |
+| --- | ---: |
+| 760×520 图（475 image tokens）GPU 编码 | **1.72 s** |
+| 同图 CPU 编码（8 线程对照） | 18.0 s |
+| 同图二次请求（编码缓存） | 约 1.8 s 端到端 |
+| 1800×1200 图（1024 tokens） | 12.5 s 端到端（含 309 tokens 生成） |
+| GPU vs CPU embeddings | cosine mean 0.999293 / rel-L2 3.24% |
+
+启用：
+
+```bash
+# 1) 把 mmproj 放进 MODEL_DIR（与两个 GGUF 分片同目录）
+#    mmproj-Qwen3.8-Flash-Next-BF16.gguf（866 MiB）
+# 2) deployment.env
+VISION_ENABLED=1
+VISION_MAX_TOKENS=1024
+# 3) 启动
+./start.sh
+```
+
+`/health` 出现 `"images": true` 即加载成功。原生 Docker 启动时，在 `strata.json` 中加 `"vision"` 段即可；完整字段、API 示例、性能与限制见 [docs/MULTIMODAL.md](docs/MULTIMODAL.md)，编码器源码与补丁见 [sources/vision-20261028](sources/vision-20261028/)。
+
 ## 累计优化内容
 
 当前运行包包含早期 K100AI 适配与内核优化，以及本次 IQ3_XXS 长上下文优化。下表列出发布版本采用的累计内容；部分属于已有内核的 gfx928 适配、分派或参数选择，不代表每一项算法均由本项目从零实现。标注版本号的是该项的引入版本，未标注的是 rc.1 之前既已存在。
@@ -72,10 +100,12 @@ decode 在同 T 对照下：verify **0.993**、draft **0.96**、commit **0.19**�
 | Decode 稠密计算 | MMVQ wave/packed 路径、MMVQ LDS 激活暂存与 WV2 分组；Q6K packed-wave 走 LDS |
 | 稠密 GEMM 累加器 | GEMM_Y_F16：qkv / qf / sg / su / sd / z 六个投影族的 GEMM Y 累加器改走 16 位路径（rc.6） |
 | MTP 图调度 | **v0.2.0**：round/step 图在 prompt 阶段预热（`STRATA_MTP_WARM_AT_START`），把 11 次图上传挪出首个 decode 窗口 |
+| 多模态视觉 | **v0.2.1**：HIP 图片编码器 `strata-vision`（llama.cpp `mtmd`），GPU 编码 475 tokens 1.72 s（CPU 18.0 s），最大 1024 image tokens；文本引擎不变 |
 
 ### 各版本新增项
 
-- **v0.2.0（当前）**：down 投影 prefetch 路径与单 plane 分块、hc read 的 `[wd|wi]` 宽 GEMM、`moe_combine` 的 `SD` 特化、decode 图预热。前两项合计把 hc read 阶段从相对 rc.7 的表观落后 38% 变成快 11%。
+- **v0.2.1（当前）**：新增 GPU 图片编码器 `strata-vision`（HIP/gfx928），支持 1024 image tokens；修正 DTK 下 norm launch bounds 导致的静默算错，并绕过 cooperative-groups 头文件兼容问题。文本引擎与 v0.2.0 相同。
+- **v0.2.0**：down 投影 prefetch 路径与单 plane 分块、hc read 的 `[wd|wi]` 宽 GEMM、`moe_combine` 的 `SD` 特化、decode 图预热。前两项合计把 hc read 阶段从相对 rc.7 的表观落后 38% 变成快 11%。
 - **v0.1.0-rc.7**：rocBLAS Tensile solution 按形状锁定（`STRATA_GEMM_SOL`），以及与 `STRATA_DENSE_TN` 的互斥约束。
 - **v0.1.0-rc.6**：16 位 GEMM Y 累加器 `GEMM_Y_F16`、h16 topk 核与寄存器最大值缓存 `TOPK_H16`/`TOPK_REG_MAX`、scores 合并批次 `SCORES_MMAC_NB` 翻倍、Q6K packed-wave LDS、MMVQ WV2 分组。
 - **v0.1.0-rc.5**：MMAC scores LDS 合并装载、IQ2 exact 扩展、FP16 scores 缓冲、K 暂存模板化、MMVQ LDS。
@@ -92,6 +122,7 @@ decode 在同 T 对照下：verify **0.993**、draft **0.96**、commit **0.19**�
 | v0.1.0-rc.6 | rc.5 | 32K / 128K / 250K | −4.70% / −6.88% / −6.49% | 同批 A/B/A，各用自己的发布环境 |
 | v0.1.0-rc.7 | rc.6 | ctx128（126,857 token） | −1.64% | 交叉 A/B，控制组极差 0.003% |
 | **v0.2.0** | **rc.7** | 30,603 / 7,556 / 126,857 | 预填 **0.988 / 0.974–1.003 / 0.986**；decode **0.941–0.998** | 同卡同会话交替，单请求串行 |
+| **v0.2.1** | v0.2.0 文本引擎 | 475 / 1024 image tokens | 编码 **1.72 s**（CPU 18.0 s）；余弦 0.999293；文本性能不变 | 单卡 gfx928，GPU HIP 编码器 |
 
 [完整优化清单](docs/OPTIMIZATIONS.md)逐项说明实现位置、启用方式和测试范围，[完整成绩](docs/BENCHMARKS.md)保留各版本原始记录。未启用的实验路径、否定结果及后续研究构建不计入上述清单；单项收益不能相加作为累计加速比。
 
@@ -121,9 +152,9 @@ free -h
 ```bash
 mkdir -p "$HOME/strata-deploy"
 cd "$HOME/strata-deploy"
-git clone --depth 1 --branch v0.2.0 \
-  https://github.com/DocPang/strata-k100ai.git strata-k100ai-020
-cd strata-k100ai-020
+git clone --depth 1 --branch v0.2.1 \
+  https://github.com/DocPang/strata-k100ai.git strata-k100ai-021
+cd strata-k100ai-021
 
 export PROJECT_DIR="$PWD"
 export DATA_DIR="$PROJECT_DIR/data"
@@ -152,7 +183,7 @@ docker image inspect "$BASE_IMAGE" --format '{{.Id}}'
 ```bash
 cd "$PROJECT_DIR"
 curl -fL --retry 3 -o strata-xxs-20261023-k100ai022-linux-amd64.tar.gz \
-  https://github.com/DocPang/strata-k100ai/releases/download/v0.2.0/strata-xxs-20261023-k100ai022-linux-amd64.tar.gz
+  https://github.com/DocPang/strata-k100ai/releases/download/v0.2.1/strata-xxs-20261023-k100ai022-linux-amd64.tar.gz
 sha256sum -c engines/strata/xxs-20261023-k100ai022/artifact.sha256
 tar -xzf strata-xxs-20261023-k100ai022-linux-amd64.tar.gz
 (cd runtime && sha256sum -c FILES.sha256)
@@ -161,7 +192,7 @@ sha256sum runtime/bin/strata
 
 最后一条应显示本页开头的 `bdbfd934…` 完整摘要。所有校验通过后再继续。
 
-也可以从源码自己编（可验证路径）：clone `v0.2.0` 与上游 `011c9e60`，覆盖 [`sources/xxs-20261023-k100ai022/`](sources/xxs-20261023-k100ai022/) 的 36 个文件，按 [引擎清单](engines/strata/xxs-20261023-k100ai022/manifest.json) 记录的配方编译，产出摘要应为 `bdbfd934…`。注意同一构建目录内两次干净编译逐字节一致（`da43917a…`），换目录后 SHA-256 会变而字节数不变，因此 `clean_rebuild_verified` 记为 `false`，细节见 [复现报告](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)。
+文本引擎也可从源码自己编（可验证路径）：clone `v0.2.1` 与上游 `011c9e60`，覆盖 [`sources/xxs-20261023-k100ai022/`](sources/xxs-20261023-k100ai022/) 的 36 个文件，按 [引擎清单](engines/strata/xxs-20261023-k100ai022/manifest.json) 记录的配方编译，产出摘要应为 `bdbfd934…`。图片编码器的构建见 [sources/vision-20261028](sources/vision-20261028/)。注意同一构建目录内两次干净编译逐字节一致（`da43917a…`），换目录后 SHA-256 会变而字节数不变，因此 `clean_rebuild_verified` 记为 `false`，细节见 [复现报告](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)。
 
 ### 5. 从魔塔下载两个 IQ3_XXS 权重分片
 
@@ -181,6 +212,18 @@ curl -fL --retry 5 -C - \
 ```
 
 两分片必须在同一目录，文件名保持不变。校验表固定了本版本测试使用的文件；魔塔仓库后续更新导致校验失败时，应先确认文件版本。
+
+多模态需要同一目录下的视觉投影文件（仅开启 `VISION_ENABLED=1` 时需要）：
+
+```bash
+curl -fL --retry 5 -C - \
+  -o "$DATA_DIR/models/IQ3_XXS/mmproj-Qwen3.8-Flash-Next-BF16.gguf" \
+  'https://modelscope.cn/api/v1/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/repo?Revision=master&FilePath=mmproj-Qwen3.8-Flash-Next-BF16.gguf'
+
+printf '%s  %s\n' \
+  b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0 \
+  "$DATA_DIR/models/IQ3_XXS/mmproj-Qwen3.8-Flash-Next-BF16.gguf" | sha256sum -c -
+```
 
 ### 6. 生成与权重匹配的 native pack
 
@@ -291,6 +334,8 @@ docker run --detach --name strata-next-iq3xxs \
   --config /config/strata.json --host 0.0.0.0 --port 8080
 ```
 
+多模态：上面的原生命令直接使用 `strata.json`，不经过 entrypoint。开启视觉时，在该文件中加 `"vision"` 段（`exe`/`mmproj`/`model`/`gpu: true`/`max_tokens: 1024`），或改用 `./start.sh` 并在 `deployment.env` 设置 `VISION_ENABLED=1`（entrypoint 会自动注入）。完整字段与 API 示例见 [docs/MULTIMODAL.md](docs/MULTIMODAL.md)。
+
 初次加载需要读取权重并建立专家缓存。服务仅绑定宿主 `127.0.0.1:18640`；跨机器访问应通过已有网关、反向代理或 SSH 转发接入。配置中的模型标识为 `qwen3.8-flash-next-strata`。
 
 ### 10. 检查加载并发送请求
@@ -332,6 +377,6 @@ curl --fail http://127.0.0.1:18640/v1/chat/completions \
 
 ## 文档与来源
 
-[模型准备](docs/MODELS.md) · [参数参考](docs/PARAMETERS.md) · [显存说明](docs/MEMORY.md) · [完整成绩](docs/BENCHMARKS.md) · [优化说明](docs/OPTIMIZATIONS.md) · [源码恢复](docs/SOURCE_BUILD.md) · [验证范围](docs/VALIDATION.md) · [v0.2.0 复现报告](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)
+[多模态视觉](docs/MULTIMODAL.md) · [模型准备](docs/MODELS.md) · [参数参考](docs/PARAMETERS.md) · [显存说明](docs/MEMORY.md) · [完整成绩](docs/BENCHMARKS.md) · [优化说明](docs/OPTIMIZATIONS.md) · [源码恢复](docs/SOURCE_BUILD.md) · [验证范围](docs/VALIDATION.md) · [v0.2.0 文本引擎复现报告](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)
 
 本项目由独立维护者发布，基于 [Strata](https://github.com/Niko1221/Strata) 和 [llama.cpp](https://github.com/ggml-org/llama.cpp)，遵循 [MIT](LICENSE) 并保留[上游许可](engines/strata/LICENSE)。DTK/HyHAL 与模型权重遵循各自许可。

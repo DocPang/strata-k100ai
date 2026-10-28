@@ -1,5 +1,17 @@
 # 更新记录
 
+## v0.2.1
+
+- **多模态视觉**：新增 HIP 图片编码器 `runtime/bin/strata-vision`（119,439,216 B，SHA-256 `9c4dc143…`），把 Qwen3.8-Flash-Next 的 ViT 放到 gfx928 GPU 上执行；文本引擎 `runtime/bin/strata` 与 v0.2.0 完全相同（`bdbfd934…`）。
+- 运行包 `strata-xxs-20261023-k100ai022-linux-amd64.tar.gz` 更新为 29,472,859 B（SHA-256 `dc6a0e96…`），`FILES.sha256` 206 项；`install.sh` / `compose.yaml` / Dockerfile 同步到 `v0.2.1`。
+- 新增入口：`VISION_ENABLED=1`、`VISION_MAX_TOKENS=1024`（`VISION_EXE` / `VISION_MMPROJ` 可选）。entrypoint 自动注入 `vision` 段；编码器是独立常驻进程，约占 2.1 GiB 显存。
+- 新增源码快照 [sources/vision-20261028](sources/vision-20261028/)：llama.cpp `3cf03257` 上的 3 个补丁（DTK hip 版本闸门、softmax cooperative-groups、norm 256 线程）、构建脚本、二进制/manifest 与验证数据。
+- 关键正确性修复：`norm_f32<1024>` 在 HCU 上超过 launch bounds（256），1024 线程会静默丢线程，embeddings 与 CPU 的 cosine 只有 0.05；改为 256 线程后恢复到 0.999293。未修时模型仍会给出看似合理的错误答案，因此该补丁是必需项。
+- 实测（单卡 gfx928，760×520 图，475 image tokens）：GPU 编码 **1.72 s**，CPU 8 线程对照 18.0 s；1800×1200 图 1024 tokens 端到端 12.5 s；GPU/CPU embeddings cosine mean 0.999293、min 0.947855、rel-L2 3.24%。
+- 长上下文 40K / 100K / 230K token 压测期间显存峰值不变（60,246 MiB，剩余 5,274 MiB）；图片编码上限 1024 tokens。
+- 端到端验证：DSH 桌面 `describe_image` 10 s、内置 `read_image` 6 s，标题、字段、表格和柱状图数值均读对。
+- 文档：新增 [docs/MULTIMODAL.md](docs/MULTIMODAL.md)；README、RUNNING/INSTALL/SOURCE_BUILD 与引擎清单同步。
+
 ## v0.2.0
 
 - **基线切换**：本版把 k100ai 优化集**重基到上游 strata 0.2.2（`011c9e60`）**。rc.1–rc.7 的引擎谱系基于上游 `fb58e0db`，与本版不是同一条基线（两棵树有 333 个文件不同），因此本版不是 rc.7 的增量，也不能与 rc.7 的二进制逐位对比；下表的对照一律是**同卡上一版 rc.7 引擎**（差值含上游基线本身的变化）。

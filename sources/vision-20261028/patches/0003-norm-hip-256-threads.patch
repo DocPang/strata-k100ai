@@ -1,0 +1,32 @@
+--- a/ggml/src/ggml-cuda/norm.cu
++++ b/ggml/src/ggml-cuda/norm.cu
+@@ -285,8 +285,15 @@
+         const dim3 block_dims(WARP_SIZE, 1, 1);
+         norm_f32<WARP_SIZE><<<blocks_num, block_dims, 0, stream>>>(x, dst, ncols, stride_row, stride_channel, stride_sample, eps);
+     } else {
++#ifdef GGML_USE_HIP
++        // DTK/hipcc limits this kernel to 256 threads per block (launch bounds),
++        // so a 1024-thread launch would silently drop work on the HCU.
++        const dim3 block_dims(256, 1, 1);
++        norm_f32<256><<<blocks_num, block_dims, block_dims.x > WARP_SIZE ? 32 * sizeof(float2): 0, stream>>>(x, dst, ncols, stride_row, stride_channel, stride_sample, eps);
++#else
+         const dim3 block_dims(1024, 1, 1);
+         norm_f32<1024><<<blocks_num, block_dims, block_dims.x > WARP_SIZE ? 32 * sizeof(float2): 0, stream>>>(x, dst, ncols, stride_row, stride_channel, stride_sample, eps);
++#endif
+     }
+ }
+ 
+@@ -296,8 +303,13 @@
+         const dim3 block_dims(WARP_SIZE, 1, 1);
+         group_norm_f32<WARP_SIZE><<<num_groups, block_dims, 0, stream>>>(x, dst, group_size, ne_elements, eps);
+     } else {
++#ifdef GGML_USE_HIP
++        const dim3 block_dims(256, 1, 1);
++        group_norm_f32<256><<<num_groups, block_dims, block_dims.x > WARP_SIZE ? 2 * 32 * sizeof(float): 0, stream>>>(x, dst, group_size, ne_elements, eps);
++#else
+         const dim3 block_dims(1024, 1, 1);
+         group_norm_f32<1024><<<num_groups, block_dims, block_dims.x > WARP_SIZE ? 2 * 32 * sizeof(float): 0, stream>>>(x, dst, group_size, ne_elements, eps);
++#endif
+     }
+ }
+ 

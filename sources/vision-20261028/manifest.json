@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "component": "strata/vision-20261028",
+  "version": "v0.2.1",
+  "built_at": "2026-10-28T08:43:00+08:00",
+  "backend": "hip",
+  "arch": "gfx928",
+  "toolchain": "DTK 25.10 (hipconfig 6.3.26113dcc), clang 17, llama.cpp 3cf03257f219afbe7334045ff7c6a06ac68c627d",
+  "binary": {
+    "path": "runtime/bin/strata-vision",
+    "sha256": "9c4dc14303e508c0c45814d886d56456a0b0b70a8732e04f9555c0491fdb41d4",
+    "bytes": 119439216
+  },
+  "model": {
+    "name": "Qwen3.8-Flash-Next",
+    "mmproj": "mmproj-Qwen3.8-Flash-Next-BF16.gguf",
+    "mmproj_sha256": "b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0",
+    "mmproj_bytes": 907543008
+  },
+  "config": {
+    "gpu": true,
+    "max_tokens": 1024
+  },
+  "patches": [
+    {
+      "file": "patches/0001-dtk-hip-version.patch",
+      "sha256": "42185cd3620ab721d21a0711c21388f945c93ac71cb0f69886d1648bb2a3acbf"
+    },
+    {
+      "file": "patches/0002-softmax-hip-cooperative-groups.patch",
+      "sha256": "e1f69cd58e081ab719b1324596a2c69fb93c76dfbb043cd32cd52707ff44555d"
+    },
+    {
+      "file": "patches/0003-norm-hip-256-threads.patch",
+      "sha256": "9bbd0b827cb3d3b6b20cb9bd51fd10608232b2c3bb9a49863f33f9905f2ee8eb"
+    }
+  ],
+  "validation": {
+    "image_tokens": 475,
+    "gpu_encode_ms": 1720,
+    "cpu_encode_ms": 18000,
+    "embedding_cosine_mean": 0.999293,
+    "embedding_cosine_min": 0.947855,
+    "embedding_rel_l2": 0.0324,
+    "large_image_tokens": 1024,
+    "large_image_end_to_end_s": 12.5,
+    "vram_encoder_mib": 2116,
+    "vram_free_after_load_mib": 5274
+  }
+}

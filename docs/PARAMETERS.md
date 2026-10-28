@@ -42,6 +42,19 @@
 
 更长草稿会增加草稿计算、验证窗口及相关状态。接受率较低时可能降低吞吐，不能仅按 spec 数值估算速度。独立 MTP 权重和 runtime 必须与配置共同准备。
 
+## 多模态
+
+通过 entrypoint 启动时使用以下环境变量；原生 `docker run` 则直接在 `strata.json` 写 `vision` 段。
+
+| 变量 | 默认 | 说明 |
+| --- | ---: | --- |
+| VISION_ENABLED | 0 | 1/true/yes/on 时加载 GPU 图片编码器 |
+| VISION_MAX_TOKENS | 1024 | 单图最大 image tokens（1–4096，建议 1024） |
+| VISION_EXE | /opt/k100ai/bin/strata-vision | 编码器路径 |
+| VISION_MMPROJ | mmproj-Qwen3.8-Flash-Next-BF16.gguf | 相对 `/models` 的文件名；也可写绝对路径 |
+
+编码器常驻约 2.1 GiB 显存；`/health` 的 `"images"` 字段表示是否启用。详见 [MULTIMODAL.md](MULTIMODAL.md)。
+
 ## 服务缓存
 
 | 参数 | 默认 | 说明 |

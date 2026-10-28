@@ -1,7 +1,8 @@
 # 项目结构
 
 ```text
-engines/strata/xxs-20261023-k100ai022/  当前引擎与实测记录（v0.2.0）
+engines/strata/xxs-20261023-k100ai022/  文本引擎与实测记录（v0.2.1 文本路径同 v0.2.0）
+sources/vision-20261028/            v0.2.1 HIP 图片编码器源码、补丁与验证
 engines/strata/xxs-20261016/       rc.5 引擎、环境、源码增量与构建记录
 engines/strata/c4/                 历史基线和基础源码恢复配方
 profiles/next-iq3s-single/          IQ3_S 历史配置

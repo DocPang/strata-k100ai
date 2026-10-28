@@ -1,7 +1,9 @@
-# xxs-20261023-k100ai022 — v0.2.0（重基到上游 0.2.2）
+# xxs-20261023-k100ai022 — v0.2.1（文本引擎同 v0.2.0，新增多模态）
 
 引擎 SHA-256 `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9`（45,674,152 B）。
-运行包 `strata-xxs-20261023-k100ai022-linux-amd64.tar.gz`（13,002,122 B，SHA-256 `359baf70…`），与 rc.7 包同构，只替换 `runtime/bin/strata` 并重算 `PROVENANCE.json` 与 `FILES.sha256`（205 项）。
+运行包 `strata-xxs-20261023-k100ai022-linux-amd64.tar.gz`（29,472,859 B，SHA-256 `dc6a0e96…`）：在 v0.2.0 文本引擎之外加入 `runtime/bin/strata-vision`（HIP 图片编码器），并重算 `PROVENANCE.json` 与 `FILES.sha256`（206 项）。
+
+v0.2.1 新增的视觉编码器 SHA-256 `9c4dc14303e508c0c45814d886d56456a0b0b70a8732e04f9555c0491fdb41d4`（119,439,216 B），配置 `gpu: true`、`max_tokens: 1024`，源码与补丁见 [sources/vision-20261028](../../../sources/vision-20261028/)。文本引擎与 v0.2.0 完全相同，下面的文本成绩继续适用。
 
 ## 这一版做了什么
 

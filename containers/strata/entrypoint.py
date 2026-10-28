@@ -7,6 +7,7 @@ import sys
 
 ROOT = Path('/opt/k100ai')
 APP = ROOT / 'app'
+VISION_DEFAULT_MMPROJ = 'mmproj-Qwen3.8-Flash-Next-BF16.gguf'
 SETTINGS = {
     'prefill': ('--prefill', 20480, 1, 262144),
     'max_context': ('--max-context', 262144, 1024, 262144),
@@ -75,6 +76,35 @@ def render(profile, settings, env):
             'sampling': {'temperature': 0}, 'engine_silence_s': 1800}
 
 
+def apply_vision(config, env, root=ROOT, models='/models'):
+    """Add the optional GPU image encoder to a rendered engine config."""
+    enabled = env.get('VISION_ENABLED', '0').strip().lower() in ('1', 'true', 'yes', 'on')
+    if not enabled:
+        return config
+    exe = env.get('VISION_EXE', str(root / 'bin/strata-vision'))
+    mmproj = env.get('VISION_MMPROJ', VISION_DEFAULT_MMPROJ).strip()
+    if not mmproj.startswith('/'):
+        mmproj = models.rstrip('/') + '/' + mmproj
+    try:
+        max_tokens = int(env.get('VISION_MAX_TOKENS', '1024'))
+    except ValueError:
+        raise SystemExit('VISION_MAX_TOKENS must be an integer') from None
+    if not 1 <= max_tokens <= 4096:
+        raise SystemExit('VISION_MAX_TOKENS must be between 1 and 4096')
+    if not Path(exe).is_file() or not os.access(exe, os.X_OK):
+        raise SystemExit('Missing executable vision encoder: ' + exe)
+    if not Path(mmproj).is_file():
+        raise SystemExit('Missing mmproj file: ' + mmproj)
+    config['vision'] = {
+        'exe': exe,
+        'mmproj': mmproj,
+        'model': models.rstrip('/') + '/' + env['SHARD1'],
+        'gpu': True,
+        'max_tokens': max_tokens,
+    }
+    return config
+
+
 def main():
     os.chdir(APP)
     command = sys.argv[1:]
@@ -94,6 +124,7 @@ def main():
     profile = json.loads((ROOT / 'profiles' / profile_id / 'profile.json').read_text())
     settings = json.loads(Path('/config/settings.json').read_text())
     config = render(profile, settings, os.environ)
+    config = apply_vision(config, os.environ)
     for path in ['/pack/tokenizer', '/mtp', '/opt/hyhal/lib',
                  '/models/' + os.environ['SHARD1'], '/models/' + os.environ['SHARD2']]:
         if not Path(path).exists():

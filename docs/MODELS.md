@@ -6,6 +6,16 @@
 
 运行包不包含模型。第一分片用于主模型，第二分片用于 PLE mmap。下载后按发布者校验值核验；IQ3_XXS 已核对文件的 SHA-256 另存于 [weights.sha256](../profiles/next-iq3xxs-single/weights.sha256)。
 
+多模态还需要视觉投影文件，放在两个分片同一目录（仅 `VISION_ENABLED=1` 时需要）：
+
+```bash
+curl -fL --retry 5 -C - \
+  -o /srv/models/next-iq3xxs/IQ3_XXS/mmproj-Qwen3.8-Flash-Next-BF16.gguf \
+  'https://modelscope.cn/api/v1/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/repo?Revision=master&FilePath=mmproj-Qwen3.8-Flash-Next-BF16.gguf'
+```
+
+固定值：907,543,008 B，SHA-256 `b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0`。字段与调用见 [MULTIMODAL.md](MULTIMODAL.md)。
+
 ```bash
 # 在包含两个 XXS 分片的目录中执行，校验表路径按项目位置填写。
 sha256sum -c /absolute/path/strata-k100ai/profiles/next-iq3xxs-single/weights.sha256

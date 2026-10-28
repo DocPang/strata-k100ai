@@ -215,5 +215,57 @@ class NativeDeploymentTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
 
 
+class VisionTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        (self.root / 'bin').mkdir()
+        self.exe = self.root / 'bin/strata-vision'
+        self.exe.write_bytes(b'#!/bin/sh\n')
+        self.exe.chmod(0o755)
+        self.models = self.root / 'models'
+        self.models.mkdir()
+        self.mmproj = self.models / 'mmproj.gguf'
+        self.mmproj.write_bytes(b'mmproj')
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_disabled_by_default(self):
+        config = entrypoint.apply_vision({'args': []}, {'SHARD1': 'first.gguf'}, self.root, str(self.models))
+        self.assertNotIn('vision', config)
+
+    def test_enabled_adds_gpu_config(self):
+        config = entrypoint.apply_vision(
+            {'args': []},
+            {'SHARD1': 'first.gguf', 'VISION_ENABLED': '1', 'VISION_MMPROJ': 'mmproj.gguf'},
+            self.root,
+            str(self.models),
+        )
+        self.assertEqual(config['vision']['exe'], str(self.exe))
+        self.assertEqual(config['vision']['mmproj'], str(self.mmproj))
+        self.assertEqual(config['vision']['model'], str(self.models / 'first.gguf'))
+        self.assertTrue(config['vision']['gpu'])
+        self.assertEqual(config['vision']['max_tokens'], 1024)
+
+    def test_missing_mmproj_fails(self):
+        with self.assertRaises(SystemExit):
+            entrypoint.apply_vision(
+                {'args': []},
+                {'SHARD1': 'first.gguf', 'VISION_ENABLED': '1', 'VISION_MMPROJ': 'missing.gguf'},
+                self.root,
+                str(self.models),
+            )
+
+    def test_bad_max_tokens_fails(self):
+        with self.assertRaises(SystemExit):
+            entrypoint.apply_vision(
+                {'args': []},
+                {'SHARD1': 'first.gguf', 'VISION_ENABLED': '1', 'VISION_MAX_TOKENS': '0'},
+                self.root,
+                str(self.models),
+            )
+
+
 if __name__ == '__main__':
     unittest.main()

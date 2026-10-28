@@ -1,5 +1,16 @@
 # 发布验证
 
+## v0.2.1
+
+- 文本引擎不变：`bdbfd934…`（45,674,152 B）。新增图片编码器 `runtime/bin/strata-vision`，SHA-256 `9c4dc14303e508c0c45814d886d56456a0b0b70a8732e04f9555c0491fdb41d4`（119,439,216 B），HIP/gfx928。
+- 运行包 `strata-xxs-20261023-k100ai022-linux-amd64.tar.gz`：29,472,859 B，SHA-256 `dc6a0e96…`，`FILES.sha256` 206 项全部校验通过（新增 `bin/strata-vision`）。
+- 单图 760×520（475 image tokens）：GPU 编码 1.72 s；CPU 8 线程对照 18.0 s。GPU/CPU embeddings cosine mean 0.999293、min 0.947855、rel-L2 3.24%。
+- 1800×1200 图按 1024 image tokens 编码，端到端 12.5 s（含 309 tokens 生成）。
+- 长上下文 40K / 100K / 230K token 请求期间 VRAM 峰值 60,246 MiB，剩余 5,274 MiB；KV 未额外占显存。
+- 正确性关键项：修复 `norm_f32<1024>` 的 launch-bounds 问题后，embeddings 才与 CPU 一致；未修时 cosine 约 0.05。
+- 端到端客户端：DSH 桌面 `describe_image` 10 s、内置 `read_image` 6 s，两张测试图的标题、字段、表格与柱状图数值均正确。
+- 未覆盖：更多图片类型/分辨率的质量评测、并发图片请求、长时间浸泡、其他 DTK/架构。
+
 ## v0.2.0
 
 - 引擎 `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9`（45,674,152 B），运行包 `strata-xxs-20261023-k100ai022-linux-amd64.tar.gz`（SHA-256 `359baf70…`，205 项校验通过）。
