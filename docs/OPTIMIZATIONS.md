@@ -1,6 +1,6 @@
 # 累计优化与发布范围
 
-**v0.2.0（当前）** 分发 `bdbfd934…`，重基到上游 0.2.2。本版新增：down 投影的 prefetch 路径与单 plane 分块、hc read 的 `[wd|wi]` 宽 GEMM（`STRATA_K100AI_HC_FUSE`）、`moe_combine` 的 `SD` 特化、gate/up exact IQ2 / wsg16 / down GEMM / IQ4 预展开，以及 decode 图预热（`STRATA_MTP_WARM_AT_START`）。对照 rc.7 的实测与模块级拆分见 [完整成绩](BENCHMARKS.md)。
+**v0.2.1（当前）** 的文本引擎与 v0.2.0 相同（`bdbfd934…`，重基到上游 0.2.2），新增 GPU 图片编码器 `strata-vision`（HIP/gfx928），见 [多模态视觉](MULTIMODAL.md)。文本侧沿用：down 投影的 prefetch 路径与单 plane 分块、hc read 的 `[wd|wi]` 宽 GEMM（`STRATA_K100AI_HC_FUSE`）、`moe_combine` 的 `SD` 特化、gate/up exact IQ2 / wsg16 / down GEMM / IQ4 预展开，以及 decode 图预热（`STRATA_MTP_WARM_AT_START`）。对照 rc.7 的实测与模块级拆分见 [完整成绩](BENCHMARKS.md)。
 
 以下 rc.6 / rc.7 的条目是历史记录。
 
