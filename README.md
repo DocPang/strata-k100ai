@@ -377,7 +377,17 @@ grep -E '^(VISION_ENABLED|VISION_MAX_TOKENS)=' deployment.env
 curl -s http://127.0.0.1:8080/health
 ```
 
-`/health` 返回 `"images": true` 即编码器已加载；若改过 `PORT`，把健康检查地址换成对应端口。图片请求示例见 [MULTIMODAL.md](docs/MULTIMODAL.md)。
+`/health` 返回 `"images": true` 即编码器已加载；若改过 `PORT`，把地址换成对应端口。发一张图验证：
+
+```bash
+IMG_B64="$(base64 -w0 /path/to/image.png)"
+curl http://127.0.0.1:8080/v1/chat/completions \
+  -H "Authorization: Bearer $(cat "$PROJECT_DIR/.strata-api-key")" \
+  -H "Content-Type: application/json" \
+  -d "{\"model\":\"qwen3.8-flash-next-strata\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"读出图片标题\"},{\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/png;base64,$IMG_B64\"}}]}],\"max_tokens\":256}"
+```
+
+更多字段与 Python 示例见 [MULTIMODAL.md](docs/MULTIMODAL.md)。
 
 ## 默认参数与调整
 
