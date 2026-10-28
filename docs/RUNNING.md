@@ -56,6 +56,8 @@ entrypoint 会自动把下面这段写入生成的配置（`/models` 已挂载�
 
 用上面的原生 `docker run` 时不会经过 entrypoint：把这段加进 `strata.json`，并确认 `MODEL_DIR` 内有 mmproj。`/health` 返回 `"images": true` 即加载成功。API 示例、显存与性能见 [MULTIMODAL.md](MULTIMODAL.md)。
 
+仓库已提供 `profiles/next-iq3xxs-single/strata-vision.json`（文本参数 + `vision` 段）；原生启动时把挂载源从 `strata.json` 换成该文件即可。
+
 ## 调试与生命周期
 
 `--rm -it` 为前台运行；替换成 `--detach` 可在后台运行并保留容器。原生实例的服务日志和引擎日志分别查看：

@@ -145,7 +145,7 @@ df -h .
 free -h
 ```
 
-两个 GGUF 分片合计约 75.84 GB；生成专家 pack 还需约 40 GiB，以及 MTP 和转换中间文件的空间。建议为整个工作目录预留至少 200 GiB 可用磁盘；转换与运行还需要充足的主机内存。若数据盘位于其他路径，下一步将 `DATA_DIR` 改到该盘。
+两个 GGUF 分片合计约 75.84 GB；开启视觉还需一个 866 MiB 的 mmproj 文件。生成专家 pack 还需约 40 GiB，以及 MTP 和转换中间文件的空间。建议为整个工作目录预留至少 200 GiB 可用磁盘；转换与运行还需要充足的主机内存。若数据盘位于其他路径，下一步将 `DATA_DIR` 改到该盘。
 
 ### 2. 获取本版本部署文件并建立目录
 
@@ -194,7 +194,7 @@ sha256sum runtime/bin/strata runtime/bin/strata-vision
 
 文本引擎也可从源码自己编（可验证路径）：clone `v0.2.1` 与上游 `011c9e60`，覆盖 [`sources/xxs-20261023-k100ai022/`](sources/xxs-20261023-k100ai022/) 的 36 个文件，按 [引擎清单](engines/strata/xxs-20261023-k100ai022/manifest.json) 记录的配方编译，产出摘要应为 `bdbfd934…`。图片编码器的构建见 [sources/vision-20261028](sources/vision-20261028/)。注意同一构建目录内两次干净编译逐字节一致（`da43917a…`），换目录后 SHA-256 会变而字节数不变，因此 `clean_rebuild_verified` 记为 `false`，细节见 [复现报告](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)。
 
-### 5. 从魔塔下载两个 IQ3_XXS 权重分片
+### 5. 从魔塔下载 IQ3_XXS 权重与视觉投影
 
 模型页面：[ISTA-DASLab / Qwen3.8-Flash-Next-GSQ-RCO-GGUF](https://modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/files)。以下命令支持断点续传，下载中断后可重新执行同一条命令。
 
@@ -228,6 +228,8 @@ printf '%s  %s\n' \
 ### 6. 生成与权重匹配的 native pack
 
 转换在 DTK 容器中执行，不需要宿主 Python，也不需要 GPU。此步骤从权重生成索引、专家数据及 tokenizer，不能直接复用 IQ3_S 的 pack。
+
+说明：第 6/7 步的转换工具容器沿用 `engines/strata/xxs-20261016-gold/environment.env`，因为它带有 `STRATA_GGUF_PY`；第 9 步的服务启动使用当前 `engines/strata/xxs-20261023-k100ai022/environment.env`。
 
 ```bash
 docker run --rm --network none \
@@ -322,7 +324,7 @@ docker run --detach --name strata-next-iq3xxs \
   --security-opt seccomp=unconfined \
   --tmpfs /var/log/hylog:rw,nosuid,nodev,mode=0755 \
   --publish 127.0.0.1:18640:8080 --env STRATA_API_KEY \
-  --env-file "$PROJECT_DIR/engines/strata/xxs-20261016-gold/environment.env" \
+  --env-file "$PROJECT_DIR/engines/strata/xxs-20261023-k100ai022/environment.env" \
   --mount "type=bind,src=$PROJECT_DIR/runtime,dst=/opt/k100ai,readonly" \
   --mount "type=bind,src=$DATA_DIR/models/IQ3_XXS,dst=/models,readonly" \
   --mount "type=bind,src=$DATA_DIR/packs/next-iq3xxs,dst=/pack,readonly" \
@@ -334,7 +336,9 @@ docker run --detach --name strata-next-iq3xxs \
   --config /config/strata.json --host 0.0.0.0 --port 8080
 ```
 
-多模态：上面的原生命令直接使用 `strata.json`，不经过 entrypoint。开启视觉时，在该文件中加 `"vision"` 段（`exe`/`mmproj`/`model`/`gpu: true`/`max_tokens: 1024`），或改用 `./start.sh` 并在 `deployment.env` 设置 `VISION_ENABLED=1`（entrypoint 会自动注入）。完整字段与 API 示例见 [docs/MULTIMODAL.md](docs/MULTIMODAL.md)。
+视觉原生启动：确认上面的模型目录（`$DATA_DIR/models/IQ3_XXS`）内有 mmproj，把上面命令里的
+`profiles/next-iq3xxs-single/strata.json` 换成 `profiles/next-iq3xxs-single/strata-vision.json`
+（该文件已含 `vision` 段），其余参数不变。也可以改用下面的辅助入口流程。
 
 初次加载需要读取权重并建立专家缓存。服务仅绑定宿主 `127.0.0.1:18640`；跨机器访问应通过已有网关、反向代理或 SSH 转发接入。配置中的模型标识为 `qwen3.8-flash-next-strata`。
 
@@ -356,6 +360,24 @@ curl --fail http://127.0.0.1:18640/v1/chat/completions \
 ```
 
 `/health` 应显示 `loaded=true`。查看引擎日志可执行 `docker exec strata-next-iq3xxs tail -n 100 /tmp/strata-engine.log`。排查步骤、前台启动、停止容器和直接调用 C++ 引擎见 [运行与调试](docs/RUNNING.md)。
+
+### 11. 视觉启动（辅助入口完整流程）
+
+如果使用 `install.sh` + `start.sh`，先确认 `deployment.env` 里的 `MODEL_DIR` / `PACK_DIR` / `MTP_DIR` 指向本项目的 `$DATA_DIR`，并已下载 mmproj：
+
+```bash
+cd "$PROJECT_DIR"
+test -f "$DATA_DIR/models/IQ3_XXS/mmproj-Qwen3.8-Flash-Next-BF16.gguf"
+
+./install.sh
+sed -i 's/^VISION_ENABLED=.*/VISION_ENABLED=1/' deployment.env
+grep -E '^(VISION_ENABLED|VISION_MAX_TOKENS)=' deployment.env
+
+./start.sh
+curl -s http://127.0.0.1:8080/health
+```
+
+`/health` 返回 `"images": true` 即编码器已加载；若改过 `PORT`，把健康检查地址换成对应端口。图片请求示例见 [MULTIMODAL.md](docs/MULTIMODAL.md)。
 
 ## 默认参数与调整
 

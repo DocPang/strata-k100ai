@@ -108,7 +108,7 @@ BUILDX_BUILDER=default docker build --pull=false --network=none \
 
 采用 Docker-backed builder 复用本机镜像。Dockerfile 不执行 apt/pip 安装。仓库保留 `install.sh`、`start.sh` 和 Compose 作为兼容入口；主要运行与调试流程见 [RUNNING.md](RUNNING.md)。
 
-v0.2.1 运行包内已包含 `bin/strata-vision`。需要图片输入时，把 `mmproj-Qwen3.8-Flash-Next-BF16.gguf` 放进模型目录，并在 `deployment.env` 设置 `VISION_ENABLED=1`；字段、API 与显存说明见 [MULTIMODAL.md](MULTIMODAL.md)。
+v0.2.1 运行包内已包含 `bin/strata-vision`。需要图片输入时，把 `mmproj-Qwen3.8-Flash-Next-BF16.gguf` 放进模型目录，并在 `deployment.env` 设置 `VISION_ENABLED=1`；原生启动也可直接用 `profiles/next-iq3xxs-single/strata-vision.json`。字段、API 与显存说明见 [MULTIMODAL.md](MULTIMODAL.md)。
 
 ## 魔塔权重下载
 

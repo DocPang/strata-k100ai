@@ -64,6 +64,8 @@ docker logs -f "k100ai-$INSTANCE" | grep -E 'vision|images'
 
 `/health` 返回 `"images": true` 表示编码器已加载。启动失败时，entrypoint 会明确报缺少 `strata-vision` 或 mmproj。
 
+原生 Docker 启动（不经过 entrypoint）直接使用 `profiles/next-iq3xxs-single/strata-vision.json`，它已包含 `vision` 段；把普通启动命令里的 `strata.json` 换成该文件即可。
+
 ## 调用
 
 端口与文本服务一致（默认 `127.0.0.1:8080/v1`），使用同一个 `STRATA_API_KEY`。

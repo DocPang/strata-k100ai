@@ -266,6 +266,12 @@ class VisionTests(unittest.TestCase):
                 str(self.models),
             )
 
+    def test_shipped_vision_profile_is_ready(self):
+        config = json.loads((ROOT / 'profiles/next-iq3xxs-single/strata-vision.json').read_text())
+        self.assertTrue(config['vision']['gpu'])
+        self.assertEqual(config['vision']['max_tokens'], 1024)
+        self.assertEqual(config['vision']['exe'], '/opt/k100ai/bin/strata-vision')
+
 
 if __name__ == '__main__':
     unittest.main()
