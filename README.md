@@ -187,10 +187,10 @@ curl -fL --retry 3 -o strata-xxs-20261023-k100ai022-linux-amd64.tar.gz \
 sha256sum -c engines/strata/xxs-20261023-k100ai022/artifact.sha256
 tar -xzf strata-xxs-20261023-k100ai022-linux-amd64.tar.gz
 (cd runtime && sha256sum -c FILES.sha256)
-sha256sum runtime/bin/strata
+sha256sum runtime/bin/strata runtime/bin/strata-vision
 ```
 
-最后一条应显示本页开头的 `bdbfd934…` 完整摘要。所有校验通过后再继续。
+文本引擎应显示本页开头的 `bdbfd934…`；图片编码器应显示 `9c4dc14303e508c0c45814d886d56456a0b0b70a8732e04f9555c0491fdb41d4`。所有校验通过后再继续。
 
 文本引擎也可从源码自己编（可验证路径）：clone `v0.2.1` 与上游 `011c9e60`，覆盖 [`sources/xxs-20261023-k100ai022/`](sources/xxs-20261023-k100ai022/) 的 36 个文件，按 [引擎清单](engines/strata/xxs-20261023-k100ai022/manifest.json) 记录的配方编译，产出摘要应为 `bdbfd934…`。图片编码器的构建见 [sources/vision-20261028](sources/vision-20261028/)。注意同一构建目录内两次干净编译逐字节一致（`da43917a…`），换目录后 SHA-256 会变而字节数不变，因此 `clean_rebuild_verified` 记为 `false`，细节见 [复现报告](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)。
 
