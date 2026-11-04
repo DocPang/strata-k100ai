@@ -84,7 +84,7 @@ cache 命中。输出速度使用服务端 timings；TTFT 和总耗时使用客�
 ### 1. 下载并安装运行包
 
 ```bash
-BASE_URL=https://github.com/DocPang/strata-k100ai/releases/download/v0.2.3
+BASE_URL=https://github.com/DocPang/strata-k100ai/releases/download/v0.2.3-k100ai
 curl -fLO "$BASE_URL/strata-v0.2.9-k100ai-dual.tar.gz"
 curl -fLO "$BASE_URL/strata-v0.2.9-k100ai-dual.tar.gz.sha256"
 sha256sum -c strata-v0.2.9-k100ai-dual.tar.gz.sha256
@@ -95,7 +95,8 @@ sha256sum -c SHA256SUMS
 bash scripts/k100ai/setup-runtime.sh
 ```
 
-归档名中的 `v0.2.9` 是上游基线，下载链接中的 `v0.2.3` 是本仓库发布版本。
+归档名中的 `v0.2.9` 是上游基线；`v0.2.3-k100ai` 是本仓库的产品版本 v0.2.3
+对应的发布标签。
 
 ### 2. 准备模型资产
 

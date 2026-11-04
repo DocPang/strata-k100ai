@@ -16,7 +16,7 @@
 - 需要自行重建时，同时下载 `strata-v0.2.9-k100ai-dual-source.tar.gz`
 
 ```bash
-VERSION=v0.2.3
+VERSION=v0.2.3-k100ai
 BASE_URL="https://github.com/DocPang/strata-k100ai/releases/download/$VERSION"
 
 curl -fL --retry 3 -O \

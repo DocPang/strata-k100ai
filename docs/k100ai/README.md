@@ -15,7 +15,7 @@ K100AI 发布版本 **v0.2.3**，上游基线 Strata v0.2.9。完整下载和资
 - 当前引擎源码：`8c413cae0f5e9f88df784642772d78dff7bef428`
 - 当前引擎版本：`0.1.55`
 - Qwen 默认快速引擎版本：`0.1.47`
-- 发布标签：`v0.2.3`
+- 发布标签：`v0.2.3-k100ai`
 - 镜像：
   `harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68`
 - 允许设备：HCU0-3，对应
