@@ -15,9 +15,9 @@ qwen_fast_bin=${QWEN_FAST_BIN:-}
 qwen_fast_source_commit=${QWEN_FAST_SOURCE_COMMIT:-2150b1acdb48c386a9afcd64e63e2369b5a5e108}
 engine_source_commit=${ENGINE_SOURCE_COMMIT:-$(git -C "$src" log -1 --format=%H -- CMakeLists.txt src 2>/dev/null || cat "$src/BUILD_ID" 2>/dev/null || printf 'unknown')}
 package_source_commit=${PACKAGE_SOURCE_COMMIT:-$(git -C "$src" rev-parse HEAD 2>/dev/null || cat "$src/BUILD_ID" 2>/dev/null || printf 'unknown')}
-qwen_current_expected=437308792b7ec08724aa90e4b11736b4f40f41c10613faa9688fbdc1723ba7ab
-dsv41_expected=6543311f453bee2c6d61653a24f0b6282f9cb3568b17a8b889c2c5e073b12286
-test_expected=0d6c8455d76815b810a38c5529bc868087e71641008e0c86843ecd8b34dd815c
+qwen_current_expected=${QWEN_CURRENT_SHA256-437308792b7ec08724aa90e4b11736b4f40f41c10613faa9688fbdc1723ba7ab}
+dsv41_expected=${DSV41_SHA256-6543311f453bee2c6d61653a24f0b6282f9cb3568b17a8b889c2c5e073b12286}
+test_expected=${DS4_TEST_SHA256-0d6c8455d76815b810a38c5529bc868087e71641008e0c86843ecd8b34dd815c}
 
 test -n "$ggml" || { echo "set STRATA_GGML_DIR to the fixed llama.cpp source snapshot" >&2; exit 2; }
 test -n "$qwen_fast_bin" || { echo "set QWEN_FAST_BIN to the verified 0.1.47 engine" >&2; exit 2; }
@@ -76,21 +76,25 @@ if [[ $rc -ne 0 ]]; then
   exit "$rc"
 fi
 
-actual=$(sha256sum "$out/qwen/strata" | awk '{print $1}')
-[[ "$actual" == "$qwen_current_expected" ]] || {
-  echo "Qwen current binary mismatch: expected $qwen_current_expected, got $actual" >&2
-  exit 1
+check_hash() {
+  local path=$1
+  local expected=$2
+  local actual
+  actual=$(sha256sum "$path" | awk '{print $1}')
+  if [[ -z "$expected" ]]; then
+    printf '%s  %s\n' "$actual" "$path"
+    return 0
+  fi
+  [[ "$actual" == "$expected" ]] || {
+    echo "binary mismatch: $path expected $expected, got $actual" >&2
+    return 1
+  }
+  printf '%s  %s\n' "$actual" "$path"
 }
-actual=$(sha256sum "$out/dsv41/strata-dsv41" | awk '{print $1}')
-[[ "$actual" == "$dsv41_expected" ]] || {
-  echo "DeepSeek binary mismatch: expected $dsv41_expected, got $actual" >&2
-  exit 1
-}
-actual=$(sha256sum "$out/dsv41/ds4_gguf_test" | awk '{print $1}')
-[[ "$actual" == "$test_expected" ]] || {
-  echo "ds4_gguf_test binary mismatch: expected $test_expected, got $actual" >&2
-  exit 1
-}
+
+check_hash "$out/qwen/strata" "$qwen_current_expected"
+check_hash "$out/dsv41/strata-dsv41" "$dsv41_expected"
+check_hash "$out/dsv41/ds4_gguf_test" "$test_expected"
 
 python3 "$src/scripts/k100ai/package-release.py" \
   --source "$src" \

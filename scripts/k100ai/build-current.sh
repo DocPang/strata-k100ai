@@ -10,9 +10,9 @@ llama_src=$(cd -- "${2:?LLAMA_SOURCE is required}" && pwd -P)
 out=${3:-"$PWD/build-current-k100ai"}
 image=${BASE_IMAGE:-harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68}
 jobs=${JOBS:-64}
-qwen_expected=437308792b7ec08724aa90e4b11736b4f40f41c10613faa9688fbdc1723ba7ab
-dsv41_expected=6543311f453bee2c6d61653a24f0b6282f9cb3568b17a8b889c2c5e073b12286
-test_expected=0d6c8455d76815b810a38c5529bc868087e71641008e0c86843ecd8b34dd815c
+qwen_expected=${QWEN_CURRENT_SHA256-437308792b7ec08724aa90e4b11736b4f40f41c10613faa9688fbdc1723ba7ab}
+dsv41_expected=${DSV41_SHA256-6543311f453bee2c6d61653a24f0b6282f9cb3568b17a8b889c2c5e073b12286}
+test_expected=${DS4_TEST_SHA256-0d6c8455d76815b810a38c5529bc868087e71641008e0c86843ecd8b34dd815c}
 
 mkdir -p "$out"
 docker run --rm --name "strata-build-current-$$" \
@@ -60,6 +60,10 @@ check_hash() {
   local expected=$2
   local actual
   actual=$(sha256sum "$path" | awk '{print $1}')
+  if [[ -z "$expected" ]]; then
+    printf '%s  %s\n' "$actual" "$path"
+    return 0
+  fi
   if [[ "$actual" != "$expected" ]]; then
     echo "binary mismatch: $path expected $expected, got $actual" >&2
     return 1
