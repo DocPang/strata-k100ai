@@ -5,7 +5,7 @@
   "strata": {
     "base_version": "0.2.9",
     "base_commit": "c62d5e3a15b40ea51c96aae9e8d36928965f53ab",
-    "current_engine_source_commit": "8544d2fa6cddf61fb47edc0c3bd8a5d7d638140e",
+    "current_engine_source_commit": "8c413cae0f5e9f88df784642772d78dff7bef428",
     "qwen_fast_source_commit": "2150b1acdb48c386a9afcd64e63e2369b5a5e108",
     "qwen_fast_base_version": "0.2.2",
     "qwen_fast_base_commit": "011c9e600a93bbc9fd451c563501b5831c32bbca"

@@ -1,6 +1,6 @@
 # K100AI 运行参数
 
-K100AI 发布版本 **v0.2.2**，上游基线 Strata v0.2.9。完整下载和资产准备步骤见[手动安装](INSTALL.md)。支持：
+K100AI 发布版本 **v0.2.3**，上游基线 Strata v0.2.9。完整下载和资产准备步骤见[手动安装](INSTALL.md)。支持：
 
 - DeepSeek-V4.1-Flash，服务模型名 `deepseek-v4.1-flash`
 - Qwen3.8-Flash-Next，服务模型名 `qwen3.8-flash-next`
@@ -12,10 +12,10 @@ K100AI 发布版本 **v0.2.2**，上游基线 Strata v0.2.9。完整下载和资
 ## 版本
 
 - 上游基础：Strata v0.2.9，`c62d5e3a15b40ea51c96aae9e8d36928965f53ab`
-- 当前引擎源码：`8544d2fa6cddf61fb47edc0c3bd8a5d7d638140e`
+- 当前引擎源码：`8c413cae0f5e9f88df784642772d78dff7bef428`
 - 当前引擎版本：`0.1.55`
 - Qwen 默认快速引擎版本：`0.1.47`
-- 发布标签：`v0.2.2`
+- 发布标签：`v0.2.3`
 - 镜像：
   `harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68`
 - 允许设备：HCU0-3，对应
@@ -29,7 +29,7 @@ K100AI 发布版本 **v0.2.2**，上游基线 Strata v0.2.9。完整下载和资
 ```json
 {
   "engine_version": "0.1.55",
-  "engine_source_commit": "8544d2fa6cddf61fb47edc0c3bd8a5d7d638140e",
+  "engine_source_commit": "8c413cae0f5e9f88df784642772d78dff7bef428",
   "package_source_commit": "<最终打包提交>",
   "container_image": "harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68",
   "platform": "linux-x86_64-gfx928-dtk2604",
@@ -171,7 +171,8 @@ MTP runtime 不进入发布包；launcher 默认从
 SHA-256 见
 [PROVENANCE.md](PROVENANCE.md)。
 
-当前 0.1.55 引擎包含 `8544d2fa` 的 gfx928 int8 expert MMAC，并保留为
+当前 0.1.55 引擎包含 `8544d2fa` 的 gfx928 int8 expert MMAC 和
+`8c413cae` 的显式 gfx928 DeepSeek MMAC/QSA 路径，并保留为
 Qwen 对照二进制：
 
 - gate/up：`IQ3_XXS,IQ3_S,IQ4_XS`

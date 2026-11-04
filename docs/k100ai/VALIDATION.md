@@ -2,7 +2,7 @@
 
 发布包采用逐模型二进制分层。Qwen 默认快速档是本机已验证的 K100AI
 0.1.47；DeepSeek 和 Qwen 对照档来自
-`8544d2fa6cddf61fb47edc0c3bd8a5d7d638140e` 的 0.1.55。所有 GPU 测试只用
+`8c413cae0f5e9f88df784642772d78dff7bef428` 的 0.1.55。所有 GPU 测试只用
 HCU0-3；每个 case 前执行 preflight，结束后确认没有测试容器和 lease，三个
 研究容器保持 `exited`。
 
@@ -101,7 +101,47 @@ profile。
 ## DeepSeek 四卡、DSpark 和长输入
 
 最终包的 `strata-dsv41` 在 HCU0-3 上完整放置四张卡，CPU lane 为 0。
-64-token smoke 中：
+
+### 单并发十档长输出
+
+服务使用四张 K100AI、IQ2_XXS、FP4 KV、1,048,576-token 配置上下文、
+DSpark Q8_0、6 experts 和 `--dspark-conf 0.65`。请求使用 OpenAI 兼容
+`/v1/chat/completions`，单并发、`temperature=0`、`top_p=1`、目标输出
+256 tokens，逐档冷启动，所有档 `cached_tokens=0`。输出速度使用服务端
+timings；TTFT 与总请求时间使用客户端墙钟。
+
+| 目标输入 | 实际 prompt | TTFT | 预填充 | 输出 | 输出 tokens | 说明 |
+| ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 512 | 556 | 2.079 s | 121.6 tok/s | 26.8 tok/s | 256 | 正常 |
+| 2,048 | 2,092 | 3.685 s | 274.9 tok/s | 14.5 tok/s | 256 | 正常 |
+| 4,096 | 4,141 | 5.768 s | 349.7 tok/s | 16.9 tok/s | 256 | 正常 |
+| 8,192 | 8,237 | 9.948 s | 415.0 tok/s | 22.0 tok/s | 160 | 自然 EOS |
+| 12,288 | 12,333 | 13.632 s | 452.4 tok/s | 25.8 tok/s | 256 | 正常 |
+| 16,384 | 16,429 | 37.289 s | 201.8 tok/s | **3.0 tok/s** | 256 | **异常，排除出正常区间统计** |
+| 32,768 | 32,813 | 38.409 s | 426.9 tok/s | 27.7 tok/s | 256 | 正常 |
+| 65,536 | 65,581 | 81.431 s | 399.8 tok/s | 26.0 tok/s | 256 | 正常 |
+| 131,072 | 131,117 | 191.209 s | 333.8 tok/s | 24.2 tok/s | 256 | 正常 |
+| 257,901 | 257,945 | 355.155 s | 363.5 tok/s | 26.3 tok/s | 256 | 正常 |
+
+正常档的输出范围是 14.5–27.7 tok/s，中位数约 25.8 tok/s。32K 及以上没有
+出现随上下文单调下降，说明这一组 mixed-content 请求的主要限制不是 KV
+长度。DSpark 每轮能接受多少 draft、输出本身是否可预测，仍是主要变量。
+
+16K 档是异常点：引擎日志前半段约 128 tokens / 75,664 ms，即 1.69 tok/s；
+后半段约 111 tokens / 4,037 ms，即 27.50 tok/s。两段合并得到报告中的
+3.0 tok/s。相邻的 12K 与 32K 档正常，因此该点不作为长上下文退化证据。
+
+### 69.19 tok/s 的准确口径
+
+发布 smoke 使用固定 25-token 输入和 64-token 输出。输出是以下 8-token
+序列连续重复 8 次：
+
+```text
+455,14083,2645,344,260,1688,2645,16
+```
+
+这种高度可预测的输出让 DSpark 在 11 轮内接受 52 / 54 个 draft，命中率
+96.3%，最终 decode 为 64 tokens / 911 ms，即 69.19 tok/s。该次 smoke 中：
 
 - CUDA0 layers 0..9：4,224 / 4,224 experts，37.30 GB
 - CUDA1 layers 10..19：3,840 / 3,840 experts，33.12 GB
@@ -117,7 +157,7 @@ profile。
 | off A | 24.32 tok/s | off |
 | on B | 68.53 tok/s | 54 offered / 52 accepted |
 | off C | 24.25 tok/s | off |
-| on，最终包 smoke | 69.19 tok/s | 54 offered / 52 accepted |
+| on，最终包短输出峰值 | 69.19 tok/s | 54 offered / 52 accepted |
 
 on/off 平均加速为 `68.53 / ((24.32 + 24.25) / 2) = 2.82x`。off/on/off
 和最终包 smoke 的四组 64-token token ID 完全相同。profile 测试前后均为：
@@ -127,6 +167,11 @@ on/off 平均加速为 `68.53 / ((24.32 + 24.25) / 2) = 2.82x`。off/on/off
 ```
 
 服务使用冻结的 `data/dsv41/profile-2.00.bin` 和 `--profile-readonly`。
+
+因此 69.19 tok/s 和 2.82× 只描述上述重复短序列。它们不能写成任意内容、
+任意输出长度或长上下文的持续吞吐。较早日志中的 52 offered / 52 accepted
+属于不同的 21-token 调参运行，decode 为 62.75–65.00 tok/s；发布 smoke
+的最终证据是 25-token 输入与 54 offered / 52 accepted。
 
 有效 4,095-token DSV 长输入使用重复且已验证的 25-token DSV 序列：
 
