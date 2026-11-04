@@ -1,770 +1,141 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="apps/host/public/brand/strata-lockup-dark.svg">
-    <img src="apps/host/public/brand/strata-lockup-light.svg" alt="Strata" width="340">
+    <img src="apps/host/public/brand/strata-lockup-light.svg" alt="Strata" width="280">
   </picture>
 </p>
 
 <h1 align="center">Strata for K100AI</h1>
 
-<p align="center">
-  面向海光 K100AI / gfx928、DTK 2604 的可复现双模型推理服务
-</p>
+<p align="center">在海光 K100AI 上运行 DeepSeek V4.1 与 Qwen3.8，提供 OpenAI / Anthropic 兼容 API。</p>
 
 <p align="center">
-  <a href="https://github.com/DocPang/strata-k100ai/releases/latest"><b>下载</b></a> ·
-  <a href="#手动安装与运行">手动安装</a> ·
-  <a href="#模型与引擎">模型</a> ·
-  <a href="#独立复现">复现</a> ·
-  <a href="docs/k100ai/VALIDATION.md">验证</a> ·
-  <a href="LICENSE">MIT</a>
+  <a href="https://github.com/DocPang/strata-k100ai/releases/latest"><b>下载 v0.2.2</b></a> ·
+  <a href="#实测性能">性能</a> ·
+  <a href="#安装与运行">安装</a> ·
+  <a href="docs/k100ai/INSTALL.md">完整手动步骤</a> ·
+  <a href="docs/k100ai/REPRODUCIBILITY.md">源码复现</a>
 </p>
 
-本仓库提供一套可直接在 Hygon K100AI 上运行的 Strata 发布包，同时支持：
+K100AI 版本 **v0.2.2** · 上游基线 **Strata v0.2.9** · **Linux x86_64 / gfx928 / DTK 2604**
 
-- **Qwen3.8-Flash-Next**：默认使用经过 8K/40K 实测的 0.1.47 快速引擎，并启用 MTP。
-- **DeepSeek-V4.1-Flash**：使用独立的 0.1.55 `strata-dsv41` 引擎，支持四卡张量并行、FP4 KV 和 DSpark。
-- **OpenAI / Anthropic 兼容 API**：可接入现有 Agent、SDK 和服务框架。
-- **可复现发布**：固定源码、固定 DTK 镜像、固定模型文件、确定性归档，并提供独立源码包。
+## 实测性能
 
-当前 K100AI 发布版本为 **v0.2.2**，上游基线为 **Strata v0.2.9**。
+### DeepSeek-V4.1-Flash · 四卡
 
-> 模型权重、Qwen MTP runtime 和 DeepSeek 模型 pack 不进入运行归档。它们体积较大，并受各自模型许可证约束；请按本文提供的命令自行下载和生成。
+**4× K100AI 64 GiB**，IQ2_XXS、FP4 KV、DSpark Q8_0；模型按 `10,10,10,10` 分层切分，routed experts 全部驻留 GPU。
 
-## 实测成绩
+| 项目 | 实测结果 | 测试条件 |
+| --- | ---: | --- |
+| **生成速度** | **69.19 tok/s** | 最终发布包，64-token 输出，DSpark 开启 |
+| **DSpark 加速** | **2.82×** | 相同 25-token 输入，off / on / off 对照 |
+| 输入处理速度 | 300.45 tok/s | 4,095-token prompt，13.629 秒 |
+| 长输入稳定性 | 120,029 tokens | 独特 prompt tokens，请求完成、服务稳定 |
 
-所有成绩都绑定具体二进制、量化、上下文和拓扑。不同模型、量化或测试轮次之间不能直接把速度相减。
+DSpark 对照的生成速度依次为 **24.32 → 68.53 → 24.25 tok/s**，三次 64-token 输出完全相同；最终发布包的输出也相同，draft 接受 **52 / 54**。2.82× 按对照轮次计算，69.19 tok/s 来自最终包的独立测试。
 
-### Qwen 双引擎 prefill
+配置上下文上限为 **1,048,576 tokens**；完整 1M 窗口尚未灌满做质量评测。[测试条件与验证记录 →](docs/k100ai/VALIDATION.md#deepseek-四卡dspark-和长输入)
 
-条件是单张 K100AI 64 GiB、gfx928、DTK 2604、IQ3_XXS、INT8 KV、24,576 expert slots、prefill cap 20,480、MTP `spec=6`、关闭 prefill borrow；两档使用相同输入和运行环境。
+### Qwen3.8-Flash-Next · 单卡
 
-| 输入 | 0.1.47 快速档 GPU timeline | 快速档吞吐 | 0.1.55 GPU timeline | 0.1.55 吞吐 | 快速档倍数 |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 8,190 tokens | **4,375 ms** | **1,846.2 tok/s** | 7,860 ms | 1,033.6 tok/s | 1.80× |
-| 40,057 tokens | **19,066 ms** | **2,086.1 tok/s** | 34,361 ms | 1,161.3 tok/s | 1.80× |
+**1× K100AI 64 GiB**，IQ3_XXS、INT8 KV、MTP `spec=6`。相同输入和环境下，两档引擎的 prefill（输入处理）吞吐：
 
-0.1.47 快速档的 decode 记录为 **79.37 tok/s**，MTP accepted **56** / offered **57**。0.1.55 在 4,095-token prompt、64-token decode 的 MTP 记录为 **75.83 tok/s**，accepted **48** / offered **48**。
+| 输入长度 | 0.1.47 默认快速档 | 0.1.55 对照档 | 快速档提升 |
+| --- | ---: | ---: | ---: |
+| 8,190 tokens | **1,846.2 tok/s** | 1,033.6 tok/s | 约 1.8× |
+| 40,057 tokens | **2,086.1 tok/s** | 1,161.3 tok/s | 约 1.8× |
 
-快速档以接受数值漂移换取 prompt 性能：
+快速档在 8,191-token 输入、64-token 输出测试中生成速度为 **79.37 tok/s**，MTP 接受 **56 / 57**。配置上下文上限为 **262,144 tokens**。
 
-| 输入 | Top-1 | Max abs | Mean abs | Relative L2 | Cosine |
-| ---: | --- | ---: | ---: | ---: | ---: |
-| 8,191 | 两边均为 `112853` | 2.00396 | 0.27595 | 13.04% | 0.991468 |
-| 40,058 | 两边均为 `12654` | 4.22781 | 0.42068 | 16.71% | 0.987025 |
+默认使用 0.1.47，原因是 0.1.55 的 gfx928 prompt attention 仍有性能回归。快速档允许数值漂移：8K / 40K 验证中 top-1 相同，logits 余弦相似度为 0.9915 / 0.9870，40K 的前 8 个 greedy token 相同；它不保证逐位一致。[精度与性能明细 →](docs/k100ai/VALIDATION.md#qwen-精度和快速档验收)
 
-40,058-token 两种引擎的前 8 个 greedy token 完全相同：
+## 安装与运行
 
-```text
-12654 220 136723 104302 97318 3709 96317 98153
-```
+需要 Linux x86_64、K100AI/gfx928、Hygon 驱动、HyHAL 和 Docker。使用固定的 DTK 2604 镜像；完整镜像 digest、模型地址和 SHA-256 见[手动安装文档](docs/k100ai/INSTALL.md)。
 
-因此本版把 0.1.47 作为速度优先的默认档，把 0.1.55 保留为 canonical 对照和诊断路径。它没有被包装成 bitwise 输出。
-
-### DeepSeek 四卡
-
-条件是 4× K100AI、gfx928、DTK 2604、IQ2_XXS、FP4 KV、1,048,576 context、`tp=4`、`DS4_SPLIT=10,10,10,10`、DSpark on。最终 profile 将全部 routed experts 放在 HCU，CPU/RAM expert lane 均为 0。
-
-| 项目 | 实测 |
-| --- | ---: |
-| 64-token DSpark decode | **69.19 tok/s** |
-| 64-token decode 时间 | 911 ms |
-| DSpark draft | 54 offered / 52 accepted |
-| 4,095-token prompt prefill | **300.45 tok/s** |
-| 4,095-token prefill 时间 | 13,629 ms |
-| 4,095 prompt + 8-token decode | **48.32 tok/s** |
-
-最终包 API smoke 报告 `max_context=1048576`、`kv=fp4`、`expert_slots=15360`、`engram_layers=2`、`engram_lookups=48` 和 `cpu_experts=0`、`ram_experts=0`。
-
-### 服务验收
-
-| 项目 | 结果 |
-| --- | --- |
-| Qwen 0.1.47 API | 262,144 context，MTP 46 offered / 28 accepted |
-| Qwen 0.1.55 API | 262,144 context，MTP 46 offered / 28 accepted |
-| DeepSeek API | 1,048,576 context，FP4 KV，DSpark 14 offered / 14 accepted |
-| DeepSeek 算子测试 | `ALL OK (0 failed)` |
-| 人工直接 Docker 启动 | Qwen 和 DeepSeek 均加载成功并通过 API 请求 |
-| 测试后设备 | `HCU0-3 are free`，测试容器为 0 |
-
-完整的数值、硬件和未测范围见
-[`docs/k100ai/VALIDATION.md`](docs/k100ai/VALIDATION.md)。
-
-## 优化内容
-
-下表按最终运行路径归类。部分工作是在上游或已有内核上做 gfx928 分派、布局和参数选择，不能自动表述为从零实现的全新算法。
-
-| 范围 | 本版采用的优化 |
-| --- | --- |
-| K100AI 平台适配 | gfx928 HIP 兼容层、DTK 2604 编译链接、DTK/rocBLAS/hipBLASLt 接口适配，以及 Strata 与 ggml/llama.cpp MMQ 的衔接 |
-| Qwen prompt attention | 默认 0.1.47 使用 gfx928 native prompt MMAC；当前 0.1.55 暂未恢复这条路径，日志会明确报告不可用 |
-| gate/up 专家计算 | fused gate/up、exact IQ2 展开、wsg16 tile 分派；0.1.55 的安全 exact 集合覆盖 IQ3_XXS、IQ3_S、IQ4_XS |
-| down 专家计算 | Q2_0 展开与 int8 MMAC、IQ4_NL exact pre-expansion、staging 和行 tile 调整 |
-| Prompt GEMM | F16 prompt GEMM、按形状选择 GEMM tile、rocBLAS stride padding，以及已验证形状的 Tensile solution |
-| Hyper-connection | gfx928 HC upmix、split/staged read、down prefetch 和单 LDS plane 分块，减少重复读取与分界 launch |
-| GDN 与路由 | 八 lane GDN 递归、关闭无消费者的 FP32 写回、常驻 expert 排序，以及 native/MMQ/fused 路径协同 |
-| 数据复用 | 每个唯一 token 行只量化一次，再按 expert 索引 gather；融合 SwiGLU、量化和共享工作区 |
-| MTP | 加载外置 Q2_0 MTP runtime，使用 `spec=6`、接受阈值 0.7、draft graph 预热和会话缓存 |
-| DeepSeek 四卡 | 每卡 10 层的 `10,10,10,10` 切分，全部 routed experts 驻留 HCU，1024-token prefill chunk |
-| DeepSeek KV 与 Engram | 1M-token FP4 KV、resident KV、2 层 Engram 和 48 次 lookup |
-| DeepSeek drafting | DSpark Q8_0 drafter，置信度 0.65；最终 profile 记录 CPU/RAM expert lane 为 0 |
-| 服务运行时 | OpenAI 与 Anthropic 兼容 API、健康检查、Prometheus metrics、MTP/DSpark draft 计数 |
-| 安全启动 | Qwen 只映射一张 HCU，DeepSeek 只映射四张；宿主端口绑定 127.0.0.1，不自动停止其他容器 |
-| 可复现发布 | 固定容器 digest、固定模型 revision、逐文件 SHA-256、canonical `/work/...` 构建路径和确定性 tar/gzip |
-
-Qwen 0.1.55 仍有一个明确未完成项：gfx928 prompt attention 没有达到 0.1.47 的原生 MMAC 路径，因此单卡 prompt 比快速档慢约 1.8 倍。本版不把这项回归写成“已优化”。
-
-## 模型与引擎
-
-| 用途 | 二进制 | 引擎 | MTP / DSpark | 目标上限 | 设备 |
-| --- | --- | --- | --- | ---: | --- |
-| Qwen 默认快速档 | `bin/strata` | 0.1.47 | MTP | 262,144 tokens | 1× HCU |
-| Qwen 当前对照档 | `bin/strata-0.1.55` | 0.1.55 | MTP | 262,144 tokens | 1× HCU |
-| DeepSeek-V4.1-Flash | `bin/strata-dsv41` | 0.1.55 | DSpark | 1,048,576 tokens | 4× HCU |
-| DeepSeek 算子自检 | `bin/ds4_gguf_test` | 0.1.55 | — | — | 1× HCU |
-
-Qwen 默认选择 0.1.47，是因为当前 0.1.55 在 gfx928 上的 prompt attention 仍有可复现性能回归。包内保留 `bin/strata-0.1.55`，便于切换、对照和后续修复。
-
-## 适用的固定环境
-
-- 硬件：Hygon K100AI `gfx928`，单卡 64 GiB 显存
-- 软件：DTK 2604、Hygon 驱动与 HyHAL
-- 系统：Linux x86_64
-- 容器镜像：
-  `harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68`
-
-这不是通用 NVIDIA/CUDA、ROCm 或桌面版安装包。其他架构需要单独编译和验证。
-
-## 手动安装与运行
-
-本页以人工步骤为主：每个模型文件、ModelScope 地址、校验值、转换命令、Docker 设备和端口都明确列出。发布包内的 `fetch-*.sh`、`prepare-*.sh` 和 launcher 可以用于批量操作，但不是复现前提，也不应代替以下检查。
-
-### 1. 下载并校验运行包
-
-从 [Releases](https://github.com/DocPang/strata-k100ai/releases) 下载：
-
-- `strata-v0.2.9-k100ai-dual.tar.gz`
-- `strata-v0.2.9-k100ai-dual.tar.gz.sha256`
-- 需要自行重建时，同时下载 `strata-v0.2.9-k100ai-dual-source.tar.gz`
+### 1. 下载并安装运行包
 
 ```bash
-VERSION=v0.2.2
-BASE_URL="https://github.com/DocPang/strata-k100ai/releases/download/$VERSION"
-
-curl -fL --retry 3 -O \
-  "$BASE_URL/strata-v0.2.9-k100ai-dual.tar.gz"
-curl -fL --retry 3 -O \
-  "$BASE_URL/strata-v0.2.9-k100ai-dual.tar.gz.sha256"
-
+BASE_URL=https://github.com/DocPang/strata-k100ai/releases/download/v0.2.2
+curl -fLO "$BASE_URL/strata-v0.2.9-k100ai-dual.tar.gz"
+curl -fLO "$BASE_URL/strata-v0.2.9-k100ai-dual.tar.gz.sha256"
 sha256sum -c strata-v0.2.9-k100ai-dual.tar.gz.sha256
-mkdir -p /data/strata-k100ai-v0.2.2
-tar -xzf strata-v0.2.9-k100ai-dual.tar.gz \
-  -C /data/strata-k100ai-v0.2.2 --strip-components=1
+mkdir /data/strata-k100ai-v0.2.2
+tar -xzf strata-v0.2.9-k100ai-dual.tar.gz -C /data/strata-k100ai-v0.2.2 --strip-components=1
 cd /data/strata-k100ai-v0.2.2
 sha256sum -c SHA256SUMS
+bash scripts/k100ai/setup-runtime.sh
 ```
 
-### 2. 安装 Python 运行时
+归档名中的 `v0.2.9` 是上游基线，下载链接中的 `v0.2.2` 是本仓库发布版本。
+
+### 2. 准备模型资产
+
+权重、MTP runtime 和模型 pack 需要另行下载或生成，不随运行包分发。先按[安装文档第 2 步](docs/k100ai/INSTALL.md#2-安装-python-运行时)设置路径与镜像变量，再准备所需模型。默认资产目录为 `/data/k100ai-assets`：
+
+- **DeepSeek**：[下载、校验权重与 DSpark](docs/k100ai/INSTALL.md#6-手动下载并校验-deepseek-资产) → [生成 pack](docs/k100ai/INSTALL.md#7-人工生成-deepseek-pack)。
+- **Qwen**：[下载、校验权重](docs/k100ai/INSTALL.md#3-手动下载并校验-qwen-主权重) → [生成 pack](docs/k100ai/INSTALL.md#4-人工生成-qwen-pack) → [准备 MTP](docs/k100ai/INSTALL.md#5-人工准备-qwen-mtp)。
+
+pack 生成步骤会导出 tokenizer，Qwen expert profile 随运行包提供。下载和转换需要数百 GB 磁盘空间。
+
+### 3. 启动服务
+
+准备好资产后，按需选择一条命令；DeepSeek 使用四卡，Qwen 使用单卡。
 
 ```bash
-test ! -e .python-packages
-
-docker run --rm --name strata-k100ai-python-setup \
-  -v "$PWD:$PWD" \
-  -w "$PWD" \
-  -e "K100AI_ROOT=$PWD" \
-  -e "K100AI_PACKAGES=$PWD/.python-packages" \
-  --entrypoint /bin/bash \
-  harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68 \
-  -lc '
-    set -euo pipefail
-    python3 -m pip install --disable-pip-version-check --no-cache-dir \
-      --target "$K100AI_PACKAGES" -r "$K100AI_ROOT/requirements.txt"
-    PYTHONPATH="$K100AI_PACKAGES" python3 -c \
-      "import jinja2, numpy, PIL, psutil, regex, requests, yaml"
-    sha256sum "$K100AI_ROOT/requirements.txt" > "$K100AI_PACKAGES/.k100ai-ready"
-  '
-```
-
-这条命令在固定 DTK 容器内把 `requirements.txt` 安装到发布目录的
-`.python-packages`，并人工导入所有顶层依赖。重新部署时应再次执行并用下列命令检查：
-
-```bash
-docker run --rm --name strata-k100ai-python-check \
-  -v "$PWD:$PWD" \
-  -w "$PWD" \
-  -e "PYTHONPATH=$PWD/.python-packages" \
-  --entrypoint python3 \
-  harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68 \
-  -c "import jinja2, numpy, PIL, psutil, regex, requests, yaml"
-```
-
-发布包中的 `setup-runtime.sh` 是同一组步骤的便利封装。
-
-安装完成后设置本页反复使用的变量：
-
-```bash
-ROOT=/data/strata-k100ai-v0.2.2
-ASSETS=/data/k100ai-assets
-IMAGE=harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68
-RUN_DIR="$ROOT/run"
-
-mkdir -p \
-  "$ASSETS/qwen3.8-flash-next-iq3-xxs/model/IQ3_XXS" \
-  "$ASSETS/qwen3.8-flash-next-iq3-xxs/pack/iq3xxs" \
-  "$ASSETS/qwen3.8-flash-next-iq3-xxs/mtp-source" \
-  "$ASSETS/qwen3.8-flash-next-iq3-xxs/mtp/rt" \
-  "$ASSETS/dsv41-2.00/dspark" \
-  "$RUN_DIR"
-```
-
-### 3. 手动下载并校验 Qwen 主权重
-
-ModelScope 仓库：`ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF`<br>
-固定 snapshot：`1868010e27505d4b8cc15970cdcc4dd76005d7de`
-
-| 文件 | ModelScope URL | 大小 | SHA-256 |
-| --- | --- | ---: | --- |
-| `IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf` | `https://www.modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/resolve/1868010e27505d4b8cc15970cdcc4dd76005d7de/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf` | 47,039,860,096 B | `219ea929900dfa9ef091f3aa473fdba6874b65fcb36526d7d851ac9e95856d15` |
-| `IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf` | `https://www.modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/resolve/1868010e27505d4b8cc15970cdcc4dd76005d7de/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf` | 28,800,138,432 B | `316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113` |
-
-```bash
-QWEN_REPO=ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF
-QWEN_REV=1868010e27505d4b8cc15970cdcc4dd76005d7de
-QWEN_BASE="https://www.modelscope.cn/models/$QWEN_REPO/resolve/$QWEN_REV"
-QWEN_MODEL="$ASSETS/qwen3.8-flash-next-iq3-xxs/model/IQ3_XXS"
-QWEN_PACK="$ASSETS/qwen3.8-flash-next-iq3-xxs/pack/iq3xxs"
-QWEN_SHARD1=Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf
-QWEN_SHARD2=Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf
-
-curl -fL --retry 8 --retry-delay 5 -C - \
-  -o "$QWEN_MODEL/$QWEN_SHARD1" \
-  "$QWEN_BASE/IQ3_XXS/$QWEN_SHARD1"
-
-curl -fL --retry 8 --retry-delay 5 -C - \
-  -o "$QWEN_MODEL/$QWEN_SHARD2" \
-  "$QWEN_BASE/IQ3_XXS/$QWEN_SHARD2"
-
-cat >"$QWEN_MODEL/SHA256SUMS" <<'EOF'
-219ea929900dfa9ef091f3aa473fdba6874b65fcb36526d7d851ac9e95856d15  Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf
-316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113  Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf
-EOF
-
-(cd "$QWEN_MODEL" && sha256sum -c SHA256SUMS)
-```
-
-### 4. 人工生成 Qwen pack
-
-转换容器不需要 GPU，也不联网。输入是刚校验的第一个 shard，输出必须位于空目录：
-
-```bash
-test ! -e "$QWEN_PACK/experts.bin"
-
-docker run --rm --name strata-qwen-pack \
-  -v "$ROOT:$ROOT" \
-  -v "$ASSETS:$ASSETS" \
-  -w "$ROOT" \
-  -e "PYTHONPATH=$ROOT/.python-packages:$ROOT" \
-  -e PYTHONWARNINGS=ignore \
-  --entrypoint python3 \
-  "$IMAGE" \
-  tools/iq_pack.py \
-    --gguf "$QWEN_MODEL/$QWEN_SHARD1" \
-    --out "$QWEN_PACK" \
-    --experts-bin
-```
-
-人工核对生成结果：
-
-| 文件 | 大小 | SHA-256 |
-| --- | ---: | --- |
-| `experts.bin` | 42,912,972,800 B | `e76956703f0cb960fa959cc0c33b0e38284ee98c8eb360417c74e7238c7bf005` |
-| `dense.bin` | 1,538,035,200 B | `d2af3d8331e5c7a1985d1d589747230f9d56719a6d33c7cddc9ee6b81cde6b13` |
-| `index.txt` | 93,687 B | `1afe12b36cd2d13bf122b741fa0e81e1f751319cc3c451e54ba75524d825f148` |
-| `native_experts.txt` | 3,296 B | `ae28cf7a2a1c9063c4b55d6c8cf86d4d079dcddcf597f9e8697c9157d462c0ee` |
-| `conversions.json` | 310 B | `68beec784ea64aeecace591b33debb8ba331a9ad257a3e1b68c5c701dd22b267` |
-| `experts.bin.src.json` | — | `30bf3328b49b4b3444dbe29bdae9b1fe65e86d33fda10fffbdb70bb9a5316644` |
-
-```bash
-cat >"$QWEN_PACK/SHA256SUMS" <<'EOF'
-e76956703f0cb960fa959cc0c33b0e38284ee98c8eb360417c74e7238c7bf005  experts.bin
-d2af3d8331e5c7a1985d1d589747230f9d56719a6d33c7cddc9ee6b81cde6b13  dense.bin
-1afe12b36cd2d13bf122b741fa0e81e1f751319cc3c451e54ba75524d825f148  index.txt
-ae28cf7a2a1c9063c4b55d6c8cf86d4d079dcddcf597f9e8697c9157d462c0ee  native_experts.txt
-68beec784ea64aeecace591b33debb8ba331a9ad257a3e1b68c5c701dd22b267  conversions.json
-30bf3328b49b4b3444dbe29bdae9b1fe65e86d33fda10fffbdb70bb9a5316644  experts.bin.src.json
-EOF
-
-(cd "$QWEN_PACK" && sha256sum -c SHA256SUMS)
-```
-
-### 5. 人工准备 Qwen MTP
-
-MTP 不在 GSQ-RCO GGUF 中，而是来自 BF16 checkpoint。这里的脚本只负责读取 safetensors header 并发出带
-`Range` 的 HTTP 请求；它不会下载完整的 360 GB checkpoint，并且会验证每个响应必须是 HTTP 206、长度正确、SHA-256 正确。
-
-固定的 BF16 checkpoint revision 是：
-
-```text
-de4b8e4d43b917e7706784d8bb445c9af86a3540
-```
-
-ModelScope 地址前缀是：
-
-```text
-https://www.modelscope.cn/models/Qwen/Qwen3.8-Flash-Next/resolve/master/
-```
-
-以下 31 个 tensor 是 MTP runtime 的完整输入。`source shard` 是该 tensor 所在的实际 safetensors 文件名，完整下载地址为
-“前缀 + source shard”。
-
-| Tensor | Source shard | Tensor SHA-256 |
-| --- | --- | --- |
-| `mtp.fc_embedding.weight` | `model-00120-of-00131.safetensors` | `241d6e87ded317a61b1aeb3ca4e28c53f1caba09ad5be66092e91fe5e3e14751` |
-| `mtp.fc_hidden.weight` | `model-00124-of-00131.safetensors` | `97c8e427ad0177e2c713ed24a397d815b523eda15ef453f1ae6463f6c70a8f96` |
-| `mtp.hyper_connection_mixer.hc_norm.weight` | `model-00037-of-00131.safetensors` | `ce948a398e15aeaa403c424cda34e6eed296ab2570d591bb5ff3da642b255d64` |
-| `mtp.hyper_connection_mixer.input_mix_weight_down.weight` | `model-00041-of-00131.safetensors` | `c633d2841fda463e82045e0b93fb8cb8d511ec0c9eda616020f01aca18d71947` |
-| `mtp.hyper_connection_mixer.input_mix_weight_up.weight` | `model-00043-of-00131.safetensors` | `6565285f0ba2923703252763cfc11d8a9bda40ab42e7548e12464b04dbdbec13` |
-| `mtp.layers.0.attn_hyper_connection.block_inject_weight.weight` | `model-00047-of-00131.safetensors` | `c8afff64e7f54412d02120097c4255033c55245e1c1eed84cc630d428ccb864c` |
-| `mtp.layers.0.attn_hyper_connection.hc_norm.weight` | `model-00049-of-00131.safetensors` | `1fb619aeaaf637ccd70f46f1f8f8116e6a46448cb43026b246de8ee8286ed809` |
-| `mtp.layers.0.attn_hyper_connection.input_mix_weight_down.weight` | `model-00053-of-00131.safetensors` | `e80ac8bf3e270e9d5a949ec7c913329dc8de017d69851334820fae7b8c86a7f5` |
-| `mtp.layers.0.attn_hyper_connection.input_mix_weight_up.weight` | `model-00057-of-00131.safetensors` | `f80f1fd44e1183e7764ea496b11ff89ead9dd758f861d4e79a770bf54956b1a5` |
-| `mtp.layers.0.mlp.experts.down_proj` | `model-00062-of-00131.safetensors` | `539c46234f73bac70450f731f40e715f77ac32faf77def0f3f800e58aaabbbc0` |
-| `mtp.layers.0.mlp.experts.gate_up_proj` | `model-00060-of-00131.safetensors` | `839e98f9642ebc884b178abd2090b6dc8b0bcd81ed92d7f7a08314c6a68f96d5` |
-| `mtp.layers.0.mlp.gate.weight` | `model-00066-of-00131.safetensors` | `f0d35fa41b360a08bc0c5b1e5766aa42df960291716ee189208b5d2599462c20` |
-| `mtp.layers.0.mlp.shared_expert.down_proj.weight` | `model-00076-of-00131.safetensors` | `d2ced8c81367cc494599d1a8cdc279c3dd6579b628ded05acd7495e99cee01d8` |
-| `mtp.layers.0.mlp.shared_expert.gate_proj.weight` | `model-00072-of-00131.safetensors` | `f4a81109165853b3b64f36d809f98094b599763364070f5fa079200e1c386d4c` |
-| `mtp.layers.0.mlp.shared_expert.up_proj.weight` | `model-00072-of-00131.safetensors` | `172586861eea53efbff10afc43ded5b6e49c83879e9efc01e089c652bbb0a156` |
-| `mtp.layers.0.mlp.shared_expert_gate.weight` | `model-00070-of-00131.safetensors` | `acdd306d9996d356e4667a16ff63af6fef086fc7f570f1bc00bbe882a2a93f6e` |
-| `mtp.layers.0.mlp_hyper_connection.block_inject_weight.weight` | `model-00078-of-00131.safetensors` | `c5782dd92b479a1f8ef43d683fe9c917fd9e8fba81f23c1aae8817bfe4b476a6` |
-| `mtp.layers.0.mlp_hyper_connection.hc_norm.weight` | `model-00082-of-00131.safetensors` | `21a504876b5e7b788301557c68dfb757999430eba36c66ec8ab96a63604dbfd1` |
-| `mtp.layers.0.mlp_hyper_connection.input_mix_weight_down.weight` | `model-00086-of-00131.safetensors` | `b71240036dea954e034d5ae04e097bcd7ac51cb28a44e4c93d198af3447278a1` |
-| `mtp.layers.0.mlp_hyper_connection.input_mix_weight_up.weight` | `model-00088-of-00131.safetensors` | `40756866bf2a5e82c28e407f717b6fa07614d593f78e79c7ceb2cd4ffe6dda94` |
-| `mtp.layers.0.self_attn.indexer.index_qk_proj.weight` | `model-00090-of-00131.safetensors` | `2befafae6e944c1fc651fd73d4d527eb6f138a6c1679065b003128ee3150e859` |
-| `mtp.layers.0.self_attn.indexer.k_layernorm.weight` | `model-00094-of-00131.safetensors` | `2db621f6a08b4085756fc69d60a4a1bd1d7fbf5d406456d2477075842efaae54` |
-| `mtp.layers.0.self_attn.indexer.q_layernorm.weight` | `model-00100-of-00131.safetensors` | `afaf59f68e251939970ffdeacad0667dffc657a522bea62cdc44a52816fc49d6` |
-| `mtp.layers.0.self_attn.k_norm.weight` | `model-00102-of-00131.safetensors` | `8f924b0357cf936e14fc34518205d000e1423aa60626827df81b0804fae8cdfd` |
-| `mtp.layers.0.self_attn.k_proj.weight` | `model-00108-of-00131.safetensors` | `1a295dc2d6e633e808aeb19e00c97856a1817bbfcc83f5b610e2bfcacfcb8c38` |
-| `mtp.layers.0.self_attn.o_proj.weight` | `model-00106-of-00131.safetensors` | `9d2fcf0ac6ac19de87f638f710cfd1af6ad14141e75b7d3d5d29fbd06f374219` |
-| `mtp.layers.0.self_attn.q_norm.weight` | `model-00112-of-00131.safetensors` | `57957aa1e7c5a3ac628bff0ec5522ad55a39b8c0b8bd2d324ae640e3771617ef` |
-| `mtp.layers.0.self_attn.q_proj.weight` | `model-00108-of-00131.safetensors` | `5220aef3d288f40759f7356af9ef453e5ac0256a38749a9bb803a4e9db58150d` |
-| `mtp.layers.0.self_attn.v_proj.weight` | `model-00108-of-00131.safetensors` | `39cb12f5424e965fa71fb81db0ee230c701b7b1e0b72c36641fde7e0e41bff41` |
-| `mtp.pre_fc_norm_embedding.weight` | `model-00114-of-00131.safetensors` | `04c4a570850e06f2d8913da8220d54d4c7f87db6eb6d45480b938e8ba41d6a86` |
-| `mtp.pre_fc_norm_hidden.weight` | `model-00118-of-00131.safetensors` | `b933b44559879449b1baf2af8385c5c237347307e3fd452394870cb53e6eab6d` |
-
-人工检查 header、抓取 tensor、逐 tensor 校验：
-
-```bash
-MTP_SRC="$ASSETS/qwen3.8-flash-next-iq3-xxs/mtp-source"
-MTP_GGUF="$ASSETS/qwen3.8-flash-next-iq3-xxs/mtp-q2_0.gguf"
-MTP_RT="$ASSETS/qwen3.8-flash-next-iq3-xxs/mtp/rt"
-
-docker run --rm --name strata-mtp-inventory \
-  -v "$ROOT:$ROOT" -v "$ASSETS:$ASSETS" -w "$ROOT" \
-  -e STRATA_SOURCE=modelscope \
-  -e "PYTHONPATH=$ROOT/.python-packages:$ROOT" \
-  --entrypoint python3 "$IMAGE" \
-  tools/mtp_fetch.py inventory --out "$MTP_SRC"
-
-docker run --rm --name strata-mtp-fetch \
-  -v "$ROOT:$ROOT" -v "$ASSETS:$ASSETS" -w "$ROOT" \
-  -e STRATA_SOURCE=modelscope \
-  -e "PYTHONPATH=$ROOT/.python-packages:$ROOT" \
-  --entrypoint python3 "$IMAGE" \
-  tools/mtp_fetch.py fetch --out "$MTP_SRC"
-
-docker run --rm --network none --name strata-mtp-verify \
-  -v "$ROOT:$ROOT" -v "$ASSETS:$ASSETS" -w "$ROOT" \
-  -e "PYTHONPATH=$ROOT/.python-packages:$ROOT" \
-  --entrypoint python3 "$IMAGE" \
-  tools/mtp_fetch.py verify --out "$MTP_SRC"
-
-docker run --rm --network none --name strata-mtp-pack \
-  -v "$ROOT:$ROOT" -v "$ASSETS:$ASSETS" -w "$ROOT" \
-  -e "PYTHONPATH=$ROOT/.python-packages:$ROOT" \
-  --entrypoint python3 "$IMAGE" \
-  tools/mtp_pack.py --src "$MTP_SRC" --experts q2_0 --out "$MTP_GGUF"
-
-docker run --rm --network none --name strata-mtp-runtime \
-  -v "$ROOT:$ROOT" -v "$ASSETS:$ASSETS" -w "$ROOT" \
-  -e "PYTHONPATH=$ROOT/.python-packages:$ROOT" \
-  --entrypoint python3 "$IMAGE" \
-  tools/mtp_rt.py --gguf "$MTP_GGUF" --out "$MTP_RT"
-
-curl -fL --retry 8 --retry-delay 5 \
-  -o "$MTP_RT/draft_vocab.bin" \
-  https://raw.githubusercontent.com/Niko1221/Strata/c62d5e3a15b40ea51c96aae9e8d36928965f53ab/data/draft_vocab.bin
-```
-
-人工核对 MTP runtime：
-
-```bash
-cat >"$MTP_RT/SHA256SUMS" <<'EOF'
-09398406be61f1f54c93861f449e48b8df0bfccbc9ec9b2b7636775a6ea9244f  experts.bin
-c724dc0b0822ada5d2977bf5bde821605feabaa64ea2e0045b67ca656329070a  dense.bin
-991456cf4eb266eb8a888c349e548d11bc640f5dbd9149439aa9786af0f732fd  dense.txt
-b1e1d3a7a9e4bf862dcd5923ce661fb59bbd07907e594df5cf86a62ac235cb91  draft_vocab.bin
-EOF
-(cd "$MTP_RT" && sha256sum -c SHA256SUMS)
-```
-
-### 6. 手动下载并校验 DeepSeek 资产
-
-Backbone 仓库：`ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF`<br>
-DSpark 仓库：`unsloth/DeepSeek-V4.1-Flash-1017-GGUF`
-
-| 文件 | ModelScope URL | 大小 | SHA-256 |
-| --- | --- | ---: | --- |
-| `DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00001-of-00006.gguf` | `https://www.modelscope.cn/models/ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF/resolve/40d2af57944f5a4a5d7cb17f921f30db8c45ecf3/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00001-of-00006.gguf` | 5,780,704 B | `f356f198561f56df36f7ab92d7238a926646d76de992c34f15bcb939a5f529b9` |
-| `DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00002-of-00006.gguf` | `https://www.modelscope.cn/models/ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF/resolve/40d2af57944f5a4a5d7cb17f921f30db8c45ecf3/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00002-of-00006.gguf` | 39,535,781,184 B | `25af3785ccf925f54137e1ead4c481a8952315dc0b1af6519a99407f67bce8f3` |
-| `DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00003-of-00006.gguf` | `https://www.modelscope.cn/models/ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF/resolve/08d153046911aec47936988a9897a8b9598adffd/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00003-of-00006.gguf` | 39,736,712,000 B | `8168d0998fc494def2e1952d83c131425a108660aae9d29190f5a8670ab62b48` |
-| `DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00004-of-00006.gguf` | `https://www.modelscope.cn/models/ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF/resolve/08d153046911aec47936988a9897a8b9598adffd/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00004-of-00006.gguf` | 39,036,908,384 B | `9eb9b4de1968f150dfc207eb31c27be9cd9b5666a9a6246bde8a22b184b4bee0` |
-| `DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00005-of-00006.gguf` | `https://www.modelscope.cn/models/ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF/resolve/20577e0adcacb9ce9c225debe076fbd4b974fffe/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00005-of-00006.gguf` | 19,923,784,832 B | `7e35f6b4e6fc46f6c4b152b593d84d683c5ece695ae6ad734f556198c041bec1` |
-| `DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf` | `https://www.modelscope.cn/models/ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF/resolve/20577e0adcacb9ce9c225debe076fbd4b974fffe/DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf` | 110,595,290,816 B | `3dac4c54893ad7aa89103c0028500eadc78e74112cef3a2930a97e67dc9fb4f3` |
-| `dspark/dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf` | `https://www.modelscope.cn/models/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/6cd2eacaad3f5d9b61e6913c188a934a3a5eac22/dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf` | 7,976,914,240 B | `6ba6ac1b331c540691a209e7fc97dec2a24e295acb1e755c84c7d24a4373927a` |
-
-逐个下载并人工建立校验表：
-
-```bash
-DS="$ASSETS/dsv41-2.00"
-DS_REPO=ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF
-DS_REV1=40d2af57944f5a4a5d7cb17f921f30db8c45ecf3
-DS_REV3=08d153046911aec47936988a9897a8b9598adffd
-DS_REV5=20577e0adcacb9ce9c225debe076fbd4b974fffe
-
-curl -fL --retry 8 -C - -o "$DS/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00001-of-00006.gguf" \
-  "https://www.modelscope.cn/models/$DS_REPO/resolve/$DS_REV1/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00001-of-00006.gguf"
-curl -fL --retry 8 -C - -o "$DS/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00002-of-00006.gguf" \
-  "https://www.modelscope.cn/models/$DS_REPO/resolve/$DS_REV1/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00002-of-00006.gguf"
-curl -fL --retry 8 -C - -o "$DS/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00003-of-00006.gguf" \
-  "https://www.modelscope.cn/models/$DS_REPO/resolve/$DS_REV3/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00003-of-00006.gguf"
-curl -fL --retry 8 -C - -o "$DS/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00004-of-00006.gguf" \
-  "https://www.modelscope.cn/models/$DS_REPO/resolve/$DS_REV3/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00004-of-00006.gguf"
-curl -fL --retry 8 -C - -o "$DS/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00005-of-00006.gguf" \
-  "https://www.modelscope.cn/models/$DS_REPO/resolve/$DS_REV5/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00005-of-00006.gguf"
-curl -fL --retry 8 -C - -o "$DS/DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf" \
-  "https://www.modelscope.cn/models/$DS_REPO/resolve/$DS_REV5/DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf"
-curl -fL --retry 8 -C - -o "$DS/dspark/dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf" \
-  "https://www.modelscope.cn/models/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/6cd2eacaad3f5d9b61e6913c188a934a3a5eac22/dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf"
+# DeepSeek：API http://127.0.0.1:18097/v1
+K100AI_ASSETS_DIR=/data/k100ai-assets \
+PORT=18097 bash scripts/k100ai/serve-k100ai.sh dsv41
 ```
 
 ```bash
-cat >"$DS/SHA256SUMS" <<'EOF'
-f356f198561f56df36f7ab92d7238a926646d76de992c34f15bcb939a5f529b9  DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00001-of-00006.gguf
-25af3785ccf925f54137e1ead4c481a8952315dc0b1af6519a99407f67bce8f3  DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00002-of-00006.gguf
-8168d0998fc494def2e1952d83c131425a108660aae9d29190f5a8670ab62b48  DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00003-of-00006.gguf
-9eb9b4de1968f150dfc207eb31c27be9cd9b5666a9a6246bde8a22b184b4bee0  DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00004-of-00006.gguf
-7e35f6b4e6fc46f6c4b152b593d84d683c5ece695ae6ad734f556198c041bec1  DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00005-of-00006.gguf
-3dac4c54893ad7aa89103c0028500eadc78e74112cef3a2930a97e67dc9fb4f3  DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf
-6ba6ac1b331c540691a209e7fc97dec2a24e295acb1e755c84c7d24a4373927a  dspark/dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf
-EOF
-(cd "$DS" && sha256sum -c SHA256SUMS)
+# Qwen：API http://127.0.0.1:18096/v1
+K100AI_ASSETS_DIR=/data/k100ai-assets \
+PORT=18096 bash scripts/k100ai/serve-k100ai.sh qwen
 ```
 
-### 7. 人工生成 DeepSeek pack
+启动器检查设备占用和资产文件；按 `Ctrl-C` 停止服务。默认仅监听本机。手动 Docker 启动命令见[安装文档](docs/k100ai/INSTALL.md#9-人工渲染并启动-qwen)。
 
-```bash
-DSPACK="$DS/maya-ds4-dspark"
-test ! -e "$DSPACK"
+### 4. 发送请求
 
-DEEPSEEK_SHARDS=(
-  DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00001-of-00006.gguf
-  DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00002-of-00006.gguf
-  DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00003-of-00006.gguf
-  DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00004-of-00006.gguf
-  DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00005-of-00006.gguf
-)
-
-docker run --rm --name strata-dsv41-pack \
-  -v "$ROOT:$ROOT" -v "$DS:$DS" -w "$ROOT" \
-  -e "PYTHONPATH=$ROOT/.python-packages:$ROOT/source:$ROOT" \
-  -e PYTHONWARNINGS=ignore \
-  --entrypoint python3 "$IMAGE" \
-  source/tools/dsv41/pack_gguf.py \
-    --model "$DS" \
-    --shards "${DEEPSEEK_SHARDS[@]}" \
-    --engram "$DS/DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf" \
-    --dspark-gguf "$DS/dspark/dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf" \
-    --dspark-noise-token 128799 \
-    --dspark-markov-rank 256 \
-    --out "$DSPACK"
-```
-
-人工核对 pack：
-
-```bash
-cat >"$DSPACK/SHA256SUMS" <<'EOF'
-87e04d460f8f9ab82a14cb3793fe0c48f85348d81da5f2e93d200bc5dbc2d6f4  ds4.txt
-f91733dc81ff262a0e6f65c0c5c3b86aa1390cfcd144bba75858357d62a50284  tensors.txt
-08d55d6433f389b14aa115f4ea4eb31d6a2d63df1ae40821f03facf4c2d49142  engram.bin
-4d61d22c90ea0cdf15c7e298f7215f23eeffd20f8eed8fb517fda5fb64693d99  tokenizer/chat_template.jinja
-547bace837acea98652eef5669c9b01cee1c73ad1d2a44d6fdce9e6a81c22147  tokenizer/merges.txt
-0a61021438e5ce6041133495f18fc360a6587aea748b17d953f552d2119ba51e  tokenizer/token_type.json
-5a47981b685b75154e29bfb0299584c9b3a4a28679585e86d524c34c065d037f  tokenizer/tokenizer.json
-2f0bf5b31f4aa191d5d0d78291927a4f28c9ceb498a5e345b97e926c4cb99c1a  tokenizer/vocab.json
-EOF
-(cd "$DSPACK" && sha256sum -c SHA256SUMS)
-```
-
-### 8. 人工检查 HCU 占用
-
-```bash
-test -c /dev/kfd
-for d in /dev/dri/renderD128 /dev/dri/renderD129 \
-         /dev/dri/renderD130 /dev/dri/renderD131; do
-  test -e "$d"
-  fuser "$d" 2>/dev/null && {
-    echo "$d is busy"
-    exit 1
-  }
-done
-
-docker ps --format '{{.Names}}\t{{.Ports}}'
-```
-
-任何目标 render 节点有进程，或已有容器占用它时，先人工确认并处理。不要为了启动本服务停止其他容器。
-
-### 9. 人工渲染并启动 Qwen
-
-先生成一份不存在占位符的配置：
-
-```bash
-export K100AI_ROOT="$ROOT"
-export K100AI_RUN_DIR="$RUN_DIR"
-export K100AI_QWEN_ENGINE=bin/strata
-export K100AI_QWEN_PACK="$QWEN_PACK"
-export K100AI_QWEN_NATIVE="$QWEN_MODEL/$QWEN_SHARD1"
-export K100AI_QWEN_PLE="$QWEN_MODEL/$QWEN_SHARD2"
-export K100AI_QWEN_TOKENIZER="$QWEN_PACK/tokenizer"
-export K100AI_QWEN_MTP_RT="$ASSETS/qwen3.8-flash-next-iq3-xxs/mtp/rt"
-
-python3 scripts/k100ai/render-config.py \
-  configs/k100ai/qwen-server.template.json \
-  "$RUN_DIR/qwen-manual.json"
-
-python3 -m json.tool "$RUN_DIR/qwen-manual.json" >/dev/null
-grep -F '${' "$RUN_DIR/qwen-manual.json" && exit 1 || true
-```
-
-直接创建容器：
-
-```bash
-LIBS=/opt/dtk/dcc/gcvm/lib:/opt/dtk/hip/lib:/opt/dtk/llvm/lib:/opt/dtk/lib:/opt/dtk/lib64:/opt/hyhal/lib:/opt/hyhal/lib64:/opt/dtk/dushmem/lib:/opt/dtk/opencl/lib:/opt/ucx/lib:/opt/mpi/lib:/opt/hwloc/lib:
-
-docker run -d --name strata-k100ai-qwen-manual \
-  --device=/dev/kfd \
-  --device=/dev/dri/renderD128 \
-  --shm-size=8g \
-  -p 127.0.0.1:18096:18096 \
-  -v /opt/hyhal:/opt/hyhal:ro \
-  -v /data:/data:ro \
-  -v "$ROOT:$ROOT" \
-  -v "$RUN_DIR:$RUN_DIR" \
-  -w "$ROOT" \
-  -e "LD_LIBRARY_PATH=$LIBS" \
-  -e HIP_VISIBLE_DEVICES=0 \
-  -e ROCR_VISIBLE_DEVICES=0 \
-  -e STRATA_K100AI_EXACT_MMAC=1 \
-  -e STRATA_K100AI_EXACT_GATE_FORMATS=IQ3_XXS,IQ3_S,IQ4_XS \
-  -e STRATA_K100AI_EXACT_DOWN_FORMATS=Q2_0 \
-  -e "PYTHONPATH=$ROOT/.python-packages" \
-  --entrypoint python3 \
-  "$IMAGE" -m serve.server \
-    --engine strata \
-    --config "$RUN_DIR/qwen-manual.json" \
-    --host 0.0.0.0 \
-    --port 18096 \
-    --no-api-key
-```
-
-### 10. 人工渲染并启动 DeepSeek
-
-```bash
-export K100AI_DSV41_PACK="$DSPACK"
-export K100AI_DSV41_TOKENIZER="$DSPACK/tokenizer"
-
-python3 scripts/k100ai/render-config.py \
-  configs/k100ai/dsv41-server.template.json \
-  "$RUN_DIR/dsv41-manual.json"
-
-python3 -m json.tool "$RUN_DIR/dsv41-manual.json" >/dev/null
-grep -F '${' "$RUN_DIR/dsv41-manual.json" && exit 1 || true
-```
-
-```bash
-docker run -d --name strata-k100ai-dsv41-manual \
-  --device=/dev/kfd \
-  --device=/dev/dri/renderD128 \
-  --device=/dev/dri/renderD129 \
-  --device=/dev/dri/renderD130 \
-  --device=/dev/dri/renderD131 \
-  --shm-size=8g \
-  -p 127.0.0.1:18097:18097 \
-  -v /opt/hyhal:/opt/hyhal:ro \
-  -v /data:/data:ro \
-  -v "$ROOT:$ROOT" \
-  -v "$RUN_DIR:$RUN_DIR" \
-  -w "$ROOT" \
-  -e "LD_LIBRARY_PATH=$LIBS" \
-  -e HIP_VISIBLE_DEVICES=0,1,2,3 \
-  -e ROCR_VISIBLE_DEVICES=0,1,2,3 \
-  -e DS4_SPLIT=10,10,10,10 \
-  -e HSA_FORCE_FINE_GRAIN_PCIE=1 \
-  -e "PYTHONPATH=$ROOT/.python-packages" \
-  --entrypoint python3 \
-  "$IMAGE" -m serve.server \
-    --engine strata \
-    --config "$RUN_DIR/dsv41-manual.json" \
-    --host 0.0.0.0 \
-    --port 18097 \
-    --no-api-key
-```
-
-### 11. 人工检查并停止
-
-```bash
-docker logs -f strata-k100ai-qwen-manual
-curl --fail http://127.0.0.1:18096/health
-```
-
-```bash
-docker logs -f strata-k100ai-dsv41-manual
-curl --fail http://127.0.0.1:18097/health
-```
-
-停止时只操作自己创建的容器：
-
-```bash
-docker stop strata-k100ai-qwen-manual
-docker rm strata-k100ai-qwen-manual
-
-docker stop strata-k100ai-dsv41-manual
-docker rm strata-k100ai-dsv41-manual
-```
-
-### 12. 可选人工 API 请求
-
-Qwen：
-
-```bash
-curl --fail http://127.0.0.1:18096/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "model":"qwen3.8-flash-next",
-    "messages":[{"role":"user","content":"请用一句话介绍你自己。"}],
-    "max_tokens":32,
-    "temperature":0
-  }'
-```
-
-DeepSeek：
+以 DeepSeek 为例：
 
 ```bash
 curl --fail http://127.0.0.1:18097/v1/chat/completions \
   -H 'Content-Type: application/json' \
-  -d '{
-    "model":"deepseek-v4.1-flash",
-    "messages":[{"role":"user","content":"请用一句话介绍你自己。"}],
-    "max_tokens":32,
-    "temperature":0
-  }'
+  -d '{"model":"deepseek-v4.1-flash","messages":[{"role":"user","content":"请用一句话介绍你自己。"}],"max_tokens":64,"temperature":0}'
 ```
 
-模型下载、pack 生成和 MTP 构造需要数百 GB 空间及较长时间。完整输入、revision 与文件摘要见
-[`configs/k100ai/release-inputs.json`](configs/k100ai/release-inputs.json)。
+接入 Qwen 时改用端口 `18096`、模型名 `qwen3.8-flash-next`。服务同时提供 `/health`、`/v1/models`、`/v1/messages` 和 `/metrics`。
 
-### 发布包中的便利脚本
+## 模型与优化
 
-以下脚本用于已经理解上述步骤之后减少重复输入，不是唯一入口：
+| 模型 / 用途 | 包内二进制 | 引擎 | 加速 | 设备 |
+| --- | --- | --- | --- | --- |
+| DeepSeek-V4.1-Flash | `bin/strata-dsv41` | 0.1.55 | DSpark | 4× K100AI |
+| Qwen 默认快速档 | `bin/strata` | 0.1.47 | MTP | 1× K100AI |
+| Qwen 对照档 | `bin/strata-0.1.55` | 0.1.55 | MTP | 1× K100AI |
 
-```bash
-bash scripts/k100ai/fetch-qwen-iq3xxs.sh "$ASSETS/qwen3.8-flash-next-iq3-xxs"
-bash scripts/k100ai/fetch-dsv41-iq2xxs.sh "$ASSETS/dsv41-2.00"
-bash scripts/k100ai/prepare-dsv41-pack.sh "$ASSETS/dsv41-2.00" "$DSPACK"
-```
+主要优化覆盖 gfx928 HIP 适配、Qwen 原生 prompt MMAC 与 fused expert、DeepSeek 四卡分层切分与专家驻留、FP4 KV，以及 MTP / DSpark 推测解码。内核路径和参数见[优化说明](docs/k100ai/OPTIMIZATION.md)。
 
-launcher 是另一条便利路径：
+## 复现与文档
 
-```bash
-K100AI_ASSETS_DIR="$ASSETS" PORT=18096 bash scripts/k100ai/serve-k100ai.sh qwen
-K100AI_ASSETS_DIR="$ASSETS" PORT=18097 bash scripts/k100ai/serve-k100ai.sh dsv41
-```
+发布页同时提供运行包、独立源码包、`RELEASE.json` 和 `validation-evidence.tar.gz`。源码包包含主源码、Qwen 0.1.47 快速档和固定 llama.cpp 快照；构建脚本校验二进制 SHA-256。
 
-服务提供：
+| 文档 | 内容 |
+| --- | --- |
+| [完整手动安装](docs/k100ai/INSTALL.md) | 模型地址、文件校验、pack / MTP 生成、Docker 命令 |
+| [运行参数](docs/k100ai/README.md) | 引擎切换、启动器行为、API 验收 |
+| [源码复现](docs/k100ai/REPRODUCIBILITY.md) | 固定镜像、源码输入、从零构建 |
+| [验证记录](docs/k100ai/VALIDATION.md) | 性能、数值差异、算子与 API 测试 |
+| [来源与校验](docs/k100ai/PROVENANCE.md) | 二进制、模型与运行资产的来源和摘要 |
+| [版本记录](CHANGELOG.md) | 版本变更 |
 
-- `GET /health`
-- `GET /v1/models`
-- `POST /v1/chat/completions`
-- `POST /v1/messages`
-- `GET /metrics`
+## 使用范围
 
-## 独立复现
+- 当前发布验证环境为 **K100AI/gfx928 + DTK 2604**。其他 GPU 架构需要单独构建和验证。
+- **本版不支持图片输入**；Qwen 256K 和 DeepSeek 1M 是配置上限，未完成整个窗口的质量评测。
+- 从 v0.2.1 升级时请解包到新目录，重新准备或迁移资产；旧 `install.sh`、`start.sh`、`compose.yaml` 不再适用。
+- 项目代码采用 [MIT](LICENSE)；模型、量化 pack、MTP、Engram 与 DSpark 分别适用其上游许可证。
 
-源码包包含：
-
-```text
-strata-v0.2.9-k100ai-dual-source/
-  main/                 # K100AI 主源码
-  qwen-fast-0.1.47/     # Qwen 快速引擎源码
-  llama.cpp/            # 固定 llama.cpp 快照
-  BUILD_INPUTS.json     # commit、镜像与三棵源码树摘要
-```
-
-Qwen 0.1.47：
-
-```bash
-tar -xzf strata-v0.2.9-k100ai-dual-source.tar.gz
-cd strata-v0.2.9-k100ai-dual-source
-
-bash main/scripts/k100ai/build-qwen-0.1.47.sh \
-  qwen-fast-0.1.47 \
-  llama.cpp \
-  /data/build-qwen-0.1.47
-```
-
-Qwen 0.1.55 与 DeepSeek 0.1.55：
-
-```bash
-bash main/scripts/k100ai/build-current.sh \
-  main \
-  llama.cpp \
-  /data/build-current
-```
-
-构建脚本把源码、llama.cpp 和输出固定挂载为 `/work/strata`、`/work/llama`、
-`/work/build` 或 `/work/out`，并在结束时断言二进制 SHA-256。编译器会写入源文件路径，所以不要随意更换容器内挂载路径。
-
-详细步骤与已知外部依赖见
-[`docs/k100ai/REPRODUCIBILITY.md`](docs/k100ai/REPRODUCIBILITY.md)。
-
-## 从 v0.2.1 升级
-
-v0.2.2 更换了上游基线、目录结构和启动入口，不支持在旧 `v0.2.1` 部署目录中原地覆盖。
-
-- 请解包到新的空目录，再迁移模型资产或重新运行资产脚本。
-- 旧的 `install.sh`、`start.sh`、`compose.yaml` 与 `deployment.env` 工作流不再作为本版本入口。
-- 本版本 launcher 和 Python server 是发布契约；旧部署中的自定义脚本需要按新路径调整。
-- v0.2.1 的 GPU 视觉编码器**不包含在本版本中**。Qwen 与 DeepSeek 均以 `--vision off` 运行。
-
-## 已知限制
-
-- 仅承诺 Hygon K100AI `gfx928` + DTK 2604。原生 NVIDIA/CUDA 构建未完成。
-- Qwen 默认 0.1.47 接受数值漂移；0.1.55 的 prompt attention 性能回归仍未修复。
-- Qwen 上限为 262,144 tokens，DeepSeek 上限为 1,048,576 tokens；两者均未灌满完整窗口做语义质量评测。
-- DeepSeek 已完成 120,029 个独特 prompt tokens 的稳定性验证，但这不等于完整 1M 上下文的质量保证。
-- 本版本不支持图片输入。
-- 模型、MTP、Engram 与 DSpark 的上游许可证需要单独确认；发布归档不分发这些资产。
-
-## 文档
-
-- [运行与模型资产](docs/k100ai/README.md)
-- [独立复现](docs/k100ai/REPRODUCIBILITY.md)
-- [验证范围与结果](docs/k100ai/VALIDATION.md)
-- [来源、提交与校验](docs/k100ai/PROVENANCE.md)
-- [发布输入清单](configs/k100ai/release-inputs.json)
-
-## 许可证
-
-本项目遵循 [MIT License](LICENSE)。Strata、llama.cpp、DTK/HyHAL 以及各模型和量化 pack 分别遵循其上游许可证。
-
-本项目由独立维护者发布，不是 Hygon 官方产品。
+基于 [Strata](https://github.com/Niko1221/Strata) 适配，由独立维护者发布。

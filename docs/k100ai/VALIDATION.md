@@ -81,8 +81,8 @@ profile。
 
 ## Qwen 性能
 
-用户质疑此前 4K “无回归”结论是正确的。相同 pack、profile、expert cache、
-设备、KV int8、prefill chunk 和 `--no-prefill-borrow` 的 matched A/B：
+相同 pack、profile、expert cache、设备、KV int8、prefill chunk 和
+`--no-prefill-borrow` 的配对测试：
 
 | 输入 | 引擎 | GPU timeline | 引擎 prefill | 吞吐 |
 | --- | --- | ---: | ---: | ---: |
@@ -207,4 +207,3 @@ on/off 平均加速为 `68.53 / ((24.32 + 24.25) / 2) = 2.82x`。off/on/off
 - Qwen 默认快速档的 HC upmix、prompt MMAC 和 fused expert 输出不
   bitwise；它按本文的 top-1、余弦和输出前缀门槛验收。0.1.55 对照档保留
   在 `bin/strata-0.1.55`。
-- 公开 push、公开分支和 release 仍处于冻结状态。

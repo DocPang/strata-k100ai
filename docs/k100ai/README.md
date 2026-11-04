@@ -1,14 +1,13 @@
-# Strata v0.2.9 K100AI 双模型版本
+# K100AI 运行参数
 
-这是面向 Hygon K100AI/gfx928 的本地发布候选，包含：
+K100AI 发布版本 **v0.2.2**，上游基线 Strata v0.2.9。完整下载和资产准备步骤见[手动安装](INSTALL.md)。支持：
 
-- Qwen3.8-Flash-Next，服务模型名 `qwen3.8-flash-next`
 - DeepSeek-V4.1-Flash，服务模型名 `deepseek-v4.1-flash`
+- Qwen3.8-Flash-Next，服务模型名 `qwen3.8-flash-next`
 
 发布目录可从任意空目录解包运行，不依赖构建目录或研究目录中的绝对路径。
 模型权重不进入发布包；嵌套 `source/` 树也排除 `.gguf`、`.safetensors`、
-`.onnx`、`.pt` 和 `.pth`，包括可选 Qwen 实验控制向量。当前没有 push、
-创建公开 release 或覆盖 `origin/main`。
+`.onnx`、`.pt` 和 `.pth`，包括可选 Qwen 实验控制向量。
 
 ## 版本
 
@@ -16,13 +15,13 @@
 - 当前引擎源码：`8544d2fa6cddf61fb47edc0c3bd8a5d7d638140e`
 - 当前引擎版本：`0.1.55`
 - Qwen 默认快速引擎版本：`0.1.47`
-- 分支：`k100ai/dsv41-v029`
+- 发布标签：`v0.2.2`
 - 镜像：
   `harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68`
 - 允许设备：HCU0-3，对应
   `/dev/dri/renderD128` 至 `/dev/dri/renderD131`
 
-这个本地包采用逐模型的明确二进制分层。Qwen 默认使用经过本机 8K/40K
+发布包按模型选择引擎。Qwen 默认使用经过 8K/40K
 验证的 0.1.47 快速档，因为当前 0.1.55 的 prompt 实现仍有可复现的长上下文
 回归；DeepSeek 使用 0.1.55。当前 Qwen 0.1.55 也保留在包内，便于切换和
 对照。`BUILD.json` 分开记录各引擎与打包源码：

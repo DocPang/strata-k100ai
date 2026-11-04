@@ -23,7 +23,7 @@
 
 - 设备：Hygon K100AI，`gfx928`
 - 软件：DTK 2604
-- 容器：`harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251ef4ca85de67171bc2c3aca68`
+- 容器：`harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68`
 - Qwen 运行设备：1 张 HCU
 - DeepSeek 验证设备：4 张 HCU
 - 原生 NVIDIA/CUDA 不在本版本支持范围内
