@@ -710,6 +710,36 @@ bool strata_pf_gemm_f16_ld(const uint16_t* X, int64_t ldx, const uint16_t* W, in
     return hipGetLastError() == hipSuccess;
 }
 
+#elif defined(STRATA_HIP_GFX928)
+#include "wmma_gemm_mmac928.cuh"
+
+bool strata_pf_gemm_f16(const uint16_t* X, const uint16_t* W, float* Y, int64_t T, int64_t N, int64_t K, int64_t ldy,
+                        float beta, void* stream) {
+    return strata_pf_gemm_f16_ld(X, K, W, K, Y, T, N, K, ldy, beta, stream);
+}
+
+bool strata_pf_gemm_f16_ld(const uint16_t* X, int64_t ldx, const uint16_t* W, int64_t ldw, float* Y, int64_t T,
+                           int64_t N, int64_t K, int64_t ldy, float beta, void* stream) {
+    if (!X || !W || !Y || T < 1) return false;
+    if (ldy <= 0) ldy = N;
+    return pfg928::launch(X, ldx, W, ldw, Y, T, N, K, ldy, beta, static_cast<hipStream_t>(stream));
+}
+
+bool strata_pf_padded_gemm_available() { return false; }
+bool strata_pf_hcdown_bf16(const uint16_t*, int64_t, const uint16_t*, const uint16_t*, int64_t, int64_t, float*, float*,
+                           int64_t, int64_t, void*) {
+    return false;
+}
+bool strata_pf_hcdown_exact_bf16(const uint16_t*, int64_t, const uint16_t*, float*, int64_t, int64_t, int64_t, void*) {
+    return false;
+}
+bool strata_wmma_gemm_f16(const uint16_t*, const uint16_t*, float*, int64_t, int64_t, int64_t, int64_t, float, void*) {
+    return false;
+}
+bool strata_wmma_gemm_bf16(const uint16_t*, const uint16_t*, float*, int64_t, int64_t, int64_t, int64_t, float, void*) {
+    return false;
+}
+
 #else
 // Non-HIP / Non-GFX11 compilation fallback
 bool strata_pf_gemm_f16(const uint16_t*, const uint16_t*, float*, int64_t, int64_t, int64_t, int64_t, float, void*) {

@@ -379,6 +379,8 @@ __device__ __forceinline__ float sub_dot(const Sub& s, const int4& xa, const int
     return v;
 }
 
+#include "ds4_iq_mmac928.inc"
+
 // values [8 p, 8 p + 8) of sub-block kb, as F32 (the prompt sets' tiles): ggml's dequantize_row_* values
 template <int T>
 __device__ __forceinline__ void deq8(const uint8_t* __restrict__ row, int kb, int p, const uint32_t* tab, float* w) {
@@ -1214,6 +1216,9 @@ void dn_ne(const Args& a, int groups, int ne, cudaStream_t s) {
 #include "ds4_iq_hip.inc"
 template <int T, bool GU>
 void launch_set(const SetArgs& a, dim3 grid, cudaStream_t s) {
+#if defined(STRATA_USE_HIP)
+    if (mmac928::launch<T, GU>(a, s)) return;
+#endif
 #if defined(STRATA_USE_HIP)
     if (hipk::launch<T, GU>(a, s)) return;   // (gfx12, STRATA_DS4_HIPK=1: the matrix-core tiles)
 #endif

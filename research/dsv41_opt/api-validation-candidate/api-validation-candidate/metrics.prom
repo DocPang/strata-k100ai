@@ -1,0 +1,45 @@
+# HELP llamacpp:prompt_tokens_total Prompt tokens read
+# TYPE llamacpp:prompt_tokens_total counter
+llamacpp:prompt_tokens_total 262
+# HELP llamacpp:prompt_tokens_cached_total Prompt tokens the conversation cache already held
+# TYPE llamacpp:prompt_tokens_cached_total counter
+llamacpp:prompt_tokens_cached_total 0
+# HELP llamacpp:prompt_seconds_total Prompt read time
+# TYPE llamacpp:prompt_seconds_total counter
+llamacpp:prompt_seconds_total 3.015
+# HELP llamacpp:tokens_predicted_total Tokens generated
+# TYPE llamacpp:tokens_predicted_total counter
+llamacpp:tokens_predicted_total 203
+# HELP llamacpp:tokens_predicted_seconds_total Generation time
+# TYPE llamacpp:tokens_predicted_seconds_total counter
+llamacpp:tokens_predicted_seconds_total 5.793
+# HELP llamacpp:prompt_tokens_seconds Average prompt read throughput in tokens/s, since the last scrape
+# TYPE llamacpp:prompt_tokens_seconds gauge
+llamacpp:prompt_tokens_seconds 86.8988391376451
+# HELP llamacpp:predicted_tokens_seconds Average generation throughput in tokens/s, since the last scrape
+# TYPE llamacpp:predicted_tokens_seconds gauge
+llamacpp:predicted_tokens_seconds 35.04229242188848
+# HELP llamacpp:requests_processing Requests running
+# TYPE llamacpp:requests_processing gauge
+llamacpp:requests_processing 0
+# HELP llamacpp:requests_deferred Requests waiting their turn
+# TYPE llamacpp:requests_deferred gauge
+llamacpp:requests_deferred 0
+# HELP strata:requests_total Requests finished
+# TYPE strata:requests_total counter
+strata:requests_total 6
+# HELP strata:drafts_offered_total Speculative draft tokens offered
+# TYPE strata:drafts_offered_total counter
+strata:drafts_offered_total 145
+# HELP strata:drafts_accepted_total Speculative draft tokens accepted
+# TYPE strata:drafts_accepted_total counter
+strata:drafts_accepted_total 115
+# HELP strata:tool_calls_unread_total <tool_call> blocks returned as text (an undeclared name or a form the template does not use)
+# TYPE strata:tool_calls_unread_total counter
+strata:tool_calls_unread_total 0
+# HELP strata:tool_args_repaired_total Tool call arguments (a JSON array or object) that were damaged and read as written
+# TYPE strata:tool_args_repaired_total counter
+strata:tool_args_repaired_total 0
+# HELP strata:model_loaded 1 while the model is loaded
+# TYPE strata:model_loaded gauge
+strata:model_loaded 1

@@ -1,0 +1,532 @@
+{
+  "schema": 1,
+  "prompts": [
+    {
+      "prompt_tokens": 34,
+      "prompt_ms": 509.0,
+      "wall_us_per_token": 14970.588235294117,
+      "stages": [],
+      "experts": [],
+      "meta": {
+        "reused": 0,
+        "generated": 1,
+        "prompt_tps": 66.8,
+        "decode_ms": 2.0,
+        "decode_tps": 653.93
+      }
+    },
+    {
+      "prompt_tokens": 4141,
+      "prompt_ms": 8700.0,
+      "wall_us_per_token": 2100.941801497223,
+      "stages": [
+        {
+          "name": "between layers",
+          "ms": 1771.3,
+          "share_pct": 8.0,
+          "summed_us_per_token": 427.74692103356676,
+          "four_card_wall_equiv_us_per_token": 106.93673025839169
+        },
+        {
+          "name": "attn rest (q_b, wo_a/b, hc_post)",
+          "ms": 3777.6,
+          "share_pct": 17.1,
+          "summed_us_per_token": 912.2434194638976,
+          "four_card_wall_equiv_us_per_token": 228.0608548659744
+        },
+        {
+          "name": "shared expert",
+          "ms": 1031.8,
+          "share_pct": 4.7,
+          "summed_us_per_token": 249.16686790630283,
+          "four_card_wall_equiv_us_per_token": 62.29171697657571
+        },
+        {
+          "name": "experts (incl waits)",
+          "ms": 10568.9,
+          "share_pct": 47.7,
+          "summed_us_per_token": 2552.257908717701,
+          "four_card_wall_equiv_us_per_token": 638.0644771794252
+        },
+        {
+          "name": "engram",
+          "ms": 620.1,
+          "share_pct": 2.8,
+          "summed_us_per_token": 149.74643805844,
+          "four_card_wall_equiv_us_per_token": 37.43660951461
+        },
+        {
+          "name": "attn mHC (mix/split/norm)",
+          "ms": 137.4,
+          "share_pct": 0.6,
+          "summed_us_per_token": 33.180391209852694,
+          "four_card_wall_equiv_us_per_token": 8.295097802463173
+        },
+        {
+          "name": "attn projections",
+          "ms": 363.9,
+          "share_pct": 1.6,
+          "summed_us_per_token": 87.87732431779763,
+          "four_card_wall_equiv_us_per_token": 21.969331079449407
+        },
+        {
+          "name": "compressor + indexer",
+          "ms": 521.7,
+          "share_pct": 2.4,
+          "summed_us_per_token": 125.98406182081624,
+          "four_card_wall_equiv_us_per_token": 31.49601545520406
+        },
+        {
+          "name": "q_b + rope",
+          "ms": 1381.7,
+          "share_pct": 6.2,
+          "summed_us_per_token": 333.66336633663366,
+          "four_card_wall_equiv_us_per_token": 83.41584158415841
+        },
+        {
+          "name": "sparse attention",
+          "ms": 1149.6,
+          "share_pct": 5.2,
+          "summed_us_per_token": 277.614102873702,
+          "four_card_wall_equiv_us_per_token": 69.4035257184255
+        },
+        {
+          "name": "ffn mHC + router + sort",
+          "ms": 829.5,
+          "share_pct": 3.7,
+          "summed_us_per_token": 200.31393383240763,
+          "four_card_wall_equiv_us_per_token": 50.07848345810191
+        }
+      ],
+      "experts": [
+        {
+          "type": "IQ2_XXS",
+          "phase": "gate+up",
+          "ms": 2791.1,
+          "calls": 490,
+          "experts": 32640,
+          "us_each": 85.5,
+          "experts_per_call": 66.6,
+          "rows_per_expert": 12.9,
+          "achieved_tflops": 7.1,
+          "summed_us_per_token": 674.0159381791838,
+          "four_card_wall_equiv_us_per_token": 168.50398454479594
+        },
+        {
+          "type": "IQ2_XXS",
+          "phase": "down",
+          "ms": 678.0,
+          "calls": 233,
+          "experts": 15360,
+          "us_each": 44.1,
+          "experts_per_call": 65.9,
+          "rows_per_expert": 12.9,
+          "achieved_tflops": 6.9,
+          "summed_us_per_token": 163.72856797874908,
+          "four_card_wall_equiv_us_per_token": 40.93214199468727
+        },
+        {
+          "type": "IQ2_XS",
+          "phase": "gate+up",
+          "ms": 1186.2,
+          "calls": 194,
+          "experts": 13440,
+          "us_each": 88.3,
+          "experts_per_call": 69.3,
+          "rows_per_expert": 12.9,
+          "achieved_tflops": 6.9,
+          "summed_us_per_token": 286.45254769379375,
+          "four_card_wall_equiv_us_per_token": 71.61313692344844
+        },
+        {
+          "type": "IQ2_XS",
+          "phase": "down",
+          "ms": 329.4,
+          "calls": 115,
+          "experts": 7680,
+          "us_each": 42.9,
+          "experts_per_call": 66.8,
+          "rows_per_expert": 12.9,
+          "achieved_tflops": 7.1,
+          "summed_us_per_token": 79.5460033808259,
+          "four_card_wall_equiv_us_per_token": 19.886500845206474
+        },
+        {
+          "type": "IQ1_M",
+          "phase": "gate+up",
+          "ms": 2942.2,
+          "calls": 453,
+          "experts": 30720,
+          "us_each": 95.8,
+          "experts_per_call": 67.8,
+          "rows_per_expert": 12.9,
+          "achieved_tflops": 6.4,
+          "summed_us_per_token": 710.5047090074861,
+          "four_card_wall_equiv_us_per_token": 177.62617725187152
+        },
+        {
+          "type": "IQ1_M",
+          "phase": "down",
+          "ms": 2450.0,
+          "calls": 789,
+          "experts": 53760,
+          "us_each": 45.6,
+          "experts_per_call": 68.1,
+          "rows_per_expert": 12.9,
+          "achieved_tflops": 6.7,
+          "summed_us_per_token": 591.6445303066893,
+          "four_card_wall_equiv_us_per_token": 147.91113257667232
+        }
+      ],
+      "meta": {
+        "reused": 0,
+        "generated": 16,
+        "prompt_tps": 476.0,
+        "decode_ms": 605.0,
+        "decode_tps": 26.44
+      }
+    },
+    {
+      "prompt_tokens": 8237,
+      "prompt_ms": 14189.0,
+      "wall_us_per_token": 1722.593177127595,
+      "stages": [
+        {
+          "name": "between layers",
+          "ms": 3326.2,
+          "share_pct": 7.7,
+          "summed_us_per_token": 403.8120675003035,
+          "four_card_wall_equiv_us_per_token": 100.95301687507587
+        },
+        {
+          "name": "attn rest (q_b, wo_a/b, hc_post)",
+          "ms": 7574.1,
+          "share_pct": 17.5,
+          "summed_us_per_token": 919.5216705111084,
+          "four_card_wall_equiv_us_per_token": 229.8804176277771
+        },
+        {
+          "name": "shared expert",
+          "ms": 1910.4,
+          "share_pct": 4.4,
+          "summed_us_per_token": 231.92910040063128,
+          "four_card_wall_equiv_us_per_token": 57.98227510015782
+        },
+        {
+          "name": "experts (incl waits)",
+          "ms": 20465.9,
+          "share_pct": 47.3,
+          "summed_us_per_token": 2484.6303265752094,
+          "four_card_wall_equiv_us_per_token": 621.1575816438024
+        },
+        {
+          "name": "engram",
+          "ms": 1155.3,
+          "share_pct": 2.7,
+          "summed_us_per_token": 140.25737525798226,
+          "four_card_wall_equiv_us_per_token": 35.064343814495565
+        },
+        {
+          "name": "attn mHC (mix/split/norm)",
+          "ms": 260.4,
+          "share_pct": 0.6,
+          "summed_us_per_token": 31.613451499332278,
+          "four_card_wall_equiv_us_per_token": 7.9033628748330695
+        },
+        {
+          "name": "attn projections",
+          "ms": 637.9,
+          "share_pct": 1.5,
+          "summed_us_per_token": 77.44324389947796,
+          "four_card_wall_equiv_us_per_token": 19.36081097486949
+        },
+        {
+          "name": "compressor + indexer",
+          "ms": 1112.5,
+          "share_pct": 2.6,
+          "summed_us_per_token": 135.06130872890614,
+          "four_card_wall_equiv_us_per_token": 33.765327182226535
+        },
+        {
+          "name": "q_b + rope",
+          "ms": 2826.0,
+          "share_pct": 6.5,
+          "summed_us_per_token": 343.08607502731576,
+          "four_card_wall_equiv_us_per_token": 85.77151875682894
+        },
+        {
+          "name": "sparse attention",
+          "ms": 2376.7,
+          "share_pct": 5.5,
+          "summed_us_per_token": 288.53951681437417,
+          "four_card_wall_equiv_us_per_token": 72.13487920359354
+        },
+        {
+          "name": "ffn mHC + router + sort",
+          "ms": 1629.6,
+          "share_pct": 3.8,
+          "summed_us_per_token": 197.8390190603375,
+          "four_card_wall_equiv_us_per_token": 49.45975476508438
+        }
+      ],
+      "experts": [
+        {
+          "type": "IQ2_XXS",
+          "phase": "gate+up",
+          "ms": 5284.5,
+          "calls": 925,
+          "experts": 58752,
+          "us_each": 89.9,
+          "experts_per_call": 63.5,
+          "rows_per_expert": 14.3,
+          "achieved_tflops": 7.5,
+          "summed_us_per_token": 641.5563918902513,
+          "four_card_wall_equiv_us_per_token": 160.38909797256284
+        },
+        {
+          "type": "IQ2_XXS",
+          "phase": "down",
+          "ms": 1254.6,
+          "calls": 434,
+          "experts": 27648,
+          "us_each": 45.4,
+          "experts_per_call": 63.7,
+          "rows_per_expert": 14.3,
+          "achieved_tflops": 7.4,
+          "summed_us_per_token": 152.31273521913317,
+          "four_card_wall_equiv_us_per_token": 38.07818380478329
+        },
+        {
+          "type": "IQ2_XS",
+          "phase": "gate+up",
+          "ms": 2334.5,
+          "calls": 386,
+          "experts": 24192,
+          "us_each": 96.5,
+          "experts_per_call": 62.7,
+          "rows_per_expert": 14.3,
+          "achieved_tflops": 7.0,
+          "summed_us_per_token": 283.416292339444,
+          "four_card_wall_equiv_us_per_token": 70.854073084861
+        },
+        {
+          "type": "IQ2_XS",
+          "phase": "down",
+          "ms": 675.9,
+          "calls": 217,
+          "experts": 13824,
+          "us_each": 48.9,
+          "experts_per_call": 63.7,
+          "rows_per_expert": 14.3,
+          "achieved_tflops": 6.9,
+          "summed_us_per_token": 82.05657399538667,
+          "four_card_wall_equiv_us_per_token": 20.514143498846668
+        },
+        {
+          "type": "IQ1_M",
+          "phase": "gate+up",
+          "ms": 5807.3,
+          "calls": 880,
+          "experts": 55296,
+          "us_each": 105.0,
+          "experts_per_call": 62.8,
+          "rows_per_expert": 14.3,
+          "achieved_tflops": 6.4,
+          "summed_us_per_token": 705.026101736069,
+          "four_card_wall_equiv_us_per_token": 176.25652543401725
+        },
+        {
+          "type": "IQ1_M",
+          "phase": "down",
+          "ms": 4720.9,
+          "calls": 1540,
+          "experts": 96768,
+          "us_each": 48.8,
+          "experts_per_call": 62.8,
+          "rows_per_expert": 14.3,
+          "achieved_tflops": 6.9,
+          "summed_us_per_token": 573.1334223625106,
+          "four_card_wall_equiv_us_per_token": 143.28335559062765
+        }
+      ],
+      "meta": {
+        "reused": 0,
+        "generated": 17,
+        "prompt_tps": 580.5,
+        "decode_ms": 685.0,
+        "decode_tps": 24.82
+      }
+    },
+    {
+      "prompt_tokens": 32812,
+      "prompt_ms": 53023.0,
+      "wall_us_per_token": 1615.9636718273803,
+      "stages": [
+        {
+          "name": "between layers",
+          "ms": 11061.8,
+          "share_pct": 5.9,
+          "summed_us_per_token": 337.1266609776911,
+          "four_card_wall_equiv_us_per_token": 84.28166524442277
+        },
+        {
+          "name": "attn rest (q_b, wo_a/b, hc_post)",
+          "ms": 30812.6,
+          "share_pct": 16.6,
+          "summed_us_per_token": 939.0649762282092,
+          "four_card_wall_equiv_us_per_token": 234.7662440570523
+        },
+        {
+          "name": "shared expert",
+          "ms": 8064.4,
+          "share_pct": 4.3,
+          "summed_us_per_token": 245.7759356333049,
+          "four_card_wall_equiv_us_per_token": 61.443983908326224
+        },
+        {
+          "name": "experts (incl waits)",
+          "ms": 80628.6,
+          "share_pct": 43.4,
+          "summed_us_per_token": 2457.2900158478606,
+          "four_card_wall_equiv_us_per_token": 614.3225039619651
+        },
+        {
+          "name": "engram",
+          "ms": 4288.3,
+          "share_pct": 2.3,
+          "summed_us_per_token": 130.69303913202486,
+          "four_card_wall_equiv_us_per_token": 32.673259783006216
+        },
+        {
+          "name": "attn mHC (mix/split/norm)",
+          "ms": 1010.1,
+          "share_pct": 0.5,
+          "summed_us_per_token": 30.78446909667195,
+          "four_card_wall_equiv_us_per_token": 7.696117274167987
+        },
+        {
+          "name": "attn projections",
+          "ms": 2545.6,
+          "share_pct": 1.4,
+          "summed_us_per_token": 77.5813726685359,
+          "four_card_wall_equiv_us_per_token": 19.395343167133976
+        },
+        {
+          "name": "compressor + indexer",
+          "ms": 20343.7,
+          "share_pct": 10.9,
+          "summed_us_per_token": 620.0079239302694,
+          "four_card_wall_equiv_us_per_token": 155.00198098256735
+        },
+        {
+          "name": "q_b + rope",
+          "ms": 10866.0,
+          "share_pct": 5.8,
+          "summed_us_per_token": 331.159331951725,
+          "four_card_wall_equiv_us_per_token": 82.78983298793125
+        },
+        {
+          "name": "sparse attention",
+          "ms": 9829.7,
+          "share_pct": 5.3,
+          "summed_us_per_token": 299.5763744971352,
+          "four_card_wall_equiv_us_per_token": 74.8940936242838
+        },
+        {
+          "name": "ffn mHC + router + sort",
+          "ms": 6485.0,
+          "share_pct": 3.5,
+          "summed_us_per_token": 197.64110691210533,
+          "four_card_wall_equiv_us_per_token": 49.41027672802633
+        }
+      ],
+      "experts": [
+        {
+          "type": "IQ2_XXS",
+          "phase": "gate+up",
+          "ms": 21123.3,
+          "calls": 3780,
+          "experts": 215424,
+          "us_each": 98.1,
+          "experts_per_call": 57.0,
+          "rows_per_expert": 15.5,
+          "achieved_tflops": 7.5,
+          "summed_us_per_token": 643.7675240765574,
+          "four_card_wall_equiv_us_per_token": 160.94188101913934
+        },
+        {
+          "type": "IQ2_XXS",
+          "phase": "down",
+          "ms": 4829.8,
+          "calls": 1759,
+          "experts": 101376,
+          "us_each": 47.6,
+          "experts_per_call": 57.6,
+          "rows_per_expert": 15.5,
+          "achieved_tflops": 7.7,
+          "summed_us_per_token": 147.19614775082286,
+          "four_card_wall_equiv_us_per_token": 36.799036937705715
+        },
+        {
+          "type": "IQ2_XS",
+          "phase": "gate+up",
+          "ms": 9065.5,
+          "calls": 1537,
+          "experts": 88704,
+          "us_each": 102.2,
+          "experts_per_call": 57.7,
+          "rows_per_expert": 15.5,
+          "achieved_tflops": 7.2,
+          "summed_us_per_token": 276.2861148360356,
+          "four_card_wall_equiv_us_per_token": 69.0715287090089
+        },
+        {
+          "type": "IQ2_XS",
+          "phase": "down",
+          "ms": 2537.2,
+          "calls": 857,
+          "experts": 50688,
+          "us_each": 50.1,
+          "experts_per_call": 59.1,
+          "rows_per_expert": 15.5,
+          "achieved_tflops": 7.3,
+          "summed_us_per_token": 77.32536876752408,
+          "four_card_wall_equiv_us_per_token": 19.33134219188102
+        },
+        {
+          "type": "IQ1_M",
+          "phase": "gate+up",
+          "ms": 22879.5,
+          "calls": 3547,
+          "experts": 202752,
+          "us_each": 112.8,
+          "experts_per_call": 57.2,
+          "rows_per_expert": 15.5,
+          "achieved_tflops": 6.5,
+          "summed_us_per_token": 697.2906253809582,
+          "four_card_wall_equiv_us_per_token": 174.32265634523955
+        },
+        {
+          "type": "IQ1_M",
+          "phase": "down",
+          "ms": 18620.5,
+          "calls": 6248,
+          "experts": 354816,
+          "us_each": 52.5,
+          "experts_per_call": 56.8,
+          "rows_per_expert": 15.5,
+          "achieved_tflops": 7.0,
+          "summed_us_per_token": 567.4905522369864,
+          "four_card_wall_equiv_us_per_token": 141.8726380592466
+        }
+      ],
+      "meta": {
+        "reused": 0,
+        "generated": 17,
+        "prompt_tps": 618.8,
+        "decode_ms": 565.0,
+        "decode_tps": 30.09
+      }
+    }
+  ]
+}

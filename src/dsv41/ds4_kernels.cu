@@ -759,6 +759,8 @@ __global__ void __launch_bounds__(kThreads) index_score_kernel(const float* __re
     o[i] = s;
 }
 
+#include "ds4_qsa_mmac928.inc"
+
 __device__ __forceinline__ uint32_t ord_key(float f) {
     const uint32_t b = __float_as_uint(f);
     return (b & 0x80000000u) ? ~b : (b | 0x80000000u);
@@ -1363,6 +1365,7 @@ __global__ void __launch_bounds__(kThreads) sparse_attn_wmma_kernel(const float*
         }
 }
 #endif   // STRATA_USE_HIP
+#include "ds4_attn_mmac928.inc"
 
 // the ring's rows are kKvFp8: E4M3 codes, a UE8M0 scale per 32 (decoded: exactly the BF16 values they were made from)
 __global__ void ring_to_ext_kernel(const uint8_t* __restrict__ ring, uint16_t* __restrict__ ext, long long p0, int n,
@@ -2457,6 +2460,9 @@ void index_score(const float* q, const float* w, const void* k, int heads, int h
                                                out, out_stride, kfmt))
         return;
 #endif
+#if defined(STRATA_USE_HIP)
+    if (qsa_mmac928::launch(q, w, (const uint8_t*) k, heads, n, T, cand, lim, out, out_stride, s, kfmt)) return;
+#endif
     const size_t smem = (size_t) (heads * hd + heads) * sizeof(float);
     const dim3 grid(cdiv(n, kThreads), T);
     if (kfmt == kKvFp4p)
@@ -2522,6 +2528,11 @@ void sparse_attn(const float* q, const uint16_t* win, const void* ckv, const int
 #if defined(STRATA_METAL)
     // sparse_attn_packed_kernel<G> / sparse_attn_kernel<false> on the Metal dispatch; the launches below are the fallback
     if (strata::dsv41::metal_host::sparse_attn(q, win, ckv, sel, sel_stride, &a, sink, heads, d, T, scale, out, ckv_fmt))
+        return;
+#endif
+#if defined(STRATA_USE_HIP)
+    if (attn_mmac928::launch(q, win, ckv, sel, sel_stride, a, sink, heads, d, T, scale, out, ckv_fmt,
+                             heads_per_block, s))
         return;
 #endif
     if (ckv_fmt == kKvBf16) {

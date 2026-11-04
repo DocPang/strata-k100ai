@@ -1,0 +1,222 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "name": "france_capital_zh",
+      "prompt": "用一句简洁的中文回答：法国的首都是哪里？",
+      "passed": true,
+      "finish_reason": "stop",
+      "content": "巴黎。",
+      "reasoning": "我们需要回答中文简洁。问题：法国首都是哪里？答巴黎。需要一句简洁中文。",
+      "usage": {
+        "prompt_tokens": 42,
+        "completion_tokens": 24,
+        "total_tokens": 66,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "response": {
+        "id": "chatcmpl-78de1d54163f4cb199fd5b98",
+        "object": "chat.completion",
+        "created": 1793800221,
+        "model": "deepseek-v4.1-flash",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "巴黎。",
+              "reasoning_content": "我们需要回答中文简洁。问题：法国首都是哪里？答巴黎。需要一句简洁中文。"
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 42,
+          "completion_tokens": 24,
+          "total_tokens": 66,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "timings": {
+          "cache_n": 0,
+          "prompt_n": 42,
+          "prompt_ms": 572.0,
+          "prompt_per_token_ms": 13.619,
+          "prompt_per_second": 73.4,
+          "predicted_n": 24,
+          "predicted_ms": 893.9,
+          "predicted_per_token_ms": 37.246,
+          "predicted_per_second": 26.8,
+          "draft_n": 15,
+          "draft_n_accepted": 9
+        }
+      }
+    },
+    {
+      "name": "arithmetic",
+      "prompt": "只给出计算结果：17 × 23 = ?",
+      "passed": true,
+      "finish_reason": "stop",
+      "content": "391",
+      "reasoning": "We need answer only calculation. 17*23=391. Need \"只给出计算结果\" so just 391.",
+      "usage": {
+        "prompt_tokens": 40,
+        "completion_tokens": 27,
+        "total_tokens": 67,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "response": {
+        "id": "chatcmpl-37b79a9f7ab3408c96bd0e0a",
+        "object": "chat.completion",
+        "created": 1793800223,
+        "model": "deepseek-v4.1-flash",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "391",
+              "reasoning_content": "We need answer only calculation. 17*23=391. Need \"只给出计算结果\" so just 391."
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 40,
+          "completion_tokens": 27,
+          "total_tokens": 67,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "timings": {
+          "cache_n": 0,
+          "prompt_n": 40,
+          "prompt_ms": 448.7,
+          "prompt_per_token_ms": 11.217,
+          "prompt_per_second": 89.1,
+          "predicted_n": 27,
+          "predicted_ms": 610.4,
+          "predicted_per_token_ms": 22.607,
+          "predicted_per_second": 44.2,
+          "draft_n": 21,
+          "draft_n_accepted": 18
+        }
+      }
+    },
+    {
+      "name": "python_add",
+      "prompt": "用 Python 写一个 add(a, b) 函数并返回两数之和，只给代码。",
+      "passed": true,
+      "finish_reason": "stop",
+      "content": "def add(a, b):\n    return a + b",
+      "reasoning": "We need answer only code. Need Python function add(a,b) return sum. Only code. Could be simple. Need no markdown? \"只给代码\" means only code. We can output code block? They said only code. Probably plain code. Need maybe function definition. Final only code.",
+      "usage": {
+        "prompt_tokens": 52,
+        "completion_tokens": 74,
+        "total_tokens": 126,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "response": {
+        "id": "chatcmpl-4163910c4546409388f7821f",
+        "object": "chat.completion",
+        "created": 1793800224,
+        "model": "deepseek-v4.1-flash",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "def add(a, b):\n    return a + b",
+              "reasoning_content": "We need answer only code. Need Python function add(a,b) return sum. Only code. Could be simple. Need no markdown? \"只给代码\" means only code. We can output code block? They said only code. Probably plain code. Need maybe function definition. Final only code."
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 52,
+          "completion_tokens": 74,
+          "total_tokens": 126,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "timings": {
+          "cache_n": 0,
+          "prompt_n": 52,
+          "prompt_ms": 575.2,
+          "prompt_per_token_ms": 11.062,
+          "prompt_per_second": 90.4,
+          "predicted_n": 74,
+          "predicted_ms": 1951.6,
+          "predicted_per_token_ms": 26.373,
+          "predicted_per_second": 37.9,
+          "draft_n": 54,
+          "draft_n_accepted": 47
+        }
+      }
+    },
+    {
+      "name": "unit_conversion_zh",
+      "prompt": "用一句简洁的中文回答：1 千米等于多少米？",
+      "passed": true,
+      "finish_reason": "stop",
+      "content": "1千米等于1000米。",
+      "reasoning": "我们需要回答中文简洁。问题：1千米等于多少米？答案1000米。需要简洁。",
+      "usage": {
+        "prompt_tokens": 44,
+        "completion_tokens": 30,
+        "total_tokens": 74,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "response": {
+        "id": "chatcmpl-5fc41cf41b974d548e2d15cd",
+        "object": "chat.completion",
+        "created": 1793800226,
+        "model": "deepseek-v4.1-flash",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "1千米等于1000米。",
+              "reasoning_content": "我们需要回答中文简洁。问题：1千米等于多少米？答案1000米。需要简洁。"
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 44,
+          "completion_tokens": 30,
+          "total_tokens": 74,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "timings": {
+          "cache_n": 0,
+          "prompt_n": 44,
+          "prompt_ms": 477.0,
+          "prompt_per_token_ms": 10.841,
+          "prompt_per_second": 92.2,
+          "predicted_n": 30,
+          "predicted_ms": 589.7,
+          "predicted_per_token_ms": 19.657,
+          "predicted_per_second": 50.9,
+          "draft_n": 25,
+          "draft_n_accepted": 23
+        }
+      }
+    }
+  ],
+  "failed": []
+}

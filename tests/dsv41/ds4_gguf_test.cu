@@ -1662,6 +1662,8 @@ void test_kv_pack(cudaStream_t s) {
         int* d_sel = dev(sel);
         uint16_t* ext = nullptr;
         uint8_t* pk = nullptr;
+        const char* attn_mmac_env = std::getenv("STRATA_DS4_ATTN_MMAC928");
+        const bool attn_mmac = attn_mmac_env != nullptr && attn_mmac_env[0] == '1';
         dk::AttnScratch scr;
         scr.max_t = ST;
         scr.cap = SEL;
@@ -1698,13 +1700,49 @@ void test_kv_pack(cudaStream_t s) {
                     ar.nsel[t] = SEL - 31 * t;
                 }
             const size_t n = (size_t) T * NH * HD;
-            dk::sparse_attn(d_q, ext, c16, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o1, s, dk::kKvBf16);
+            dk::sparse_attn(d_q, ext, c16, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o1, s, dk::kKvBf16, -1);
             CU(cudaStreamSynchronize(s));
             const std::vector<float> want = host(o1, n);
             bool same = true;
-            for (int g : {-1, 0, 1, 2, 4, 8}) {
+            const bool mmac_shape = attn_mmac && sh.gen && T >= 16 && NH % 16 == 0;
+            if (mmac_shape) {
                 CU(cudaMemset(o2, 0xff, n * 4));
-                dk::sparse_attn(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o2, s, dk::kKvFp4, g, &scr);
+                dk::sparse_attn(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o2, s, dk::kKvFp4, 0);
+                CU(cudaStreamSynchronize(s));
+                const std::vector<float> got = host(o2, n);
+                double error2 = 0.0, reference2 = 0.0, worst_abs = 0.0;
+                int got_nonfinite = 0, want_nonfinite = 0;
+                for (size_t i = 0; i < n; ++i) {
+                    const double error = (double) got[i] - want[i];
+                    error2 += error * error;
+                    reference2 += (double) want[i] * want[i];
+                    worst_abs = std::max(worst_abs, std::fabs(error));
+                    got_nonfinite += !std::isfinite(got[i]);
+                    want_nonfinite += !std::isfinite(want[i]);
+                }
+                const double rel_l2 = std::sqrt(error2 / (reference2 + 1e-30));
+                same = got_nonfinite == 0 && want_nonfinite == 0 && rel_l2 <= 5e-4;
+                std::printf("kv pack: sparse attention %d queries MMAC928 accuracy: rel L2 %.3e, max %.3e, "
+                            "nonfinite got/want %d/%d%s\n",
+                            T, rel_l2, worst_abs, got_nonfinite, want_nonfinite, same ? "" : " FAIL");
+                if (!same) {
+                    for (size_t i = 0, shown = 0; i < n && shown < 8; ++i)
+                        if (!std::isfinite(got[i]) || !std::isfinite(want[i])) {
+                            std::printf("  sample[%zu] got %.9g want %.9g\n", i, got[i], want[i]);
+                            ++shown;
+                        }
+                }
+                CU(cudaMemset(o2, 0xff, n * 4));
+                dk::sparse_attn(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o2, s, dk::kKvFp4, 1);
+            } else {
+                for (int g : {-1, 0, 1, 2, 4, 8}) {
+                    CU(cudaMemset(o2, 0xff, n * 4));
+                    dk::sparse_attn(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o2, s, dk::kKvFp4, g, &scr);
+                    CU(cudaStreamSynchronize(s));
+                    same = same && std::memcmp(want.data(), host(o2, n).data(), n * 4) == 0;
+                }
+            }
+            if (mmac_shape) {
                 CU(cudaStreamSynchronize(s));
                 same = same && std::memcmp(want.data(), host(o2, n).data(), n * 4) == 0;
             }
@@ -1715,7 +1753,7 @@ void test_kv_pack(cudaStream_t s) {
                 CU(cudaEventRecord(e0, s));
                 for (int it = 0; it < sh.iters; ++it) {
                     if (ways[w] == 99)
-                        dk::sparse_attn(d_q, ext, c16, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o1, s, dk::kKvBf16);
+                        dk::sparse_attn(d_q, ext, c16, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o1, s, dk::kKvBf16, -1);
                     else
                         dk::sparse_attn(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o1, s, dk::kKvFp4,
                                         ways[w] == -2 ? 0 : ways[w], ways[w] == -2 ? nullptr : &scr);
@@ -1768,6 +1806,47 @@ void test_kv_pack(cudaStream_t s) {
         CU(cudaStreamSynchronize(s));
         kv_same("kv pack: index scores", host(o1, (size_t) T * ss).data(), host(o2, (size_t) T * ss).data(),
                 (size_t) T * ss * 4);
+        {
+            // A CPU reference over a prefix catches a fast path that agrees
+            // with itself for both key formats but computes the wrong dot.
+            const std::vector<uint16_t> keys = host(i16, (size_t) NC * IX);
+            const std::vector<float> scores = host(o1, (size_t) T * ss);
+            const char* qsa_mmac_env = std::getenv("STRATA_DS4_QSA_MMAC928");
+            double worst = 0, worst_abs = 0;
+            double sum_got2 = 0, sum_ref2 = 0, sum_got_ref = 0;
+            for (int t = 0; t < T; ++t)
+                for (int p = 0; p < 128; ++p) {
+                    float acc[NH] = {};
+                    double denom = 0;
+                    for (int h = 0; h < NH; ++h) {
+                        for (int c = 0; c < IX; ++c) {
+                            const uint32_t bits = (uint32_t) keys[(size_t) p * IX + c] << 16;
+                            float kv;
+                            std::memcpy(&kv, &bits, sizeof(kv));
+                            const float qv = q[(size_t) t * NH * IX + h * IX + c];
+                            acc[h] = std::fmaf(qv, kv, acc[h]);
+                            denom += std::fabs((double) qv * kv * w[(size_t) t * 64 + h]);
+                        }
+                    }
+                    float ref = 0;
+                    for (int h = 0; h < NH; ++h) ref = std::fmaf(fmaxf(acc[h], 0.0f), w[(size_t) t * 64 + h], ref);
+                    const float got = scores[(size_t) t * ss + p];
+                    const double err = std::fabs(got - ref);
+                    sum_got2 += (double) got * got;
+                    sum_ref2 += (double) ref * ref;
+                    sum_got_ref += (double) got * ref;
+                    worst_abs = std::max(worst_abs, err);
+                    const double rel = err / (denom + 1e-30);
+                    worst = std::max(worst, rel);
+                }
+            const bool mmac = qsa_mmac_env != nullptr && qsa_mmac_env[0] != '0';
+            std::printf("%-44s       CPU worst %.3e relative, %.3e absolute%s\n", "kv pack: index score accuracy",
+                        worst, worst_abs, mmac ? " (MMAC928)" : "");
+            std::printf("%-44s       correlation %.6f, norms got %.6g ref %.6g\n", "kv pack: index score accuracy detail",
+                        sum_got_ref / std::sqrt((sum_got2 + 1e-30) * (sum_ref2 + 1e-30)), std::sqrt(sum_got2),
+                        std::sqrt(sum_ref2));
+            if (worst > (mmac ? 1e-4 : 1e-5)) ++g_fail;
+        }
         {   // (the time of each over the 16385 keys, 50 times)
             cudaEvent_t e0, e1;
             CU(cudaEventCreate(&e0));

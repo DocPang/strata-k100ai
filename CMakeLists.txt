@@ -964,6 +964,13 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
     target_include_directories(ds4_native_q5_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
                                ${_strata_gpu_include_directories})
     target_link_libraries(ds4_native_q5_probe PRIVATE strata_kernels ${_strata_gpu_runtime_target} Threads::Threads)
+    if((STRATA_ENABLE_HIP OR STRATA_HIP_GFX906) AND CMAKE_HIP_ARCHITECTURES MATCHES "gfx928")
+      set_source_files_properties(tests/dsv41/dense_gemm_mmac_test.cu PROPERTIES LANGUAGE HIP)
+      add_executable(dense_gemm_mmac_test tests/dsv41/dense_gemm_mmac_test.cu)
+      target_include_directories(dense_gemm_mmac_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
+                                 ${_strata_gpu_include_directories})
+      target_link_libraries(dense_gemm_mmac_test PRIVATE strata_prefill)
+    endif()
     if(STRATA_NATIVE_EXPERTS)
       # the trellis experts (device kernels ds4_tq.cu, CPU lane ds4_tq_cpu.cpp) against a double reference; needs a GPU, no model
       # both test .cpp files launch kernels, so they compile as HIP on the AMD backend and as CUDA on the NVIDIA one

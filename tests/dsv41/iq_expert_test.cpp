@@ -517,7 +517,9 @@ int main(int argc, char** argv) {
             // ---- the matrix-core tiles (HIP gfx11 / gfx12) forced on, against the scalar tiles forced on the same inputs: each within the
             // tolerances above of the CPU reference, the two within the same tolerance of each other, and the forced-on run must really
             // have launched them (STRATA_DS4_HIPK is not needed)
-            if (iq::hipk_force(1)) {
+            const bool mmac928 = std::getenv("STRATA_DS4_MMAC928") != nullptr &&
+                                 std::strcmp(std::getenv("STRATA_DS4_MMAC928"), "1") == 0;
+            if (!mmac928 && iq::hipk_force(1)) {
                 const long long n0 = iq::hipk_launches();
                 iq::SetArgs qm = q;
                 uint16_t* mh; CK(hipMalloc(&mh, (size_t) NR * FF * 2)); float* my; CK(hipMalloc(&my, (size_t) NR * E * 4));
