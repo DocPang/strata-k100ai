@@ -1340,7 +1340,9 @@ struct Model::Impl {
     // compressor), 7 compressor + indexer, 8 q_b + rope, 9 sparse attention, 10 ffn mHC + router + sort.  Decode uses
     // 6..16 for the same parts of attention, with 12..16 splitting q_b, sparse attention and the output path. 17..22
     // split decode's routing and shared expert, and 23..25 split the expert tail, allreduce and hc_post.
-    double cprof_ms[23] = {};
+    // Chunked prompts use 23 for q/kv preparation plus compression, 24 for the
+    // indexer's dense projections, and 26/27 for scoring/top-k respectively.
+    double cprof_ms[28] = {};
     // DS4_PROF: the experts' kernels alone, by type (events around the gate/up and down calls of run_set)
     struct EkMark {
         cudaEvent_t e0, e1, e2;
@@ -8194,6 +8196,7 @@ struct Model::Impl {
                 }
             }
             const int clen_max = (int) ((p0 + T) / R);
+            prof_mark(d, 23);
             if (l.ix_src) {
                 Src& ks = srcs[(size_t) l.ik_src];
                 if (l.owns_k && ng > 0) {
@@ -8228,6 +8231,7 @@ struct Model::Impl {
                         fi.freqs = freqs;
                         fi.quant = 3;
                         finish(c.iq, na * g.ix_heads, g.ix_hd, g.ix_hd, fi, s);
+                        prof_mark(d, 24);
                         Rows lim;
                         lim.gen = 1;
                         lim.p0 = pa;
@@ -8245,12 +8249,14 @@ struct Model::Impl {
                             cl.gen = 2;
                             index_score(c.iq, iw, ks.ik[(size_t) l.dev], g.ix_heads, g.ix_hd, na, g.cand_topk * g.cand_blk,
                                         cd, (int) cand_stride(), g.cand_blk, cl, c.scores, ss, s);
+                            prof_mark(d, 26);
                             Rows tr = lim;
                             tr.gen = 3;
                             topk(c.scores, ss, na, tr, cd, (int) cand_stride(), g.cand_blk, tk, (int) topk_stride(), s);
                         } else {
                             index_score(c.iq, iw, ks.ik[(size_t) l.dev], g.ix_heads, g.ix_hd, na, nlast, nullptr, 0, 1,
                                         lim, c.scores, ss, s);
+                            prof_mark(d, 26);
                             if (l.cand_src) {
                                 Rows cr = lim;
                                 cr.kcap = g.cand_topk;
@@ -8259,6 +8265,7 @@ struct Model::Impl {
                             }
                             topk(c.scores, ss, na, lim, nullptr, 0, 1, tk, (int) topk_stride(), s);
                         }
+                        prof_mark(d, 27);
                     }
                 }
             }
@@ -8296,6 +8303,7 @@ struct Model::Impl {
             ckv = sr.ckv[(size_t) l.dev];
         }
         if (kv_only) return true;
+        prof_mark(d, 23);
         prof_mark(d, 7);
         // the attention in slabs: q, the sparse attention, wo_a, wo_b (this member's share) into acc
         if (NHL == 0) CK(cudaMemsetAsync(c.acc, 0, (size_t) T * D * sizeof(*c.acc), s));   // (no heads)
@@ -9444,13 +9452,26 @@ struct Model::Impl {
                          "(with the waits for streamed ones), between layers %.0f ms\n",
                          n, cprof_ms[1], cprof_ms[2], cprof_ms[3], cprof_ms[0]);
             {   // the finer table (ms, % of the sum)
-                static const char* nm_[16] = {"between layers", "attn rest (q_b, wo_a/b, hc_post)", "shared expert", "experts (incl waits)",
+                static const char* nm_[28] = {"between layers", "attn rest (q_b, wo_a/b, hc_post)", "shared expert", "experts (incl waits)",
                                               "engram", "attn mHC (mix/split/norm)", "attn projections", "compressor + indexer",
-                                              "q_b + rope", "sparse attention", "ffn mHC + router + sort", "", "", "", "", ""};
+                                              "q_b + rope", "sparse attention", "ffn mHC + router + sort", "", "", "", "", "",
+                                              "", "", "", "", "", "", "", "q/kv + compressor", "indexer projections", "",
+                                              "indexer scoring", "indexer top-k"};
                 double sum = 0;
                 for (double v : cprof_ms) sum += v;
-                for (int i = 0; i < 11; ++i)
-                    std::fprintf(stderr, "ds4 prof  %-34s %9.1f ms %5.1f%%\n", nm_[i], cprof_ms[i], sum > 0 ? 100.0 * cprof_ms[i] / sum : 0.0);
+                for (int i = 0; i < 11; ++i) {
+                    if (i == 7) {
+                        const double total = cprof_ms[26] + cprof_ms[27];
+                        std::fprintf(stderr, "ds4 prof  %-34s %9.1f ms %5.1f%%\n", nm_[i], total,
+                                     sum > 0 ? 100.0 * total / sum : 0.0);
+                    } else {
+                        std::fprintf(stderr, "ds4 prof  %-34s %9.1f ms %5.1f%%\n", nm_[i], cprof_ms[i],
+                                     sum > 0 ? 100.0 * cprof_ms[i] / sum : 0.0);
+                    }
+                }
+                for (const int i : {23, 24, 26, 27})
+                    std::fprintf(stderr, "ds4 prof  %-34s %9.1f ms %5.1f%%\n", nm_[i], cprof_ms[i],
+                                 sum > 0 ? 100.0 * cprof_ms[i] / sum : 0.0);
                 struct Agg {
                     double ms = 0, flops = 0;
                     long calls = 0, rows = 0, experts = 0;

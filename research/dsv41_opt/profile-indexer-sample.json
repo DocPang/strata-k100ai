@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "rows": [
+    {
+      "name": "mixed-32k",
+      "kind": "mixed",
+      "target_tokens": 32768,
+      "raw_prompt_tokens": 32767,
+      "prompt_sha256": "e20d0ecf11a690acf54b922664420cf61bddffe975421f7a90847e31f4a6d69b",
+      "external_ttft_s": 38.63357979245484,
+      "total_s": 38.634619121439755,
+      "stream_chunks": 3,
+      "finish_reason": "length",
+      "usage": {
+        "prompt_tokens": 32812,
+        "completion_tokens": 1,
+        "total_tokens": 32813,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "cached_tokens": 0,
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 32812,
+        "prompt_ms": 38554.5,
+        "prompt_per_token_ms": 1.175,
+        "prompt_per_second": 851.1,
+        "predicted_n": 1,
+        "predicted_ms": 1.6,
+        "predicted_per_token_ms": 1.6,
+        "predicted_per_second": 625.0,
+        "draft_n": 0,
+        "draft_n_accepted": 0,
+        "at": 1793803105
+      },
+      "status": {
+        "cache_max_tokens": 1048576,
+        "model": "deepseek-v4.1-flash",
+        "engine": "ds4-0.1",
+        "last_timings": {
+          "cache_n": 0,
+          "prompt_n": 32812,
+          "prompt_ms": 38554.5,
+          "prompt_per_token_ms": 1.175,
+          "prompt_per_second": 851.1,
+          "predicted_n": 1,
+          "predicted_ms": 1.6,
+          "predicted_per_token_ms": 1.6,
+          "predicted_per_second": 625.0,
+          "draft_n": 0,
+          "draft_n_accepted": 0,
+          "at": 1793803105
+        }
+      },
+      "iteration": 0,
+      "health": {
+        "status": "ok",
+        "max_context": 1048576,
+        "model": "deepseek-v4.1-flash",
+        "images": false,
+        "api_key": false,
+        "image_generation": false,
+        "loaded": true,
+        "service": "strata"
+      }
+    }
+  ],
+  "summary": [
+    {
+      "name": "mixed-32k",
+      "repeats": 1,
+      "prompt_tokens_median": 32812,
+      "cached_tokens_max": 0,
+      "prompt_ms_median": 38554.5,
+      "prompt_tokens_s_median": 851.0550000648433,
+      "decode_tokens_s_median": 625.0,
+      "external_ttft_s_median": 38.63357979245484,
+      "external_ttft_s_p95": 38.63357979245484,
+      "total_s_median": 38.634619121439755
+    }
+  ]
+}

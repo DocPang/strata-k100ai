@@ -1,0 +1,219 @@
+kv pack: compressed KV (FP4 + E4M3 / 16)     ok    16385 rows x 512, 0 of 8389120 values differ (first at 0), 288 B a row vs 1024
+kv pack: index keys (FP4 + 2^k / 32)         ok    16385 rows x 128, 0 of 2097280 values differ (first at 0), 80 B a row vs 256
+kv pack: finish leaves its input             ok    33556480 bytes identical
+kv pack: window ring (FP8 + 2^k / 32)        ok    4194304 values, 0 differ through the ring, 0 from the finish's packing; 528 B a row vs 1024
+kv pack: window ring rollback                ok    67584 bytes identical
+kv pack: sparse attention, 1 query           ok    identical every way; BF16 rows 138.0 us a call, packed 139.7 (decoded once a query 139.8, staged 222.0)
+kv pack: sparse attention, 2 queries         ok    identical every way; BF16 rows 155.5 us a call, packed 155.9 (decoded once a query 155.9, staged 289.6)
+kv pack: sparse attention, 4 queries         ok    identical every way; BF16 rows 183.2 us a call, packed 176.3 (decoded once a query 190.3, staged 351.8)
+kv pack: sparse attention, 8 queries         ok    identical every way; BF16 rows 263.0 us a call, packed 346.2 (decoded once a query 238.1, staged 346.3)
+kv pack: sparse attention, 16 queries        ok    identical every way; BF16 rows 396.4 us a call, packed 401.8 (decoded once a query 346.2, staged 400.9)
+kv pack: sparse attention, a chunk slab of 16 ok    identical every way; BF16 rows 629.0 us a call, packed 591.7 (decoded once a query 566.0, staged 591.6)
+kv pack: sparse attention, a chunk slab of 256 ok    identical every way; BF16 rows 8932.2 us a call, packed 4761.3 (decoded once a query 4754.8, staged 4757.9)
+kv pack: index scores                        ok    2105472 bytes identical
+kv pack: index score accuracy                      CPU worst 1.091e-06 relative, 1.062e+00 absolute (MMAC928)
+kv pack: index score accuracy detail               correlation 1.000000, norms got 1.65927e+06 ref 1.65927e+06
+kv pack: index score time                          BF16 keys 284.6 us a call, packed 235.2 us
+mv BF16, 1 activations                       ok    max rel err 2.15e-07 (at 252: -1.09875 vs -1.09875)
+mv BF16, 1 activations, unaligned            ok    max rel err 1.31e-07 (at 66: -0.486342 vs -0.486343)
+mv BF16, 3 activations                       ok    max rel err 1.87e-07 (at 1176: -0.023795 vs -0.0237952)
+  ... one activation alone, bit for bit      ok
+mv BF16, 3 activations, unaligned            ok    max rel err 1.52e-07 (at 1548: -0.425989 vs -0.425989)
+  ... one activation alone, bit for bit      ok
+mv BF16, 16 activations                      ok    max rel err 1.42e-07 (at 3581: 0.792777 vs 0.792777)
+  ... one activation alone, bit for bit      ok
+mv BF16, 16 activations, unaligned           ok    max rel err 1.91e-07 (at 4253: 1.08841 vs 1.08841)
+  ... one activation alone, bit for bit      ok
+mv MXFP4, 1 activations                      ok    max rel err 1.63e-07 (at 8: -6.74078 vs -6.74078)
+mv MXFP4, 1 activations, unaligned           ok    max rel err 1.19e-07 (at 87: 1.83211 vs 1.83211)
+mv MXFP4, 3 activations                      ok    max rel err 1.52e-07 (at 1119: -3.58585 vs -3.58585)
+  ... one activation alone, bit for bit      ok
+mv MXFP4, 3 activations, unaligned           ok    max rel err 1.35e-07 (at 1238: -2.71644 vs -2.71644)
+  ... one activation alone, bit for bit      ok
+mv MXFP4, 16 activations                     ok    max rel err 1.49e-07 (at 986: -2.55069 vs -2.55069)
+  ... one activation alone, bit for bit      ok
+mv MXFP4, 16 activations, unaligned          ok    max rel err 1.71e-07 (at 674: -8.41993 vs -8.41993)
+  ... one activation alone, bit for bit      ok
+mv Q8_0, 1 activations                       ok    max rel err 6.86e-08 (at 85: -2.22802 vs -2.22802)
+mv Q8_0, 1 activations, unaligned            ok    max rel err 1.29e-07 (at 102: -3.70133 vs -3.70133)
+mv Q8_0, 3 activations                       ok    max rel err 9.63e-08 (at 965: 3.1742 vs 3.17419)
+  ... one activation alone, bit for bit      ok
+mv Q8_0, 3 activations, unaligned            ok    max rel err 6.63e-08 (at 326: -3.39036 vs -3.39036)
+  ... one activation alone, bit for bit      ok
+mv Q8_0, 16 activations                      ok    max rel err 1.12e-07 (at 7655: 4.03665 vs 4.03665)
+  ... one activation alone, bit for bit      ok
+mv Q8_0, 16 activations, unaligned           ok    max rel err 1.37e-07 (at 5386: 4.78025 vs 4.78025)
+  ... one activation alone, bit for bit      ok
+rows BF16 -> F16 (a view)                    ok    max rel err 0.00e+00 (at 0: -0.597656 vs -0.597656)
+rows Q8_0 -> F16 (a view)                    ok    max rel err 3.18e-04 (at 228: -0.250977 vs -0.251099)
+Engram Q6_K rows = ggml's, bit for bit       ok
+token experts (D 512, F 256)                 ok    max rel err 1.23e-07 (at 1788: -87.601 vs -87.601)
+window experts (T 5)                         ok    max rel err 1.23e-07 (at 1788: -87.601 vs -87.601)
+  ... bit for bit the token path's           ok
+set gate/up (F16 h), 100 rows, 100 light     ok    max rel err 3.10e-04 (at 8812: -81.375 vs -81.406)
+set down, 100 rows, 100 light                ok    max rel err 1.20e-07 (at 28494: 402.153 vs 402.153)
+set gate/up (F16 h), 200 rows, 62 light      ok    max rel err 3.11e-04 (at 19344: 73.375 vs 73.3439)
+set down, 200 rows, 62 light                 ok    max rel err 4.32e-07 (at 96551: 393.434 vs 393.434)
+set gate/up (F16 h), 400 rows, 0 light       ok    max rel err 3.12e-04 (at 20897: 79.5625 vs 79.5937)
+set down, 400 rows, 0 light                  ok    max rel err 3.38e-07 (at 87549: -308.044 vs -308.044)
+CPU lane rows                                ok    max rel err 1.72e-07 (at 77: 4.07345 vs 4.07344)
+CPU int8 quant (gate's k)                    ok    vector = scalar = bands = q8_round
+CPU int8 rows gate scalar n=1                ok    max rel err 5.42e-08 (at 58: -5.22247 vs -5.22247)
+CPU int8 rows gate scalar n=2                ok    max rel err 6.35e-08 (at 88: 7.09377 vs 7.09377)
+CPU int8 rows gate scalar n=3                ok    max rel err 9.41e-08 (at 143: 12.8125 vs 12.8125)
+CPU int8 rows gate scalar n=8                ok    max rel err 1.00e-07 (at 450: -11.5707 vs -11.5707)
+CPU int8 rows gate scalar n=9                ok    max rel err 9.48e-08 (at 450: -11.5707 vs -11.5707)
+CPU int8 rows gate avx2 n=1                  ok    max rel err 5.42e-08 (at 58: -5.22247 vs -5.22247)
+  CPU int8 rows gate avx2 n=1                ok    bit-identical to the scalar tier
+CPU int8 rows gate avx2 n=2                  ok    max rel err 6.35e-08 (at 88: 7.09377 vs 7.09377)
+  CPU int8 rows gate avx2 n=2                ok    bit-identical to the scalar tier
+CPU int8 rows gate avx2 n=3                  ok    max rel err 9.41e-08 (at 143: 12.8125 vs 12.8125)
+  CPU int8 rows gate avx2 n=3                ok    bit-identical to the scalar tier
+CPU int8 rows gate avx2 n=8                  ok    max rel err 1.00e-07 (at 450: -11.5707 vs -11.5707)
+  CPU int8 rows gate avx2 n=8                ok    bit-identical to the scalar tier
+CPU int8 rows gate avx2 n=9                  ok    max rel err 9.48e-08 (at 450: -11.5707 vs -11.5707)
+  CPU int8 rows gate avx2 n=9                ok    bit-identical to the scalar tier
+CPU int8 quant (down's k)                    ok    vector = scalar = bands = q8_round
+CPU int8 rows down scalar n=1                ok    max rel err 4.49e-08 (at 2: 0.538526 vs 0.538526)
+CPU int8 rows down scalar n=2                ok    max rel err 5.27e-08 (at 81: -0.0197206 vs -0.0197206)
+CPU int8 rows down scalar n=3                ok    max rel err 5.27e-08 (at 81: -0.0197206 vs -0.0197206)
+CPU int8 rows down scalar n=8                ok    max rel err 6.32e-08 (at 411: 0.428861 vs 0.428861)
+CPU int8 rows down scalar n=9                ok    max rel err 6.08e-08 (at 411: 0.428861 vs 0.428861)
+CPU int8 rows down avx2 n=1                  ok    max rel err 4.49e-08 (at 2: 0.538526 vs 0.538526)
+  CPU int8 rows down avx2 n=1                ok    bit-identical to the scalar tier
+CPU int8 rows down avx2 n=2                  ok    max rel err 5.27e-08 (at 81: -0.0197206 vs -0.0197206)
+  CPU int8 rows down avx2 n=2                ok    bit-identical to the scalar tier
+CPU int8 rows down avx2 n=3                  ok    max rel err 5.27e-08 (at 81: -0.0197206 vs -0.0197206)
+  CPU int8 rows down avx2 n=3                ok    bit-identical to the scalar tier
+CPU int8 rows down avx2 n=8                  ok    max rel err 6.32e-08 (at 411: 0.428861 vs 0.428861)
+  CPU int8 rows down avx2 n=8                ok    bit-identical to the scalar tier
+CPU int8 rows down avx2 n=9                  ok    max rel err 6.08e-08 (at 411: 0.428861 vs 0.428861)
+  CPU int8 rows down avx2 n=9                ok    bit-identical to the scalar tier
+CPU int8 rows: this CPU's tier avx2
+mv IQ2_XXS, 1 activations                    ok    max rel err 1.13e-07 (at 69: -0.708912 vs -0.708912)
+mv IQ2_XXS, 3 activations                    ok    max rel err 1.06e-07 (at 114: 2.54894 vs 2.54894)
+mv IQ2_XXS, 16 activations                   ok    max rel err 1.06e-07 (at 561: 1.62735 vs 1.62735)
+mv IQ2_S, 1 activations                      ok    max rel err 1.05e-07 (at 96: 2.1742 vs 2.1742)
+mv IQ2_S, 3 activations                      ok    max rel err 9.36e-08 (at 270: 0.927773 vs 0.927773)
+mv IQ2_S, 16 activations                     ok    max rel err 1.13e-07 (at 1630: -2.7687 vs -2.7687)
+mv IQ3_XXS, 1 activations                    ok    max rel err 8.65e-08 (at 20: -2.11726 vs -2.11726)
+mv IQ3_XXS, 3 activations                    ok    max rel err 9.08e-08 (at 88: -5.09287 vs -5.09287)
+mv IQ3_XXS, 16 activations                   ok    max rel err 6.73e-08 (at 358: -6.24706 vs -6.24706)
+mv IQ3_S, 1 activations                      ok    max rel err 1.34e-07 (at 72: -7.12782 vs -7.12782)
+mv IQ3_S, 3 activations                      ok    max rel err 9.43e-08 (at 386: 5.82046 vs 5.82046)
+mv IQ3_S, 16 activations                     ok    max rel err 7.96e-08 (at 2002: 6.70395 vs 6.70395)
+mv IQ4_XS, 1 activations                     ok    max rel err 1.09e-07 (at 88: 7.71838 vs 7.71838)
+mv IQ4_XS, 3 activations                     ok    max rel err 1.30e-07 (at 41: -71.5479 vs -71.5478)
+mv IQ4_XS, 16 activations                    ok    max rel err 9.14e-08 (at 633: 73.2334 vs 73.2334)
+mv Q2_K, 1 activations                       ok    max rel err 9.30e-08 (at 36: -0.745817 vs -0.745817)
+mv Q2_K, 3 activations                       ok    max rel err 8.47e-08 (at 312: -0.608751 vs -0.608751)
+mv Q2_K, 16 activations                      ok    max rel err 9.08e-08 (at 491: -0.611676 vs -0.611676)
+mv Q3_K, 1 activations                       ok    max rel err 8.74e-08 (at 14: -0.443773 vs -0.443774)
+mv Q3_K, 3 activations                       ok    max rel err 7.90e-08 (at 3: -1.44397 vs -1.44397)
+mv Q3_K, 16 activations                      ok    max rel err 1.04e-07 (at 1863: 2.38446 vs 2.38446)
+mv Q4_K, 1 activations                       ok    max rel err 1.02e-07 (at 67: -5.02643 vs -5.02642)
+mv Q4_K, 3 activations                       ok    max rel err 8.68e-08 (at 325: -2.74781 vs -2.74781)
+mv Q4_K, 16 activations                      ok    max rel err 1.04e-07 (at 877: -16.6893 vs -16.6893)
+mv Q5_K, 1 activations                       ok    max rel err 5.14e-09 (at 128: -636434 vs -636434)
+mv Q5_K, 3 activations                       ok    max rel err 1.86e-12 (at 407: 301.913 vs 301.912)
+mv Q5_K, 16 activations                      ok    max rel err 3.53e-08 (at 2175: -1.31925e+07 vs -1.31925e+07)
+IQ2_XXS/IQ3_XXS token experts (D 512, F 256) ok    max rel err 1.74e-07 (at 1611: -5.68863 vs -5.68863)
+  window experts (T 4)                       ok    max rel err 1.74e-07 (at 1611: -5.68863 vs -5.68863)
+  ... bit for bit the token path's           ok
+  set gate/up (F16 h), 90 rows, 90 light     ok    max rel err 2.34e-04 (at 21466: 16.1719 vs 16.1665)
+  set down, 90 rows, 90 light                ok    max rel err 1.12e-07 (at 18451: -46.6741 vs -46.6741)
+  set gate/up (F16 h), 200 rows, 38 light    ok    max rel err 3.61e-04 (at 45512: 17.4062 vs 17.3985)
+  set down, 200 rows, 38 light               ok    max rel err 7.57e-07 (at 98416: 33.3508 vs 33.3508)
+  set gate/up (F16 h), 400 rows, 0 light     ok    max rel err 2.43e-04 (at 64284: 19.4375 vs 19.4317)
+  set down, 400 rows, 0 light                ok    max rel err 5.30e-07 (at 123782: -44.0035 vs -44.0035)
+  CPU lane gate/up (Q8_K)                    ok    max rel err 9.95e-08 (at 393: 8.50689 vs 8.50689)
+  CPU lane down (Q8_K)                       ok    max rel err 7.57e-08 (at 717: -18.7336 vs -18.7336)
+IQ2_S/IQ3_S token experts (D 512, F 256)     ok    max rel err 1.84e-07 (at 1985: -4.75551 vs -4.75551)
+  window experts (T 4)                       ok    max rel err 1.84e-07 (at 1985: -4.75551 vs -4.75551)
+  ... bit for bit the token path's           ok
+  set gate/up (F16 h), 90 rows, 90 light     ok    max rel err 2.27e-04 (at 18999: 18.1719 vs 18.1656)
+  set down, 90 rows, 90 light                ok    max rel err 8.28e-08 (at 42290: -36.3465 vs -36.3465)
+  set gate/up (F16 h), 200 rows, 46 light    ok    max rel err 2.42e-04 (at 49261: -18.9844 vs -18.9913)
+  set down, 200 rows, 46 light               ok    max rel err 7.55e-07 (at 42495: 36.3221 vs 36.3221)
+  set gate/up (F16 h), 400 rows, 0 light     ok    max rel err 2.53e-04 (at 44542: 17.0625 vs 17.0558)
+  set down, 400 rows, 0 light                ok    max rel err 5.00e-07 (at 78549: 37.5339 vs 37.5339)
+  CPU lane gate/up (Q8_K)                    ok    max rel err 1.13e-07 (at 85: -7.50584 vs -7.50584)
+  CPU lane down (Q8_K)                       ok    max rel err 6.68e-08 (at 379: -28.4517 vs -28.4518)
+IQ3_XXS/IQ3_S token experts (D 512, F 256)   ok    max rel err 1.53e-07 (at 209: -0.746134 vs -0.746122)
+  window experts (T 4)                       ok    max rel err 1.53e-07 (at 209: -0.746134 vs -0.746122)
+  ... bit for bit the token path's           ok
+  set gate/up (F16 h), 90 rows, 90 light     ok    max rel err 3.07e-04 (at 10192: -64.5625 vs -64.5932)
+  set down, 90 rows, 90 light                ok    max rel err 1.03e-07 (at 26074: -270.131 vs -270.131)
+  set gate/up (F16 h), 200 rows, 16 light    ok    max rel err 3.11e-04 (at 34804: 67.8125 vs 67.7816)
+  set down, 200 rows, 16 light               ok    max rel err 5.03e-07 (at 44293: 151.647 vs 151.647)
+  set gate/up (F16 h), 400 rows, 0 light     ok    max rel err 3.10e-04 (at 98501: 71.5 vs 71.469)
+  set down, 400 rows, 0 light                ok    max rel err 4.46e-07 (at 66150: 212.179 vs 212.179)
+  CPU lane gate/up (Q8_K)                    ok    max rel err 1.16e-07 (at 464: 52.2347 vs 52.2347)
+  CPU lane down (Q8_K)                       ok    max rel err 6.21e-08 (at 1166: 171.633 vs 171.633)
+IQ4_XS/Q4_K token experts (D 512, F 256)     ok    max rel err 1.32e-07 (at 280: -444.983 vs -444.983)
+  window experts (T 4)                       ok    max rel err 1.32e-07 (at 280: -444.983 vs -444.983)
+  ... bit for bit the token path's           ok
+  set gate/up (F16 h), 90 rows, 90 light     ok    max rel err 3.12e-04 (at 11073: -67.25 vs -67.2812)
+  set down, 90 rows, 90 light                ok    max rel err 1.04e-07 (at 18322: 3304.63 vs 3304.63)
+  set gate/up (F16 h), 200 rows, 14 light    ok    max rel err 3.12e-04 (at 38414: 76.9375 vs 76.9687)
+  set down, 200 rows, 14 light               ok    max rel err 4.95e-07 (at 25334: -3216.7 vs -3216.7)
+  set gate/up (F16 h), 400 rows, 0 light     ok    max rel err 3.15e-04 (at 25239: 71.5625 vs 71.531)
+  set down, 400 rows, 0 light                ok    max rel err 4.92e-07 (at 139114: -2879.55 vs -2879.54)
+  CPU lane gate/up (Q8_K)                    ok    max rel err 6.90e-07 (at 670: -61.1155 vs -61.1155)
+  CPU lane down (Q8_K)                       ok    max rel err 1.64e-07 (at 507: 2578.09 vs 2578.09)
+Q2_K/Q3_K token experts (D 512, F 256)       ok    max rel err 9.31e-08 (at 1537: 0.160321 vs 0.160321)
+  window experts (T 4)                       ok    max rel err 9.31e-08 (at 1537: 0.160321 vs 0.160321)
+  ... bit for bit the token path's           ok
+  set gate/up (F16 h), 90 rows, 90 light     ok    max rel err 2.24e-04 (at 5228: 1.09375 vs 1.09329)
+  set down, 90 rows, 90 light                ok    max rel err 7.66e-08 (at 10290: 1.69172 vs 1.69172)
+  set gate/up (F16 h), 200 rows, 43 light    ok    max rel err 3.07e-04 (at 33387: 1.00977 vs 1.00928)
+  set down, 200 rows, 43 light               ok    max rel err 4.32e-07 (at 66990: 1.07412 vs 1.07412)
+  set gate/up (F16 h), 400 rows, 0 light     ok    max rel err 3.03e-04 (at 1710: 1.03027 vs 1.03074)
+  set down, 400 rows, 0 light                ok    max rel err 4.19e-07 (at 132254: -1.00166 vs -1.00166)
+  CPU lane gate/up (Q8_K)                    ok    max rel err 1.28e-07 (at 131: -0.373423 vs -0.373423)
+  CPU lane down (Q8_K)                       ok    max rel err 6.44e-08 (at 57: 0.283108 vs 0.283108)
+Q4_K/IQ4_XS token experts (D 512, F 256)     ok    max rel err 8.91e-08 (at 601: 1454.06 vs 1454.06)
+  window experts (T 4)                       ok    max rel err 8.91e-08 (at 601: 1454.06 vs 1454.06)
+  ... bit for bit the token path's           ok
+  set gate/up (F16 h), 90 rows, 73 light     ok    max rel err 3.13e-04 (at 7424: -82.9375 vs -82.9062)
+  set down, 90 rows, 73 light                ok    max rel err 3.02e-07 (at 19114: 7676.2 vs 7676.21)
+  set gate/up (F16 h), 200 rows, 41 light    ok    max rel err 3.12e-04 (at 23960: 99.375 vs 99.3438)
+  set down, 200 rows, 41 light               ok    max rel err 5.11e-07 (at 18045: -9384.83 vs -9384.84)
+  set gate/up (F16 h), 400 rows, 0 light     ok    max rel err 3.13e-04 (at 34160: -81.1875 vs -81.1562)
+  set down, 400 rows, 0 light                ok    max rel err 7.23e-07 (at 141305: 9929 vs 9929.02)
+  CPU lane gate/up (Q8_K)                    ok    max rel err 2.12e-07 (at 481: 99.3682 vs 99.3682)
+  CPU lane down (Q8_K)                       ok    max rel err 4.44e-08 (at 970: -3336.83 vs -3336.83)
+Q3_K/Q2_K token experts (D 512, F 256)       ok    max rel err 2.05e-07 (at 121: -0.330132 vs -0.330132)
+  window experts (T 4)                       ok    max rel err 2.05e-07 (at 121: -0.330132 vs -0.330132)
+  ... bit for bit the token path's           ok
+  set gate/up (F16 h), 90 rows, 90 light     ok    max rel err 2.91e-04 (at 9755: -8.33594 vs -8.33978)
+  set down, 90 rows, 90 light                ok    max rel err 7.86e-08 (at 36138: 2.02913 vs 2.02913)
+  set gate/up (F16 h), 200 rows, 28 light    ok    max rel err 2.80e-04 (at 40660: -9.92188 vs -9.91805)
+  set down, 200 rows, 28 light               ok    max rel err 7.18e-07 (at 62010: -1.8476 vs -1.84759)
+  set gate/up (F16 h), 400 rows, 0 light     ok    max rel err 2.68e-04 (at 79709: 8.30469 vs 8.30081)
+  set down, 400 rows, 0 light                ok    max rel err 7.00e-07 (at 184831: 1.8654 vs 1.8654)
+  CPU lane gate/up (Q8_K)                    ok    max rel err 9.57e-08 (at 473: -3.01604 vs -3.01604)
+  CPU lane down (Q8_K)                       ok    max rel err 8.10e-08 (at 1270: -0.423005 vs -0.423005)
+IQ3_S/IQ2_XXS token experts (D 512, F 256)   ok    max rel err 1.45e-07 (at 1709: -18.3238 vs -18.3238)
+  window experts (T 4)                       ok    max rel err 1.45e-07 (at 1709: -18.3238 vs -18.3238)
+  ... bit for bit the token path's           ok
+  set gate/up (F16 h), 90 rows, 90 light     ok    max rel err 3.07e-04 (at 1213: 69.9375 vs 69.9682)
+  set down, 90 rows, 90 light                ok    max rel err 7.80e-08 (at 31502: -38.897 vs -38.897)
+  set gate/up (F16 h), 200 rows, 8 light     ok    max rel err 3.10e-04 (at 6561: 65.6875 vs 65.6565)
+  set down, 200 rows, 8 light                ok    max rel err 4.56e-07 (at 19140: 82.4059 vs 82.406)
+  set gate/up (F16 h), 400 rows, 0 light     ok    max rel err 3.12e-04 (at 63752: -65.8125 vs -65.7813)
+  set down, 400 rows, 0 light                ok    max rel err 6.12e-07 (at 145049: 55.7831 vs 55.7832)
+  CPU lane gate/up (Q8_K)                    ok    max rel err 6.74e-08 (at 176: -32.4891 vs -32.4891)
+  CPU lane down (Q8_K)                       ok    max rel err 9.87e-08 (at 1485: 69.2872 vs 69.2872)
+IQ3_S/IQ2_S token experts (D 512, F 256)     ok    max rel err 2.01e-07 (at 27: 25.8705 vs 25.8705)
+  window experts (T 4)                       ok    max rel err 2.01e-07 (at 27: 25.8705 vs 25.8705)
+  ... bit for bit the token path's           ok
+  set gate/up (F16 h), 90 rows, 90 light     ok    max rel err 3.11e-04 (at 14284: 68.125 vs 68.0939)
+  set down, 90 rows, 90 light                ok    max rel err 1.01e-07 (at 43726: 53.4643 vs 53.4643)
+  set gate/up (F16 h), 200 rows, 24 light    ok    max rel err 3.10e-04 (at 18120: -90.5 vs -90.469)
+  set down, 200 rows, 24 light               ok    max rel err 7.11e-07 (at 60299: 76.3699 vs 76.3699)
+  set gate/up (F16 h), 400 rows, 0 light     ok    max rel err 3.12e-04 (at 93339: -72 vs -71.9688)
+  set down, 400 rows, 0 light                ok    max rel err 4.83e-07 (at 168531: 74.1229 vs 74.1228)
+  CPU lane gate/up (Q8_K)                    ok    max rel err 5.54e-08 (at 487: -13.6347 vs -13.6347)
+  CPU lane down (Q8_K)                       ok    max rel err 1.06e-07 (at 794: 71.6108 vs 71.6108)
+ALL OK (0 failed)

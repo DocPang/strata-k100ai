@@ -14,7 +14,6 @@ typedef float floatx4 __attribute__((ext_vector_type(4)));
 
 constexpr int QT = 16;
 constexpr int KB = 64;
-constexpr int LD = 136;
 
 __device__ __forceinline__ uint16_t bf16_bits(float v) {
     uint32_t u = __float_as_uint(v);
@@ -52,7 +51,7 @@ __device__ __forceinline__ void load_key8(const uint8_t* __restrict__ k, int row
 // One CTA is four waves: 16 queries x 64 compressed keys.  A wave owns one
 // 16-key tile; the 32 heads are reduced in register order, so two executions
 // with the same inputs write the same F32 bits.
-template <int KF>
+template <int KF, int LD>
 __global__ void __launch_bounds__(256) score_kernel(
     const float* __restrict__ q, const float* __restrict__ hw, const uint8_t* __restrict__ k,
     int T, int n, Rows lim, float* __restrict__ out, long long out_stride) {
@@ -166,7 +165,14 @@ inline bool launch(const float* q, const float* w, const uint8_t* k, int heads, 
                    cudaStream_t s) {
     if (!enabled() || !device_ok() || heads != 32 || n <= 0 || cand != nullptr) return false;
     const dim3 grid((unsigned) ((n + KB - 1) / KB), (unsigned) ((T + QT - 1) / QT));
-    score_kernel<KF><<<grid, 256, 0, s>>>(q, w, k, T, n, lim, out, out_stride);
+    static const int ld = [] {
+        const char* value = std::getenv("STRATA_DS4_QSA_MMAC928_LD");
+        return value != nullptr ? std::atoi(value) : 136;
+    }();
+    if (ld == 132)
+        score_kernel<KF, 132><<<grid, 256, 0, s>>>(q, w, k, T, n, lim, out, out_stride);
+    else
+        score_kernel<KF, 136><<<grid, 256, 0, s>>>(q, w, k, T, n, lim, out, out_stride);
     return cudaPeekAtLastError() == cudaSuccess;
 }
 

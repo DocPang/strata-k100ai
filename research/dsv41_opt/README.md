@@ -91,3 +91,12 @@ INT8 392 TOPS。直读/写/拷贝探针仍用于测实际可持续上限，不�
 4,995 位置 teacher-forced PPL、固定 API 任务和全部相关算子测试均通过。
 完整数据、profile、质量门和已知边界见
 [`round-002-final.md`](round-002-final.md)。
+
+## 第三轮结果
+
+32K profile 已把 compressor/indexer 拆成 q/kv、dense projection、scoring 和
+top-k；scoring 占该组合约 78%。packed-key shared stride 从 136 调到 132 后，
+32-query packed 微基准三次中位从 `243.5 µs` 降到 `235.7 µs`，32K 冷启动整模型
+三次中位从 `38.3522 s` 降到 `38.3307 s`。这是 exact layout 优化，收益较小且
+只对 32K 做了整模型 A/B。完整实验、失败路径和复现信息见
+[`round-003-indexer.md`](round-003-indexer.md)。

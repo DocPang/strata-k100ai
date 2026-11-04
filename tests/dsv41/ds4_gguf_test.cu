@@ -1784,9 +1784,10 @@ void test_kv_pack(cudaStream_t s) {
         CU(cudaFree(scr.rows));
     }
 
-    // the indexer's scores over every key (32 heads), BF16 vs packed keys
+    // the indexer's scores over every key (32 heads), BF16 vs packed keys.
+    // T=32 matches the chunk path's 32-query indexer slab.
     {
-        const int T = 4, NH = 32;
+        const int T = 32, NH = 32;
         std::vector<float> q((size_t) T * NH * IX), w((size_t) T * 64);
         for (float& v : q) v = frand(1.0f);
         for (float& v : w) v = frand(0.3f);
@@ -1797,10 +1798,10 @@ void test_kv_pack(cudaStream_t s) {
         CU(cudaMemset(o1, 0, (size_t) T * ss * 4));
         CU(cudaMemset(o2, 0, (size_t) T * ss * 4));
         dk::Rows lim;
-        for (int t = 0; t < T; ++t) {
-            lim.n[t] = NC - 3 * t;
-            lim.k[t] = 512;
-        }
+        lim.gen = 1;
+        lim.R = 1;
+        lim.p0 = NC - T;
+        lim.kcap = 512;
         dk::index_score(d_q, d_w, i16, NH, IX, T, NC, nullptr, 0, 1, lim, o1, ss, s, dk::kKvBf16);
         dk::index_score(d_q, d_w, i4, NH, IX, T, NC, nullptr, 0, 1, lim, o2, ss, s, dk::kKvFp4p);
         CU(cudaStreamSynchronize(s));

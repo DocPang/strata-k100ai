@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "prompt": "mixed-32k",
+  "prompt_tokens": 32812,
+  "profile_four_card_wall_equiv_us_per_token": {
+    "qkv_compressor": 8.3,
+    "indexer_projections": 16.6,
+    "indexer_scoring": 125.5,
+    "indexer_top_k": 10.9,
+    "combined": 161.3
+  },
+  "packed_key_microbenchmark_us": {
+    "q32_n16385": {
+      "LD130": 258.3,
+      "LD132": [
+        235.5,
+        235.7,
+        236.4
+      ],
+      "LD134": 258.8,
+      "LD136": [
+        243.1,
+        243.5,
+        243.6
+      ],
+      "LD144": 298.1
+    },
+    "final_LD132": 235.2
+  },
+  "whole_model_mixed_32k_prompt_ms": {
+    "LD136": [
+      38392.7,
+      38320.0,
+      38352.2
+    ],
+    "LD132": [
+      38366.1,
+      38318.8,
+      38330.7
+    ],
+    "LD136_median": 38352.2,
+    "LD132_median": 38330.7,
+    "cached_tokens_max": 0
+  },
+  "final": {
+    "engine_sha256": "1b0610416b3cce179983f3e439c2d4dc173122c9dc432b485450107b9116d811",
+    "ds4_gguf_test_sha256": "6159e5e04a602f0362f23501194d63cce0bc47c2089f0b3be4dd088d486f9ee6",
+    "operator_tests": "ALL OK (0 failed)",
+    "fixed_api_tasks": "content, reasoning, finish_reason and usage identical to the saved candidate"
+  }
+}
