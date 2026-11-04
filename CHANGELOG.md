@@ -1,112 +1,262 @@
 # 更新记录
 
-## v0.2.1
+## v0.2.2 — Qwen + DeepSeek 双模型与可复现发布
 
-- **多模态视觉**：新增 HIP 图片编码器 `runtime/bin/strata-vision`（119,439,216 B，SHA-256 `9c4dc143…`），把 Qwen3.8-Flash-Next 的 ViT 放到 gfx928 GPU 上执行；文本引擎 `runtime/bin/strata` 与 v0.2.0 完全相同（`bdbfd934…`）。
-- 运行包 `strata-xxs-20261023-k100ai022-linux-amd64.tar.gz` 更新为 29,472,859 B（SHA-256 `dc6a0e96…`），`FILES.sha256` 206 项；`install.sh` / `compose.yaml` / Dockerfile 同步到 `v0.2.1`。
-- 新增入口：`VISION_ENABLED=1`、`VISION_MAX_TOKENS=1024`（`VISION_EXE` / `VISION_MMPROJ` 可选）。entrypoint 自动注入 `vision` 段；编码器是独立常驻进程，约占 2.1 GiB 显存。
-- 新增源码快照 [sources/vision-20261028](sources/vision-20261028/)：llama.cpp `3cf03257` 上的 3 个补丁（DTK hip 版本闸门、softmax cooperative-groups、norm 256 线程）、构建脚本、二进制/manifest 与验证数据。
-- 关键正确性修复：`norm_f32<1024>` 在 HCU 上超过 launch bounds（256），1024 线程会静默丢线程，embeddings 与 CPU 的 cosine 只有 0.05；改为 256 线程后恢复到 0.999293。未修时模型仍会给出看似合理的错误答案，因此该补丁是必需项。
-- 实测（单卡 gfx928，760×520 图，475 image tokens）：GPU 编码 **1.72 s**，CPU 8 线程对照 18.0 s；1800×1200 图 1024 tokens 端到端 12.5 s；GPU/CPU embeddings cosine mean 0.999293、min 0.947855、rel-L2 3.24%。
-- 长上下文 40K / 100K / 230K token 压测期间显存峰值不变（60,246 MiB，剩余 5,274 MiB）；图片编码上限 1024 tokens。
-- 端到端验证：DSH 桌面 `describe_image` 10 s、内置 `read_image` 6 s，标题、字段、表格和柱状图数值均读对。
-- 文档：新增 [docs/MULTIMODAL.md](docs/MULTIMODAL.md)；README、RUNNING/INSTALL/SOURCE_BUILD 与引擎清单同步。
+本版把 `strata-k100ai` 从单一 Qwen Docker 部署整理包，升级为面向 Hygon K100AI / gfx928 的双模型运行包：
 
-## v0.2.0
+- Qwen3.8-Flash-Next：默认 0.1.47 快速引擎，保留 0.1.55 对照引擎。
+- DeepSeek-V4.1-Flash：独立 0.1.55 引擎，四卡、1M context、FP4 KV 与 DSpark。
+- 两个模型都通过同一套 OpenAI / Anthropic 兼容 API 提供服务。
+- 运行包与源码包分别发布，并加入确定性归档、固定镜像、固定模型 revision、二进制哈希断言和隔离安装验证。
 
-- **基线切换**：本版把 k100ai 优化集**重基到上游 strata 0.2.2（`011c9e60`）**。rc.1–rc.7 的引擎谱系基于上游 `fb58e0db`，与本版不是同一条基线（两棵树有 333 个文件不同），因此本版不是 rc.7 的增量，也不能与 rc.7 的二进制逐位对比；下表的对照一律是**同卡上一版 rc.7 引擎**（差值含上游基线本身的变化）。
-- 分发固定引擎 `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9`（45,674,152 B），运行包 `strata-xxs-20261023-k100ai022-linux-amd64.tar.gz`（13.0 MB，SHA-256 `359baf70…`），安装脚本 `install.sh` 与镜像标签同步到 v0.2.0，构建配方与实测使用的 43 个开关见 [engines/strata/xxs-20261023-k100ai022/manifest.json](engines/strata/xxs-20261023-k100ai022/manifest.json)。
-- 新增增量源码快照 [sources/xxs-20261023-k100ai022](sources/xxs-20261023-k100ai022/)：相对上游 `011c9e60` 的 **36 个文件（30 改 / 6 增）**，逐文件 SHA-256；全树逐文件比对确认除这 36 个路径外与 0.2.2 完全一致。复现记录见 [REBUILD_REPORT.md](sources/xxs-20261023-k100ai022/REBUILD_REPORT.md)。
-- 主要优化：
-  - 预填 down 投影的 **prefetch 路径**（单 LDS plane、TH=128）与单 plane 分块，使 5–8 token 窗口不再分两趟 launch；hc read 阶段由此从表观落后 38% 变为**快 11%**，是本版最大的一项。
-  - hc read 的 **`[wd|wi]` 宽 GEMM**（`STRATA_K100AI_HC_FUSE`，默认开）。
-  - `moe_combine` 按 `scale_down_rows` 是否存在做模板特化（`SD`），去掉内层循环的每元素分支与乘法：combine 411 → 371 ms。
-  - gate/up 的 exact IQ2 路径、wsg16 tile、down GEMM、IQ4 预展开。
-  - decode：MTP round/step 图在 prompt 阶段预热（`STRATA_MTP_WARM_AT_START`，默认开）。
-- 实测（单卡 gfx928、同会话交替、对照组为同卡上一版 rc.7 引擎）：预填 30,603 token **14,232 / 13,947 ms**（对照 14,411 / 14,160，**0.988 / 0.985**）、126,857 token **67,401 / 67,350 ms**（对照 68,356 / 68,280，**0.986 / 0.986**）、7,556 token 4,497 / 3,851（对照 4,482 / 3,956，1.003 / **0.974**）；decode 9/9 格持平或领先（**0.941–0.998**）。
-- 如实记录两处代价：①首个（不计分）请求的预填因图预热约 **+200 ms**（约 500 对 305 ms），每进程一次；②hc 融合使 ctx128 输出与上游不同（`84f393bf…` 对 `a6bcf7fd…`），置 `STRATA_K100AI_HC_FUSE=0` 可逐位还原（30K logits exact）。
-- 可复现性：`clean_rebuild_verified` 为 **`false`**。同一构建目录内两次全量干净编译逐字节一致（`da43917a…`），但二进制内嵌构建目录路径，换目录后 SHA-256 变化而字节数不变（45,674,152）。
-- 运行包 `strata-xxs-20261023-k100ai022-linux-amd64.tar.gz`（13,002,122 B，SHA-256 `359baf70…`）随 Release 分发，`install.sh` 默认按 `VERSION=v0.2.0` 拉取并校验；镜像标签同步为 `k100ai/strata-xxs-20261023-k100ai022:v0.2.0`。
+上游基线为 **Strata v0.2.9**。本版不是 v0.2.1 的增量补丁；目录结构、启动入口和兼容范围都有变化。
 
-## v0.1.0-rc.7
+## 成绩与速度
 
+Qwen 在单卡 K100AI 64 GiB、gfx928、IQ3_XXS、INT8 KV、24,576 expert slots、prefill cap 20,480、MTP `spec=6` 下完成 matched A/B：
 
-- **复现验证通过（字节级）**：按 `docs/SOURCE_BUILD.md` 从公开材料重建 —— 纯净重放 + 本次发布的 7 个增量文件覆盖后与部署源码树 **零差异**，干净编译产出 **SHA-256 完全相同**（`19b367e0…`），因此 `clean_rebuild_verified` 记为 `true`，范围为 `byte-identical`。详见 [sources/xxs-20261022-sol/REBUILD_REPORT.md](sources/xxs-20261022-sol/REBUILD_REPORT.md)。
-- 分发固定引擎 [engines/strata/xxs-20261022-sol](engines/strata/xxs-20261022-sol/)：`19b367e0…`（29,327,416 B），运行时包为 `strata-xxs-20261022-sol-linux-amd64.tar.gz`，与 rc.6 的运行时完全一致，仅替换 `runtime/bin/strata`，在 rc.6 行为之上按形状锁定 rocBLAS Tensile solution，门控 `STRATA_GEMM_SOL=2560x6144=20377,10240x2560=20385`。**本目录不分发二进制/运行包**，`clean_rebuild_verified` 为 `false`。
-- 新增增量源码快照 [sources/xxs-20261022-sol](sources/xxs-20261022-sol/)：`src/prefill/gemm.cu` 与 `CMakeLists.txt` 两个文件 + 3 个 fail-closed 补丁脚本 + 逐文件 SHA-256。
-- 实测：ctx128 交叉 A/B（同窗交替、控制组极差 0.003%）**61,271.7 → 60,265.7 ms（−1.64%）**；精度 KL 8.3e−05、top-1 一致；取消变量即回位精确。数据见 [docs/BENCHMARKS.md](docs/BENCHMARKS.md)，归因与方法见 [docs/PREFILL_GEMM_SOL.md](docs/PREFILL_GEMM_SOL.md)。
-- 记录一条否决结论：`STRATA_GEMM_SOL` 与 `STRATA_DENSE_TN=1` **不可合并**（`Gemm::native` 的 TN 分支提前返回会绕过两处 hook；合并实测 −1.24%，劣于任一单独）。
-- 记录一组方法论结论：独立微基准与引擎内实测可差 30%（同一调用 72.07 vs 95.6 TF/s），微基准只能证伪方向；只有"同 kernel 换 solution"可跨形状迁移（9 个形状里 2 个成功）。
-- **生产部署时发现**：rc.6 定版 `43002a72…` 在 23k token 档比同源重编慢 **9.15%**，且把 `43002a72` 重新部署复测仍为同一数值，排除重启效应；`CMakeCache` 编译选项与发布配方逐项一致，因此差异来自相对 `sources/xxs-20261016-gold` 的 **7 个文件未归档源码增量**。其中 5 个（`gemm.hpp`、`dequant_bf16.cu`、`gateup_exact.hpp`、`kernels.cu`、`moe_mmq.cu`）的逐项补丁来源未归档，列为待办；在补齐前不要宣称该引擎可从公开材料重建。
+| 输入 | 0.1.47 快速档 | 快速档吞吐 | 0.1.55 | 0.1.55 吞吐 | 快速档倍数 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 8,190 tokens | **4,375 ms** | **1,846.2 tok/s** | 7,860 ms | 1,033.6 tok/s | **1.80×** |
+| 40,057 tokens | **19,066 ms** | **2,086.1 tok/s** | 34,361 ms | 1,161.3 tok/s | **1.80×** |
 
-## 2026-10-20 源码审查回应（main）
+- Qwen 0.1.47 decode：**79.37 tok/s**，MTP accepted **56** / offered **57**。
+- Qwen 0.1.55 在 4,095-token prompt + 64-token decode：**75.83 tok/s**，MTP accepted **48** / offered **48**。
+- DeepSeek 条件是 4× K100AI、IQ2_XXS、FP4 KV、DSpark：64-token decode **69.19 tok/s**，accepted **52** / offered **54**。
+- DeepSeek 4,095-token prompt：**300.45 tok/s** prefill；后续 8-token decode 为 **48.32 tok/s**。
 
-- 新增 [sources/xxs-20261016-gold/KNOWN_ISSUES.md](sources/xxs-20261016-gold/KNOWN_ISSUES.md)，记录静态审查确认的 4 项：`STRATA_GEMM_F32OUT` 与 `STRATA_GEMM_Y_F16` 在 padr 分支缺互斥（`gemm.cu:1247` 对 `gemm.cu:1019`，当前不可达）；`kernel_hcdown_mmac` 的 LDS 行维越界写（`sA/sB` 声明 64 行、写到第 127 行，因 `(nd+ni)%16` 门禁当前不可达）与 `STRATA_HC_MMAC` 用 `getenv()!=nullptr` 解析导致字符串 0 也算开启；工作区仍按 FP32 容量分配（`m.qkv` / `m.Qf` / `m.z` / `m.shared`）。
-- **修正一处会误导重建的文档错误**：`docs/SOURCE_BUILD.md` 原先让读者按「c4 补丁 + rc.5 补丁 + 4 个 FP16 脚本」重建 rc.6，这是错的——`c4-to-xxs-20261016.patch` 中 `TOPK_H16`、`TOPK_REG_MAX`、`Q6_WAVE_PACK_LDS` 出现次数均为 0。现改为三步：恢复 c4 → 打 rc.5 补丁 → **按路径覆盖 `sources/xxs-20261016-gold/` 的 7 个文件并逐文件校验 SHA-256**。
-- 记录补丁脚本的路径契约差异：`patch_yf16_*.py` 需要 `<workdir>/source/...`，与 `prepared/strata/...` 不同。
-- 快照文件本身未改动；`clean_rebuild_verified` 仍为 `false`（干净重建 + 固定样本输出一致尚未执行）。
+Qwen 快速档不是 bitwise：
 
-## 2026-10-20 源码公开（main，未打新标签）
+| 输入 | Top-1 | Max abs | Mean abs | Relative L2 | Cosine |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 8,191 | 一致 | 2.00396 | 0.27595 | 13.04% | 0.991468 |
+| 40,058 | 一致 | 4.22781 | 0.42068 | 16.71% | 0.987025 |
 
-- 新增 `sources/` 目录，**一个版本一个文件夹**：首个目录 [sources/xxs-20261016-gold](sources/xxs-20261016-gold/) 存放 rc.6 定版引擎 `43002a72…` 的增量源码。
-- 内容：`GEMM_Y_F16` 补丁链触及的 7 个文件（`include/strata/prefill/{gemm,kernels}.hpp`、`src/prefill/{gemm,kernels}.cu`、`src/prefill/prefill.cpp`、`src/kernels/cuda/{qsa_select,native_mmvq}.cu`）、4 个按序应用的 fail-closed 补丁脚本、逐文件 SHA-256 的 `manifest.json`，以及相对上游 `fb58e0db` 的累计差异 `vs-upstream-fb58e0db.diff`（5,097 行，仅覆盖这 7 个文件）。
-- 边界不变：该目录是**增量**不是完整引擎树；重编译不保证字节一致，`clean_rebuild_verified` 仍为 `false`，字节身份以 `engine_sha256` 为准。
-- `engines/strata/xxs-20261016-gold/manifest.json` 的 `source_snapshot_included` 由 `false` 改为 `true`，并新增 `source_snapshot` 指向该目录；`docs/SOURCE_BUILD.md` 同步更新。
+40,058-token 快速档和 0.1.55 的前 8 个 greedy token 完全相同。本版接受数值漂移以换取约 1.8× 的 prompt 吞吐，同时保留 0.1.55 作为 canonical 对照。
 
-## v0.1.0-rc.6
+## 主要变化
 
-- 分发固定引擎 `43002a7262e5`（`engines/strata/xxs-20261016-gold/`），在 rc.5 的 `d87a4678a21b` 基础上继续提升 prefill 与 decode。
-- 新增 `STRATA_GEMM_Y_F16`（qkv/qf/sg/su/sd/z 六个投影族的 16 位 Y 累加器）、`STRATA_TOPK_H16` 与 `STRATA_TOPK_REG_MAX=7168`（h16 topk 核 + 寄存器最大值缓存）、`STRATA_Q6_WAVE_PACK_LDS`、`STRATA_MMVQ_WV2_GROUP`；`STRATA_SCORES_MMAC_NB` 由 1 提至 2。
-- 记录并否决 `STRATA_TOPK_H16_T`（h16 topk 核线程数 256→1024）：250K 下整模 +11.96%、qsa select +86%（相对非 regmax 基线），相对单独 `REG_MAX` 基线为 +13.7%；同批次 6 个臂输出 SHA 一致，回归出在性能侧。该键不设置，源码保留默认关闭实例。
-- 打包时对运行中的生产引擎做了验证请求：约 39K token 输入 20.38 s、约 66K token 输入 25.73 s；短提示 TTFT 0.70–1.06 s。同二进制在实验卡上的工程记录（250K / 32K / decode）单独列出，两组条件不同不可混用。
-- 新增 [卡外 KV 容量扩展](docs/KV_CAPACITY.md)：说明如何用引擎原生的会话存/读接口在 tmpfs 与 SSD 上建立跨卡共享的 KV 池，并给出实测的搬运耗时与容量换算。
-- 本包不含源码快照或增量补丁，`clean_rebuild_verified` 为 `false`；不要据此宣称可从公开材料重建出相同二进制。
-- 2026-10-17 修正：安装器此前仍按 rc.5 的名称下载 XXS 运行包（rc.6 未分发该文件），现改为 `VERSION=v0.1.0-rc.6` 与 `xxs-20261016-gold`；`start.sh`、`compose.yaml`、Dockerfile 与 `profiles/next-iq3xxs-single` 同步到 rc.6 开关；首页与文档按 rc.6 更新，rc.5 记录保留并标注为上一版；`deployment-v0.1.0-rc.6.tar.gz` 由同一标签重新生成。
-- 2026-10-17 成绩修正：此前公布的 32K 15.597 s / 250K 142.119 s 取自只启用 `TOPK_REG_MAX` 的中间引擎，不是本版分发的 `43002a72` 定版二进制；`benchmarks.json` 与各文档已按定版数据更正。
-- 2026-10-17 复测：按"本版对上一版"的口径重做同批 A/B/A（同卡同批、各用自己的发布环境），补齐 128K 档：**32K 15.620 → 14.885 s（−4.70%）**、**128K 70.715 → 65.848 s（−6.88%）**、**250K 146.780 → 137.249 s（−6.49%）**，每档两个版本输出逐位一致。单开关口径另记：`GEMM_Y_F16` 为 32K −5.49%、250K −3.43%。
-- 2026-10-17 组件级结果复验：`STRATA_MMVQ_WV2_GROUP` 的孤立微基准 −24.8% **未在整模 decode 复现**（两批 balanced A/B/A/B，81.96 对 82.00 tok/s，落在样本漂移内）；文档已按实测口径标注。
+### 双模型运行包
 
-## v0.1.0-rc.5
+`strata-v0.2.9-k100ai-dual.tar.gz` 包含四个 gfx928 二进制：
 
-- 补全首页累计优化范围，恢复早期平台、量化布局、MoE、GDN/HC、数据复用、工作区及 attention 优化说明，区分本次新增、上游能力与未启用实验。
+| 文件 | 角色 | 大小 | SHA-256 |
+| --- | --- | ---: | --- |
+| `bin/strata` | Qwen 0.1.47 默认快速档 | 45,674,152 B | `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9` |
+| `bin/strata-0.1.55` | Qwen 0.1.55 对照档 | 49,484,096 B | `437308792b7ec08724aa90e4b11736b4f40f41c10613faa9688fbdc1723ba7ab` |
+| `bin/strata-dsv41` | DeepSeek-V4.1-Flash | 22,576,544 B | `6543311f453bee2c6d61653a24f0b6282f9cb3568b17a8b889c2c5e073b12286` |
+| `bin/ds4_gguf_test` | DeepSeek GGUF 算子自检 | 18,816,624 B | `0d6c8455d76815b810a38c5529bc868087e71641008e0c86843ecd8b34dd815c` |
 
-- 分发已完成指定负载 GPU 测试的固定引擎 d87a4678a21b，不包含后续研究构建。
-- 启用 MMAC scores 合并装载、IQ2 exact 扩展、FP16 scores、K 暂存模板化与 MMVQ LDS。
-- XXS 默认 prefill=30602、spec=4、256K KV 全显存驻留、全部专家驻留和单槽 FIFO；移除 SEL_BATCH=1024 覆盖，关闭会话缓存以便复现冷输入。
-- 首页增加三档实测成绩及完整十步安装命令，涵盖魔塔 GGUF/MTP 下载、校验、pack 转换、设备选择和 API 检查。
-- 新增脱敏样本结果、引擎来源清单与源码恢复补丁，明确质量与重建验证范围。
+发布页提供运行包的 `.sha256` sidecar，包内另有 `SHA256SUMS`。模型权重、MTP runtime、DeepSeek pack 和 `draft_vocab.bin` 均未进入归档。
 
-## v0.1.0-rc.4
+### Qwen 使用双引擎策略
 
-- 预发布部署配置采用 IQ3_XXS、exact+fused、256K 全 KV 显存驻留和单槽 FIFO。
-- 在 XXS exact+fused 基准引擎（`ad743dbf9cc1`）上增加 selection 参数及配套显存记账，显式使用 STRATA_SEL_BATCH=1024，并说明测试条件及显存竞争。
-- 新增参考成绩表，分别标注引擎标识、测试配置、相位计时和整模结果；补充 2026-10-16 长上下文实验引擎（`ecd44f1c900c`）的四档成绩及 XXS 迁移限制。
-- 补充魔塔权重直链、MTP 来源及国内 DTK 镜像地址和固定摘要。
-- IQ3_S/c4 配方保留为历史资料。
+默认 `bin/strata` 继续使用已经验证的 0.1.47 K100AI 快速路径，并启用 MTP：
 
-## v0.1.0-rc.3
+- gfx928 native prompt MMAC
+- F16 prompt GEMM
+- fused gate/up
+- Q2_0 down
+- HC upmix
 
-- 部署文档改为原生 Docker、Strata 服务及 C++ 引擎命令，补充设备映射、参数与调试方法。
-- 增加 IQ3_XXS 的 c4 基线配置及权重校验值，保留 IQ3_S 配置。
-- 增加显存、KV streaming、上下文与并发容量说明。
-- 辅助入口支持运行时选择 profile，按 profile 保留 spec 默认值，并修正 KV 驻留范围。
-- c4 引擎运行包保持不变。
+包内同时提供 `bin/strata-0.1.55`。该引擎包含 `8544d2fa` 的 gfx928 int8 expert MMAC，可用于 canonical 对照：
 
-## v0.1.0-rc.2
+- gate/up：`IQ3_XXS,IQ3_S,IQ4_XS`
+- down：`Q2_0`
 
-- 项目更名为 `strata-k100ai`，展示名称为 **Strata for K100AI**。
-- 更新安装器下载地址、文档链接和镜像来源标签。
-- 部署包解压目录采用新名称；引擎运行包、模型配置和启动参数不变。
-- 保留此前 v0.1.0-rc.1 发布资产，使用新版本分发名称更新。
+这不是简单“保留两个文件”：两条引擎路径分别从固定源码构建，并各自带哈希断言。
 
-## v0.1.0-rc.1
+### DeepSeek-V4.1-Flash
 
-首次公开 K100AI 推理部署整理版。
+新增 `bin/strata-dsv41` 和 `bin/ds4_gguf_test`：
 
-- 小运行包与官方 DTK 基础镜像分开分发，支持自动下载与本地/离线组合安装。
-- 冻结 Strata c4 引擎和文件校验，首版提供 Next IQ3_S 单卡配置。
-- 默认启动只需要 Docker Engine，可选 Compose；路径、设备、密钥与性能参数分别管理。
-- 附优化清单、启动参数、模型转换、来源、源码恢复和验证范围。
-- 按引擎、模型量化和拓扑组织目录，为 XXS 和 TP2 保留扩展方式。
+- 4× K100AI
+- 1,048,576-token context
+- FP4 KV
+- 15,360 expert slots
+- Engram 2 layers / 48 lookups
+- DSpark drafting
+- `cpu_experts=0`、`ram_experts=0`
+- 冻结 placement profile，服务使用 `--profile-readonly`
 
-这是候选版：完整干净源码重建和新安装入口下真实模型全套验收尚未完成，见 docs/VALIDATION.md。
+DeepSeek pack 由固定 backbone shard、Engram 和 DSpark 生成。所有下载使用逐文件 ModelScope revision，并在生成后逐文件比对 SHA-256。
+
+### 优化内容
+
+| 范围 | 本版采用的优化 |
+| --- | --- |
+| K100AI 平台 | gfx928 HIP 兼容层、DTK 2604 编译链接、rocBLAS/hipBLASLt 接口和 ggml/llama.cpp MMQ 衔接 |
+| Qwen prompt attention | 默认 0.1.47 使用 native gfx928 prompt MMAC；0.1.55 暂未恢复这条路径 |
+| gate/up | fused gate/up、exact IQ2 展开、wsg16 tile；0.1.55 exact 集合覆盖 IQ3_XXS、IQ3_S、IQ4_XS |
+| down | Q2_0 展开与 int8 MMAC、IQ4_NL exact pre-expansion、staging 和行 tile 调整 |
+| Prompt GEMM | F16 prompt GEMM、形状相关 GEMM tile、stride padding 和验证过的 Tensile solution |
+| Hyper-connection | HC upmix、split/staged read、down prefetch 和单 LDS plane 分块 |
+| GDN 与路由 | 八 lane GDN 递归、去掉无用 FP32 写回、常驻 expert 排序和 native/MMQ/fused 分派 |
+| MTP | 外置 Q2_0 MTP runtime、`spec=6`、接受阈值 0.7、draft graph 预热和会话缓存 |
+| DeepSeek 四卡 | 每卡 10 层的 `10,10,10,10` 切分、全部 routed experts 驻留 HCU、1024-token prefill chunk |
+| DeepSeek KV 与 Engram | 1M FP4 resident KV、2 层 Engram、48 lookups，CPU/RAM expert lane 为 0 |
+| DeepSeek drafting | DSpark Q8_0、置信度 0.65，并在 API metrics 中记录 offered/accepted drafts |
+| 服务与安全 | OpenAI/Anthropic API、metrics、127.0.0.1 绑定、单次容器清理和 HCU 预检查 |
+| 可复现性 | 固定镜像 digest、固定模型 revision、逐文件 SHA-256、canonical 构建路径和确定性归档 |
+
+Qwen 0.1.55 的 prompt 回归没有被写成“已优化”：最终单卡 prompt 仍比 0.1.47 慢约 1.8 倍，本版选择把 0.1.47 作为默认快速档。
+
+### 可复现发布
+
+新增 `strata-v0.2.9-k100ai-dual-source.tar.gz`，发布页提供对应的 `.sha256` sidecar。
+
+源码包包含：
+
+```text
+main/
+qwen-fast-0.1.47/
+llama.cpp/
+BUILD_INPUTS.json
+```
+
+固定输入：
+
+- 打包源码：v0.2.2 tag commit；准确值同时记录在 `BUILD.json` 和 `BUILD_INPUTS.json`
+- 当前引擎源码：`8544d2fa6cddf61fb47edc0c3bd8a5d7d638140e`
+- Qwen 快速引擎源码：`2150b1acdb48c386a9afcd64e63e2369b5a5e108`
+- 上游基线：`c62d5e3a15b40ea51c96aae9e8d36928965f53ab`
+
+两个归档均为确定性 tar/gzip：排序路径、零时间戳、空 owner/group。连续生成两次，运行包与源码包均得到相同哈希。
+
+### 安装与启动
+
+本版 README 以**人工步骤**为默认安装路径，不要求调用全自动下载或启动脚本。文档逐项列出：
+
+- Python 依赖的完整 `pip --target` 安装命令
+- Qwen 两个 GGUF 的精确文件名、ModelScope snapshot、URL、大小和 SHA-256
+- Qwen pack 的独立转换命令与六个输出文件摘要
+- MTP 所需的 31 个 tensor 名称、来源 shard 和 SHA-256
+- DeepSeek 五个 backbone shard、Engram 与 DSpark 的精确下载 URL
+- DeepSeek pack 的独立生成命令和八个输出摘要
+- HCU 设备、容器占用、Docker 挂载、端口、启动、检查和停止命令
+
+上述步骤见新版 README 的“手动安装与运行”。只有在用户已经理解并核对人工步骤后，才可选择使用发布包内脚本减少重复输入：
+
+```bash
+bash scripts/k100ai/setup-runtime.sh
+bash scripts/k100ai/preflight.sh
+```
+
+脚本不是唯一入口，也不是复现证据。launcher 仍会检查外部资产和 HCU0-3 占用；它不会自动停止其他研究容器，只清理本次创建的容器。
+
+## 验证结果
+
+最终候选包在独立空目录完成解包和 runtime 安装：
+
+- 运行包内部 `SHA256SUMS`：全部通过
+- runtime 依赖安装：首次安装通过
+- runtime 依赖安装：重复执行通过
+- preflight：每轮 GPU 测试前后均报告 `HCU0-3 are free`
+
+真实 GPU API：
+
+| 测试 | 结果 |
+| --- | --- |
+| Qwen 默认 0.1.47 | 262,144 context，MTP，46 offered / 28 accepted |
+| Qwen 0.1.55 | 262,144 context，MTP，46 offered / 28 accepted |
+| DeepSeek | 1,048,576 context，FP4 KV，DSpark，14 offered / 14 accepted |
+| 人工直接 Docker 启动 | Qwen 与 DeepSeek 均加载成功；DeepSeek 请求返回 2/2 接受的 drafts |
+
+DeepSeek `ds4_gguf_test` 完成：
+
+- KV packing
+- sparse attention
+- BF16 / MXFP4 / Q8_0 MMV
+- token/window experts
+- CPU lanes
+- SwiGLU
+- combine
+- expertise sets
+- 量化格式
+
+最终结果：
+
+```text
+ALL OK (0 failed)
+```
+
+DeepSeek profile 测试前后均为：
+
+```text
+8db93e483b34b15dbf63a0826601f1db2107a8cfea73774e7d21d8559e0a9568
+```
+
+源码测试：
+
+- `tests.terminal.test_drafting`：40/40
+- `serve.test_dsv41`：64 通过，1 个依赖模型 pack 的测试跳过
+- `serve.test_server`：360/360
+
+## 下载
+
+发布页应上传：
+
+- `strata-v0.2.9-k100ai-dual.tar.gz`
+- `strata-v0.2.9-k100ai-dual.tar.gz.sha256`
+- `strata-v0.2.9-k100ai-dual-source.tar.gz`
+- `strata-v0.2.9-k100ai-dual-source.tar.gz.sha256`
+- `RELEASE.json`
+- `RELEASE.json.sha256`
+- 验证日志归档
+
+模型权重和模型派生运行资产不在发布附件中。下载与生成命令见新版 README。
+
+## 升级与兼容性
+
+### 从 v0.2.1 升级
+
+请安装到新的空目录，不要覆盖旧部署：
+
+1. 下载本版运行包和源码包。
+2. 校验归档与内部 `SHA256SUMS`。
+3. 运行 `setup-runtime.sh`。
+4. 准备新的 Qwen pack/MTP 和 DeepSeek pack。
+5. 使用 `serve-k100ai.sh` 启动。
+
+旧版目录中的 `install.sh`、`start.sh`、`compose.yaml` 和 `deployment.env` 不属于本版运行契约。
+
+### 视觉功能
+
+v0.2.1 的 GPU 图片编码器不包含在本版本中。Qwen 和 DeepSeek 都以 `--vision off` 运行，`/health` 会报告 `images=false`。需要视觉能力的部署应继续使用 v0.2.1，或等待单独的视觉发布。
+
+### API 模型名
+
+- Qwen：`qwen3.8-flash-next`
+- DeepSeek：`deepseek-v4.1-flash`
+
+旧的 `qwen3.8-flash-next-strata` 名称不再由本版配置使用。
+
+## 已知限制
+
+- 仅支持 Hygon K100AI `gfx928` + DTK 2604；原生 NVIDIA/CUDA 未构建。
+- Qwen 0.1.55 的 prompt attention 性能回归尚未修复。
+- Qwen 默认 0.1.47 是有实测边界的 drift-accepted 快速档。
+- 未灌满 262,144-token Qwen 或 1,048,576-token DeepSeek 窗口做语义质量评测。
+- 本版视觉关闭。
+- 模型资产许可证需要使用者自行确认；运行包不重新分发模型权重。
+
+## 文档
+
+- [README](https://github.com/DocPang/strata-k100ai/blob/v0.2.2/README.md)
+- [运行与模型资产](https://github.com/DocPang/strata-k100ai/blob/v0.2.2/docs/k100ai/README.md)
+- [独立复现](https://github.com/DocPang/strata-k100ai/blob/v0.2.2/docs/k100ai/REPRODUCIBILITY.md)
+- [验证结果](https://github.com/DocPang/strata-k100ai/blob/v0.2.2/docs/k100ai/VALIDATION.md)
+- [来源与提交](https://github.com/DocPang/strata-k100ai/blob/v0.2.2/docs/k100ai/PROVENANCE.md)
+
+## 致谢与许可
+
+本项目基于 [Strata](https://github.com/Niko1221/Strata)、[llama.cpp](https://github.com/ggml-org/llama.cpp)、ISTA-DASLab 的 Qwen/DeepSeek GGUF、Unsloth 的 DSpark，以及 Hygon DTK/HyHAL 构建。
+
+项目代码遵循 MIT License。模型、量化文件、DTK/HyHAL 和上游依赖分别遵循各自许可证。
+
+## 历史版本
+
+- [v0.2.1](https://github.com/DocPang/strata-k100ai/releases/tag/v0.2.1)：Qwen3.8-Flash-Next GPU 多模态视觉。
+- [v0.2.0](https://github.com/DocPang/strata-k100ai/releases/tag/v0.2.0)：K100AI 优化集重基到 Strata 0.2.2。
+- [v0.1.0-rc.7](https://github.com/DocPang/strata-k100ai/releases/tag/v0.1.0-rc.7)：rocBLAS Tensile solution 按形状锁定。
+- [更早版本](https://github.com/DocPang/strata-k100ai/releases)：rc.1–rc.6 和首个公开部署包。

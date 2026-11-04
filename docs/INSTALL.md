@@ -1,127 +1,149 @@
-# 环境准备
+# Install Strata
 
-从权重下载到启动的完整顺序见[首页安装教程](../README.md#安装与运行)。本节补充本地镜像复用、离线传输和手动派生镜像构建。
+This page is for anyone installing or updating Strata (version 0.2.5). Use the **desktop app** for a graphical
+interface, or the **Terminal** for `strata launch` and coding tools. Both use released engine packages. A normal
+install does not need a source checkout or a startup `.bat` file.
 
-## 基础镜像
+## Quick start
 
-参考环境为 Linux amd64、Ubuntu 22.04、DTK 2604、Python 3.10：
+| I want | Do this |
+| --- | --- |
+| A window with chat | Download the installer from the [latest release](https://github.com/Niko1221/Strata/releases/latest) ([steps](#the-app)) |
+| The terminal, or my coding tool | Run the one-line install, then `strata launch` ([steps](#the-terminal)) |
+| DeepSeek V4.1-Flash | Pick it in the app, or run `strata launch --family deepseek41` ([model page](MODELS.md#deepseek-v41-flash)) |
 
-```bash
-BASE_IMAGE=harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68
-docker pull "$BASE_IMAGE"
+[Requirements](#what-you-need) · [Desktop app](#the-app) · [Terminal](#the-terminal) ·
+[Update](#updating) · [Files and folders](#where-things-are-stored) · [Build from source](SOURCE_INSTALL.md)
+
+## What you need
+
+| Computer | Guide |
+| --- | --- |
+| Windows 10/11 or Linux x86-64 with an NVIDIA RTX GPU | Use the app or the Terminal. The engine for your card is downloaded for you. [Older NVIDIA cards](OLDER_GPUS.md) use the CUDA 12 engine. DeepSeek V4.1-Flash runs on RTX 30, 40 and 50 cards in the app and the Terminal. |
+| Windows or Linux x86-64 with a supported AMD Radeon | [AMD guide](AMD_HIP.md), including the card-to-package table. DeepSeek V4.1-Flash runs on the Radeon AI PRO R9700 under Linux, in the app and the Terminal. |
+| Linux x86-64 with Intel Arc | [Intel Arc guide](INTEL_ARC.md); install the driver/compute runtime and check model preparation requirements |
+| Apple Silicon Mac, macOS 15 or newer | [Mac guide](MAC.md). Intel Macs are not supported by the Mac package. |
+| AMD Ryzen AI Max / Strix Halo | [Strix Halo guide](STRIX_HALO.md) |
+| NVIDIA DGX Spark (Linux ARM64) | [DGX Spark guide](DGX_SPARK_LINUX.md). Use the Terminal; there is no desktop app for ARM64 Linux. |
+
+Memory and disk needs depend on the **model, quantization, context and enabled features**. Check
+[which model fits](MODELS.md#pick-by-memory); download size is not the same as RAM use. Unified memory counts once.
+Use an SSD and leave room for helper files and model preparation. The Terminal's `--plan` prints what is missing.
+
+Install a graphics driver that supports the package you choose. CUDA 13 packages require NVIDIA driver 580 or newer;
+older NVIDIA cards use CUDA 12. AMD and Intel requirements are in their guides. Packaged GPU runtimes do not replace
+hardware drivers. Models and updates need an internet connection to download.
+
+## The app
+
+1. Open the [latest release](https://github.com/Niko1221/Strata/releases/latest).
+2. Download the one installer for your system. There is one per system, not one per graphics card:
+   - **Windows:** run `Strata-0.2.9-windows-x64-setup.exe`. It installs for your user and needs no administrator rights.
+   - **Linux:** make `Strata-0.2.9-linux-x86_64.AppImage` executable, then open it. If FUSE is unavailable, run the
+     downloaded file with `--appimage-extract-and-run`. [Linux help](TROUBLESHOOTING.md).
+   - **Mac:** open `Strata-0.2.9-macos-arm64.dmg`, drag Strata into Applications, then open it. [Mac help](MAC.md).
+3. On Windows and Linux the installer has no engine inside. On first start the app shows the engine for your
+   graphics card with its size and one **Download** button, with progress and resume. If you already downloaded the
+   engine file, choose **I already have the file** and it installs without internet. The Mac file keeps its small
+   Metal engine inside.
+4. Choose a model and its storage folder, let it download, then chat. DeepSeek V4.1-Flash is in the model list on
+   the supported cards ([model page](MODELS.md#deepseek-v41-flash)); it has three sizes, an 8K context and a **Speed**
+   choice, Faster or Full quality.
+
+The `strata-engine-…` and `strata-control-…` archives on the release page are components, not installers. The
+installer is the same file for a first install and for an update. There is no Intel desktop installer yet; Intel Arc
+runs on Linux only, through the [Terminal](INTEL_ARC.md).
+
+The first launch can take time to check and prepare large model files. Watch its progress and logs; there is no fixed
+startup time for every model or computer. Closing the desktop app stops its managed engine.
+
+The provider order recommended here is **ISTA-DASLab, Unsloth, Gyro, then others**, when a compatible pack fits.
+Current app recommendations can differ; choose the model explicitly when you want a particular provider.
+
+## The Terminal
+
+Install once, then use `strata launch`. The Terminal includes Python and downloads the engine for your computer.
+
+**Linux / Mac**
+
+```sh
+curl -fsSL https://github.com/Niko1221/Strata/releases/latest/download/install.sh -o install.sh && sh install.sh
 ```
 
-对应 tag 为 `0.5.12-ubuntu22.04-dtk2604-py3.10`。本地已有该镜像时，可直接将 `BASE_IMAGE` 设为本地 tag，不必重新下载：
+**Windows PowerShell**
 
-```bash
-BASE_IMAGE=my-local-dtk:2604
-docker image inspect "$BASE_IMAGE" --format '{{.Id}}'
+```powershell
+irm https://github.com/Niko1221/Strata/releases/latest/download/install.ps1 | iex
 ```
 
-本版本使用的固定镜像配置 ID 为：
+On Windows, open a **new terminal** afterwards. On Linux and Mac, if `strata` is not found, use the full path printed
+by the installer (normally `~/.local/bin/strata`) or add that folder to your shell's PATH.
 
-```text
-sha256:caeff0e9e6efef918a31359c4764b18bf2d428f2b76e3580c788f4cc8b0e93ad
+```sh
+strata launch
 ```
 
-更换基础镜像需要重新检查动态库、Python 依赖和模型加载。宿主机需安装兼容的 K100AI 驱动与 HyHAL；容器挂载宿主 `/opt/hyhal`。镜像访问需要认证时，由使用方执行 `docker login harbor.sourcefind.cn:5443`。
+Follow the screens to choose a model, context, storage folder and access settings. The monitor opens after startup.
+Use the address printed by Strata; the default local endpoint is `http://127.0.0.1:8080`.
+The Terminal opens a browser only when you add `--open`.
 
-## 运行包与目录
+For a script or AI agent, inspect a plan before downloading. This example selects ISTA-DASLab Q2_0 explicitly:
 
-在项目根目录下载并校验运行包：
-
-```bash
-curl -fL --retry 3 -o strata-xxs-20261023-k100ai022-linux-amd64.tar.gz \
-  https://github.com/DocPang/strata-k100ai/releases/download/v0.2.1/strata-xxs-20261023-k100ai022-linux-amd64.tar.gz
-sha256sum -c engines/strata/xxs-20261023-k100ai022/artifact.sha256
-tar -xzf strata-xxs-20261023-k100ai022-linux-amd64.tar.gz
-(cd runtime && sha256sum -c FILES.sha256)
+```sh
+strata launch --family qwen --model q2_0 --plan
+strata launch --family qwen --model q2_0 --yes --no-tui
 ```
 
-校验失败时停止部署。运行文件布局：
+`--no-tui` leaves the server running in the background. Check it, connect a tool, or stop it:
 
-```text
-runtime/
-  bin/strata          C++/HIP 推理引擎
-  app/serve/          HTTP 服务与协议处理
-  app/tools/          模型转换工具
-  app/data/           专家分布与词表等辅助数据
-  app/gguf-py/        固定版本的 GGUF 工具依赖
-  FILES.sha256        文件校验表
-  PROVENANCE.json     产物来源
+```sh
+strata launch --status
+strata connect
+strata launch --stop
 ```
 
-原生启动将该目录挂载到 DTK 容器中，不需要构建派生镜像。模型权重、pack 和 MTP 应放在独立目录，准备方式见 [MODELS.md](MODELS.md)。
+If a model is already running with different settings, add `--restart` to replace that run; `--yes` alone does not
+restart it. A restart interrupts current answers. See [all launch options](TERMINAL_LAUNCH.md),
+[advanced Terminal commands](TERMINAL.md), and [agent setup](AI_SETUP.md).
 
-## 显卡设备
+## Updating
 
-```bash
-ls -l /dev/dri/by-path/
-ls -l /dev/dri/renderD*
+**Desktop app:** open Settings and find the update controls, check for updates, and use the offered app or engine update.
+Unload running models before replacing the engine. Your model files and settings are kept.
+
+**Terminal:**
+
+```sh
+strata update --check
+strata update
+strata --version
 ```
 
-根据 PCI 地址与供应方设备工具确认目标卡，检查是否已有任务占用。启动时映射 `/dev/kfd` 和目标 render 节点，并保留节点原路径。例如：
+Stop models first. The next Terminal command uses the updated Control component. The app, Control and engine have
+separate version numbers, so they can differ.
 
-```bash
---device /dev/kfd:/dev/kfd \
---device /dev/dri/renderD129:/dev/dri/renderD129
-```
+Use `strata components rollback` to return to the previous engine. See [update details](../packaging/UPDATES.md).
+Source checkouts have a [separate update workflow](SOURCE_INSTALL.md#updating).
 
-不要将宿主 `renderD129` 重命名为容器 `renderD128`，也不要为单卡实例挂载整个 `/dev/dri`。参考环境中，单节点映射配合 `HIP_VISIBLE_DEVICES=0`、`ROCR_VISIBLE_DEVICES=0` 使用；需通过启动日志确认目标设备。
+## Where things are stored
 
-## 离线环境
+| Item | Default location |
+| --- | --- |
+| Desktop chats and host state | `~/.strata` (or `STRATA_HOME`) |
+| Engine components, Windows | `%LOCALAPPDATA%\Strata\components` |
+| Engine components, Linux / Mac | `$XDG_DATA_HOME/strata/components`, normally `~/.local/share/strata/components` |
+| Terminal files | The `terminal` folder beside `components`; the installer prints the exact path |
+| Models | The folder chosen in the app or launch screens; an existing model library is reused |
 
-在可联网机器下载部署包和运行包，并根据供应方许可导出基础镜像：
+The desktop app normally proposes `Documents/Strata/Models` for a new library. The Terminal discovers saved
+folders from earlier installs. Use the path shown by the app or `strata models list`, not an assumed folder name.
+`--data-dir` changes where new downloads go; it does not move existing models unless you add `--move-data`.
+See [model discovery](TERMINAL_LAUNCH.md#models-you-already-have).
 
-```bash
-docker tag "$BASE_IMAGE" dtk-local:2604
-docker save -o dtk-base.tar dtk-local:2604
-```
+## More options
 
-目标服务器导入后使用本地名称：
-
-```bash
-docker load -i dtk-base.tar
-BASE_IMAGE=dtk-local:2604
-```
-
-权重、pack、MTP runtime 与项目文件需同时传入。文件准备完成后，原生启动不需要访问模型仓库或 Python 包源。
-
-## 可选派生镜像
-
-需要将运行文件固定在派生镜像中时，可手动构建：
-
-```bash
-mkdir -p .cache
-BUILD_DIR="$(mktemp -d "$PWD/.cache/manual-build.XXXXXX")"
-cp -R runtime "$BUILD_DIR/runtime"
-cp -R profiles "$BUILD_DIR/profiles"
-cp containers/strata/Dockerfile "$BUILD_DIR/Dockerfile"
-cp containers/strata/entrypoint.py "$BUILD_DIR/entrypoint.py"
-
-docker tag "$BASE_IMAGE" k100ai-base-dtk:2604-caeff0e9
-BUILDX_BUILDER=default docker build --pull=false --network=none \
-  --build-arg BASE_IMAGE=k100ai-base-dtk:2604-caeff0e9 \
-  --build-arg ENGINE_ID=strata/xxs-20261023-k100ai022 \
-  -t k100ai/strata-xxs-20261023-k100ai022:v0.2.1 "$BUILD_DIR"
-```
-
-采用 Docker-backed builder 复用本机镜像。Dockerfile 不执行 apt/pip 安装。仓库保留 `install.sh`、`start.sh` 和 Compose 作为兼容入口；主要运行与调试流程见 [RUNNING.md](RUNNING.md)。
-
-v0.2.1 运行包内已包含 `bin/strata-vision`。需要图片输入时，把 `mmproj-Qwen3.8-Flash-Next-BF16.gguf` 放进模型目录，并在 `deployment.env` 设置 `VISION_ENABLED=1`；原生启动也可直接用 `profiles/next-iq3xxs-single/strata-vision.json`。字段、API 与显存说明见 [MULTIMODAL.md](MULTIMODAL.md)。
-
-## 魔塔权重下载
-
-[魔塔模型页面](https://modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/files)。以下为可断点续传的两个直接下载命令：
-
-```bash
-mkdir -p /srv/models/next-iq3xxs/IQ3_XXS
-cd /srv/models/next-iq3xxs/IQ3_XXS
-curl -fL --retry 3 -C - -o Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf \
-  'https://modelscope.cn/api/v1/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/repo?Revision=master&FilePath=IQ3_XXS%2FQwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf'
-curl -fL --retry 3 -C - -o Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf \
-  'https://modelscope.cn/api/v1/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/repo?Revision=master&FilePath=IQ3_XXS%2FQwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf'
-sha256sum -c /absolute/path/strata-k100ai/profiles/next-iq3xxs-single/weights.sha256
-```
-
-2026-10-16 核验：两个直链可访问，大小与 SHA-256 对应已核验权重。DTK 镜像来自海光国内 sourcefind 仓库，已核验匿名拉取的 manifest 摘要；未将其他平台的镜像链接作为其副本。
+- [Docker](DOCKER.md)
+- [Build or run from a source checkout](SOURCE_INSTALL.md)
+- [Multiple GPUs](MULTI_GPU.md)
+- [Troubleshooting and logs](TROUBLESHOOTING.md)
+- [Model compatibility](MODELS.md)

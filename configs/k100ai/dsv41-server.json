@@ -1,0 +1,47 @@
+{
+  "name": "DeepSeek-V4.1-Flash K100AI",
+  "model_name": "deepseek-v4.1-flash",
+  "arch": "deepseek41",
+  "backend": "hip",
+  "exe": "/data/strata-dsv41-k100ai/build-gfx928-dsv41-v029-896743023/strata-dsv41",
+  "cwd": "/data/strata-dsv41-k100ai",
+  "gpu": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "gpu_order": "as_given",
+  "tokenizer": "/data/models/dsv41-2.00/maya-ds4-dspark/tokenizer",
+  "engine_ready_s": 3600,
+  "engine_silence_s": 600,
+  "args": [
+    "--pack",
+    "/data/models/dsv41-2.00/maya-ds4-dspark",
+    "--expert-profile",
+    "/data/strata-dsv41-k100ai/data/dsv41/profile-2.00.bin",
+    "--profile-readonly",
+    "--experts",
+    "6",
+    "--vision",
+    "off",
+    "--max-context",
+    "1048576",
+    "--prefill-chunk",
+    "1024",
+    "--vram-experts",
+    "1.0",
+    "--ssd-cache",
+    "0",
+    "--dspark",
+    "on",
+    "--dspark-conf",
+    "0.65",
+    "--tp",
+    "4"
+  ],
+  "env": {
+    "DS4_SPLIT": "10,10,10,10",
+    "HSA_FORCE_FINE_GRAIN_PCIE": "1"
+  }
+}
