@@ -24,4 +24,3 @@
 | 可复现发布 | 固定容器 digest、固定模型 revision、逐文件 SHA-256、canonical `/work/...` 构建路径和确定性 tar/gzip |
 
 Qwen 0.1.55 仍有一个明确未完成项：gfx928 prompt attention 没有达到 0.1.47 的原生 MMAC 路径，因此单卡 prompt 比快速档慢约 1.8 倍。
-

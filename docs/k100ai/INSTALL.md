@@ -565,4 +565,3 @@ K100AI_ASSETS_DIR="$ASSETS" PORT=18097 bash scripts/k100ai/serve-k100ai.sh dsv41
 - `POST /v1/chat/completions`
 - `POST /v1/messages`
 - `GET /metrics`
-
