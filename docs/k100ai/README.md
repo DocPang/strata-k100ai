@@ -55,9 +55,9 @@ K100AI 发布版本 **v0.2.3**，上游基线 Strata v0.2.9。完整下载和资
 | 文件 | 大小 | SHA-256 |
 | --- | ---: | --- |
 | `bin/strata`（Qwen 默认快速档，0.1.47） | 45,674,152 B | `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9` |
-| `bin/strata-0.1.55`（Qwen 当前对照档） | 49,484,096 B | `437308792b7ec08724aa90e4b11736b4f40f41c10613faa9688fbdc1723ba7ab` |
-| `bin/strata-dsv41` | 22,576,544 B | `6543311f453bee2c6d61653a24f0b6282f9cb3568b17a8b889c2c5e073b12286` |
-| `bin/ds4_gguf_test` | 18,816,624 B | `0d6c8455d76815b810a38c5529bc868087e71641008e0c86843ecd8b34dd815c` |
+| `bin/strata-0.1.55`（Qwen 当前对照档） | 49,496,856 B | `25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e` |
+| `bin/strata-dsv41` | 22,812,816 B | `1b0610416b3cce179983f3e439c2d4dc173122c9dc432b485450107b9116d811` |
+| `bin/ds4_gguf_test` | 19,044,176 B | `6159e5e04a602f0362f23501194d63cce0bc47c2089f0b3be4dd088d486f9ee6` |
 
 配套源码归档、资产下载和从零构建步骤见
 [REPRODUCIBILITY.md](REPRODUCIBILITY.md)。源码归档包含主源码树、

@@ -32,6 +32,15 @@ DeepSeek 十档结果：
 DSpark 峰值当作长输出、任意内容或 1M 上下文的持续性能。本版还包含 gfx928
 MMAC/QSA 研究路径、操作符质量门和发布文档更新；这些路径继续通过环境变量显式开启。
 
+本版二进制：
+
+| 文件 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| `bin/strata`（Qwen 0.1.47 默认快速档） | 45,674,152 B | `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9` |
+| `bin/strata-0.1.55`（Qwen 当前对照档） | 49,496,856 B | `25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e` |
+| `bin/strata-dsv41` | 22,812,816 B | `1b0610416b3cce179983f3e439c2d4dc173122c9dc432b485450107b9116d811` |
+| `bin/ds4_gguf_test` | 19,044,176 B | `6159e5e04a602f0362f23501194d63cce0bc47c2089f0b3be4dd088d486f9ee6` |
+
 ## v0.2.2 — Qwen + DeepSeek 双模型与可复现发布
 
 本版把 `strata-k100ai` 从单一 Qwen Docker 部署整理包，升级为面向 Hygon K100AI / gfx928 的双模型运行包：

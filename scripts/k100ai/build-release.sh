@@ -15,9 +15,9 @@ qwen_fast_bin=${QWEN_FAST_BIN:-}
 qwen_fast_source_commit=${QWEN_FAST_SOURCE_COMMIT:-2150b1acdb48c386a9afcd64e63e2369b5a5e108}
 engine_source_commit=${ENGINE_SOURCE_COMMIT:-$(git -C "$src" log -1 --format=%H -- CMakeLists.txt src 2>/dev/null || cat "$src/BUILD_ID" 2>/dev/null || printf 'unknown')}
 package_source_commit=${PACKAGE_SOURCE_COMMIT:-$(git -C "$src" rev-parse HEAD 2>/dev/null || cat "$src/BUILD_ID" 2>/dev/null || printf 'unknown')}
-qwen_current_expected=${QWEN_CURRENT_SHA256-437308792b7ec08724aa90e4b11736b4f40f41c10613faa9688fbdc1723ba7ab}
-dsv41_expected=${DSV41_SHA256-6543311f453bee2c6d61653a24f0b6282f9cb3568b17a8b889c2c5e073b12286}
-test_expected=${DS4_TEST_SHA256-0d6c8455d76815b810a38c5529bc868087e71641008e0c86843ecd8b34dd815c}
+qwen_current_expected=${QWEN_CURRENT_SHA256-25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e}
+dsv41_expected=${DSV41_SHA256-1b0610416b3cce179983f3e439c2d4dc173122c9dc432b485450107b9116d811}
+test_expected=${DS4_TEST_SHA256-6159e5e04a602f0362f23501194d63cce0bc47c2089f0b3be4dd088d486f9ee6}
 
 test -n "$ggml" || { echo "set STRATA_GGML_DIR to the fixed llama.cpp source snapshot" >&2; exit 2; }
 test -n "$qwen_fast_bin" || { echo "set QWEN_FAST_BIN to the verified 0.1.47 engine" >&2; exit 2; }
