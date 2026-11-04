@@ -140,7 +140,8 @@ timings；TTFT 与总请求时间使用客户端墙钟。
 455,14083,2645,344,260,1688,2645,16
 ```
 
-这种高度可预测的输出让 DSpark 在 11 轮内接受 52 / 54 个 draft，命中率
+这种高度可预测的输出让 DSpark 在 11 轮内从 54 个 offered drafts 中接受
+52 个，命中率
 96.3%，最终 decode 为 64 tokens / 911 ms，即 69.19 tok/s。该次 smoke 中：
 
 - CUDA0 layers 0..9：4,224 / 4,224 experts，37.30 GB
@@ -188,18 +189,33 @@ on/off 平均加速为 `68.53 / ((24.32 + 24.25) / 2) = 2.82x`。off/on/off
 
 最终改动后的本地结果：
 
-- `python3 -m unittest tests.terminal.test_drafting -v`：40 tests，OK
-- `python3 -m unittest serve.test_dsv41`：64 tests，OK，1 skipped
-- `python3 -m unittest serve.test_server`：360 tests，OK
+- `python3 -m unittest tests.terminal.test_drafting serve.test_dsv41 serve.test_server`：
+  464 tests，OK；其中 `serve.test_dsv41` 的 1 项因 `STRATA_DSV41_PACK`
+  未设置而跳过
 - `bash -n scripts/k100ai/*.sh`
 - 所有 `scripts/k100ai/*.py` 通过 `py_compile`
 - 两个 server template 通过 `json.tool`
 - `git diff --check`
 - launcher、preflight、setup 脚本保持 executable
 
-发布包还在全新目录验证：
+本版发布归档：
 
-- `sha256sum -c SHA256SUMS`
+| 文件 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| `strata-v0.2.9-k100ai-dual.tar.gz` | 70,790,149 B | `e318437e0bd5aff676dd022a737267c933a5f0df9c393fb83f1b8603073e2871` |
+| `strata-v0.2.9-k100ai-dual-source.tar.gz` | 76,881,571 B | `deeffa4bc7086656b84ab8ec0507623a9fe78c44a46fdfff5c1a12038968e5b3` |
+| `validation-evidence.tar.gz` | 59,981 B | `702c54ebd44d40de2dc40b0dda6ab2ab7d02712761511f28a829a5c585c9c764` |
+
+运行包在全新目录验证：
+
+- 解压后 `sha256sum -c SHA256SUMS`：5,812 个文件条目全部 OK
+- 固定 DTK 2604 容器内 `--version`：`strata 0.1.47`、`strata 0.1.55`、
+  `strata-dsv41 0.1.55 build unknown`
+
+以下 API 和启动器 smoke 是 v0.2.2 发布包的历史验证记录，用于说明同源
+runtime 路径；本次 v0.2.3 没有连接 HCU，未重跑 GPU/API 验证，因此不把
+这些历史结果表述为本版最终包的实测：
+
 - DTK Python 3.10 中首次 runtime setup 和重复 setup/import marker
 - preflight 的 HCU0-3 占用检查
 - launcher 同名容器拒绝、SIGTERM 清理和研究容器保持

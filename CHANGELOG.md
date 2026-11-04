@@ -7,7 +7,7 @@
 
 - 69.19 tok/s 是 25-token 输入、64-token 规则重复输出、DSpark 开启时的短输出峰值。
 - 该输出为 `455,14083,2645,344,260,1688,2645,16` 连续重复 8 次；11 轮内接受
-  52 / 54 个 draft，命中率 96.3%。
+  54 个 offered drafts 中的 52 个，命中率 96.3%。
 - 同一短序列在 DSpark 关闭时为 24.32 / 24.25 tok/s，因此 2.82× 仅适用于该对照。
 - 单并发、Greedy、256-token 混合内容输出的正常观测区间为 14.5–27.7 tok/s。
 - 16K 档的 3.0 tok/s 是异常点：前约 128-token 阶段为 1.69 tok/s，随后约
@@ -40,6 +40,14 @@ MMAC/QSA 研究路径、操作符质量门和发布文档更新；这些路径�
 | `bin/strata-0.1.55`（Qwen 当前对照档） | 49,496,856 B | `25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e` |
 | `bin/strata-dsv41` | 22,812,816 B | `1b0610416b3cce179983f3e439c2d4dc173122c9dc432b485450107b9116d811` |
 | `bin/ds4_gguf_test` | 19,044,176 B | `6159e5e04a602f0362f23501194d63cce0bc47c2089f0b3be4dd088d486f9ee6` |
+
+本版发布归档：
+
+| 文件 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| `strata-v0.2.9-k100ai-dual.tar.gz` | 70,790,149 B | `e318437e0bd5aff676dd022a737267c933a5f0df9c393fb83f1b8603073e2871` |
+| `strata-v0.2.9-k100ai-dual-source.tar.gz` | 76,881,571 B | `deeffa4bc7086656b84ab8ec0507623a9fe78c44a46fdfff5c1a12038968e5b3` |
+| `validation-evidence.tar.gz` | 59,981 B | `702c54ebd44d40de2dc40b0dda6ab2ab7d02712761511f28a829a5c585c9c764` |
 
 ## v0.2.2 — Qwen + DeepSeek 双模型与可复现发布
 

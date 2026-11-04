@@ -36,8 +36,9 @@ K100AI 版本 **v0.2.3** · 上游基线 **Strata v0.2.9** · **Linux x86_64 / g
 
 69.19 tok/s 是真实测得的短输出峰值，不是适用于任意内容或任意输出长度的持续吞吐。
 该测试的 64-token 输出是 `455,14083,2645,344,260,1688,2645,16` 连续重复 8 次；
-DSpark 在 11 轮内接受 **52 / 54** 个 draft，命中率 96.3%。相同短序列在 DSpark
-关闭时为 24.32 / 24.25 tok/s，因此 2.82× 也只描述这一有利工况。
+DSpark 在 11 轮内从 **54 个 offered drafts 中接受 52 个**，命中率 96.3%。
+相同短序列在 DSpark 关闭时为 24.32 / 24.25 tok/s，因此 2.82× 也只描述
+这一有利工况。
 
 ### DeepSeek-V4.1-Flash · 十档长输出
 
@@ -97,6 +98,14 @@ bash scripts/k100ai/setup-runtime.sh
 
 归档名中的 `v0.2.9` 是上游基线；`v0.2.3-k100ai` 是本仓库的产品版本 v0.2.3
 对应的发布标签。
+
+发布归档：
+
+| 文件 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| `strata-v0.2.9-k100ai-dual.tar.gz` | 70,790,149 B | `e318437e0bd5aff676dd022a737267c933a5f0df9c393fb83f1b8603073e2871` |
+| `strata-v0.2.9-k100ai-dual-source.tar.gz` | 76,881,571 B | `deeffa4bc7086656b84ab8ec0507623a9fe78c44a46fdfff5c1a12038968e5b3` |
+| `validation-evidence.tar.gz` | 59,981 B | `702c54ebd44d40de2dc40b0dda6ab2ab7d02712761511f28a829a5c585c9c764` |
 
 ### 2. 准备模型资产
 

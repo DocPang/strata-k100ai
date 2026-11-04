@@ -13,6 +13,7 @@ K100AI 发布版本 **v0.2.3**，上游基线 Strata v0.2.9。完整下载和资
 
 - 上游基础：Strata v0.2.9，`c62d5e3a15b40ea51c96aae9e8d36928965f53ab`
 - 当前引擎源码：`8c413cae0f5e9f88df784642772d78dff7bef428`
+- 打包源码：`ae0abbd3a8dc198d0983ed5d947ad554a52330a3`
 - 当前引擎版本：`0.1.55`
 - Qwen 默认快速引擎版本：`0.1.47`
 - 发布标签：`v0.2.3-k100ai`
@@ -30,7 +31,7 @@ K100AI 发布版本 **v0.2.3**，上游基线 Strata v0.2.9。完整下载和资
 {
   "engine_version": "0.1.55",
   "engine_source_commit": "8c413cae0f5e9f88df784642772d78dff7bef428",
-  "package_source_commit": "<最终打包提交>",
+  "package_source_commit": "ae0abbd3a8dc198d0983ed5d947ad554a52330a3",
   "container_image": "harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68",
   "platform": "linux-x86_64-gfx928-dtk2604",
   "models_included": false,
@@ -58,6 +59,14 @@ K100AI 发布版本 **v0.2.3**，上游基线 Strata v0.2.9。完整下载和资
 | `bin/strata-0.1.55`（Qwen 当前对照档） | 49,496,856 B | `25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e` |
 | `bin/strata-dsv41` | 22,812,816 B | `1b0610416b3cce179983f3e439c2d4dc173122c9dc432b485450107b9116d811` |
 | `bin/ds4_gguf_test` | 19,044,176 B | `6159e5e04a602f0362f23501194d63cce0bc47c2089f0b3be4dd088d486f9ee6` |
+
+最终归档：
+
+| 文件 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| `strata-v0.2.9-k100ai-dual.tar.gz` | 70,790,149 B | `e318437e0bd5aff676dd022a737267c933a5f0df9c393fb83f1b8603073e2871` |
+| `strata-v0.2.9-k100ai-dual-source.tar.gz` | 76,881,571 B | `deeffa4bc7086656b84ab8ec0507623a9fe78c44a46fdfff5c1a12038968e5b3` |
+| `validation-evidence.tar.gz` | 59,981 B | `702c54ebd44d40de2dc40b0dda6ab2ab7d02712761511f28a829a5c585c9c764` |
 
 配套源码归档、资产下载和从零构建步骤见
 [REPRODUCIBILITY.md](REPRODUCIBILITY.md)。源码归档包含主源码树、
