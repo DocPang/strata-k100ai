@@ -1,6 +1,6 @@
 # K100AI 优化说明
 
-[返回首页](../../README.md) · [验证记录](VALIDATION.md)
+[返回首页](../../../README.md) · [验证记录](VALIDATION.md)
 
 
 下表列出 v0.2.3 的运行路径，包括 gfx928 内核适配、布局与参数选择。性能结果见 [验证记录](VALIDATION.md)。

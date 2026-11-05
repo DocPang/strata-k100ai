@@ -189,7 +189,7 @@ on/off 平均加速为 `68.53 / ((24.32 + 24.25) / 2) = 2.82x`。off/on/off
 
 最终改动后的本地结果：
 
-- `python3 -m unittest tests.terminal.test_drafting serve.test_dsv41 serve.test_server`：
+- `(cd k100ai && python3 -m unittest tests.terminal.test_drafting serve.test_dsv41 serve.test_server)`：
   464 tests，OK；其中 `serve.test_dsv41` 的 1 项因 `STRATA_DSV41_PACK`
   未设置而跳过
 - `bash -n scripts/k100ai/*.sh`

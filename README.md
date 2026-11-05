@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="apps/host/public/brand/strata-lockup-dark.svg">
-    <img src="apps/host/public/brand/strata-lockup-light.svg" alt="Strata" width="280">
+    <source media="(prefers-color-scheme: dark)" srcset="k100ai/apps/host/public/brand/strata-lockup-dark.svg">
+    <img src="k100ai/apps/host/public/brand/strata-lockup-light.svg" alt="Strata" width="280">
   </picture>
 </p>
 
@@ -13,11 +13,13 @@
   <a href="https://github.com/DocPang/strata-k100ai/releases/latest"><b>下载 v0.2.3</b></a> ·
   <a href="#实测性能">性能</a> ·
   <a href="#安装与运行">安装</a> ·
-  <a href="docs/k100ai/INSTALL.md">完整手动步骤</a> ·
-  <a href="docs/k100ai/REPRODUCIBILITY.md">源码复现</a>
+  <a href="k100ai/docs/k100ai/INSTALL.md">完整手动步骤</a> ·
+  <a href="k100ai/docs/k100ai/REPRODUCIBILITY.md">源码复现</a>
 </p>
 
 K100AI 版本 **v0.2.3** · 上游基线 **Strata v0.2.9** · **Linux x86_64 / gfx928 / DTK 2604**
+
+源码、运行时和发布工具集中在 [`k100ai/`](k100ai/)；仓库根目录只保留发布入口。
 
 ## 实测性能
 
@@ -63,7 +65,7 @@ cache 命中。输出速度使用服务端 timings；TTFT 和总耗时使用客�
 上下文容量或单调长上下文退化。排除该异常后，正常档输出速度中位数约 **25.8 tok/s**。
 完整 1M 窗口尚未灌满做质量评测。
 
-配置上下文上限为 **1,048,576 tokens**；完整 1M 窗口尚未灌满做质量评测。[测试条件与验证记录 →](docs/k100ai/VALIDATION.md#deepseek-四卡dspark-和长输入)
+配置上下文上限为 **1,048,576 tokens**；完整 1M 窗口尚未灌满做质量评测。[测试条件与验证记录 →](k100ai/docs/k100ai/VALIDATION.md#deepseek-四卡dspark-和长输入)
 
 ### Qwen3.8-Flash-Next · 单卡
 
@@ -76,11 +78,11 @@ cache 命中。输出速度使用服务端 timings；TTFT 和总耗时使用客�
 
 快速档在 8,191-token 输入、64-token 输出测试中生成速度为 **79.37 tok/s**，MTP 接受 **56 / 57**。配置上下文上限为 **262,144 tokens**。
 
-默认使用 0.1.47，原因是 0.1.55 的 gfx928 prompt attention 仍有性能回归。快速档允许数值漂移：8K / 40K 验证中 top-1 相同，logits 余弦相似度为 0.9915 / 0.9870，40K 的前 8 个 greedy token 相同；它不保证逐位一致。[精度与性能明细 →](docs/k100ai/VALIDATION.md#qwen-精度和快速档验收)
+默认使用 0.1.47，原因是 0.1.55 的 gfx928 prompt attention 仍有性能回归。快速档允许数值漂移：8K / 40K 验证中 top-1 相同，logits 余弦相似度为 0.9915 / 0.9870，40K 的前 8 个 greedy token 相同；它不保证逐位一致。[精度与性能明细 →](k100ai/docs/k100ai/VALIDATION.md#qwen-精度和快速档验收)
 
 ## 安装与运行
 
-需要 Linux x86_64、K100AI/gfx928、Hygon 驱动、HyHAL 和 Docker。使用固定的 DTK 2604 镜像；完整镜像 digest、模型地址和 SHA-256 见[手动安装文档](docs/k100ai/INSTALL.md)。
+需要 Linux x86_64、K100AI/gfx928、Hygon 驱动、HyHAL 和 Docker。使用固定的 DTK 2604 镜像；完整镜像 digest、模型地址和 SHA-256 见[手动安装文档](k100ai/docs/k100ai/INSTALL.md)。
 
 ### 1. 下载并安装运行包
 
@@ -109,10 +111,10 @@ bash scripts/k100ai/setup-runtime.sh
 
 ### 2. 准备模型资产
 
-权重、MTP runtime 和模型 pack 需要另行下载或生成，不随运行包分发。先按[安装文档第 2 步](docs/k100ai/INSTALL.md#2-安装-python-运行时)设置路径与镜像变量，再准备所需模型。默认资产目录为 `/data/k100ai-assets`：
+权重、MTP runtime 和模型 pack 需要另行下载或生成，不随运行包分发。先按[安装文档第 2 步](k100ai/docs/k100ai/INSTALL.md#2-安装-python-运行时)设置路径与镜像变量，再准备所需模型。默认资产目录为 `/data/k100ai-assets`：
 
-- **DeepSeek**：[下载、校验权重与 DSpark](docs/k100ai/INSTALL.md#6-手动下载并校验-deepseek-资产) → [生成 pack](docs/k100ai/INSTALL.md#7-人工生成-deepseek-pack)。
-- **Qwen**：[下载、校验权重](docs/k100ai/INSTALL.md#3-手动下载并校验-qwen-主权重) → [生成 pack](docs/k100ai/INSTALL.md#4-人工生成-qwen-pack) → [准备 MTP](docs/k100ai/INSTALL.md#5-人工准备-qwen-mtp)。
+- **DeepSeek**：[下载、校验权重与 DSpark](k100ai/docs/k100ai/INSTALL.md#6-手动下载并校验-deepseek-资产) → [生成 pack](k100ai/docs/k100ai/INSTALL.md#7-人工生成-deepseek-pack)。
+- **Qwen**：[下载、校验权重](k100ai/docs/k100ai/INSTALL.md#3-手动下载并校验-qwen-主权重) → [生成 pack](k100ai/docs/k100ai/INSTALL.md#4-人工生成-qwen-pack) → [准备 MTP](k100ai/docs/k100ai/INSTALL.md#5-人工准备-qwen-mtp)。
 
 pack 生成步骤会导出 tokenizer，Qwen expert profile 随运行包提供。下载和转换需要数百 GB 磁盘空间。
 
@@ -132,7 +134,7 @@ K100AI_ASSETS_DIR=/data/k100ai-assets \
 PORT=18096 bash scripts/k100ai/serve-k100ai.sh qwen
 ```
 
-启动器检查设备占用和资产文件；按 `Ctrl-C` 停止服务。默认仅监听本机。手动 Docker 启动命令见[安装文档](docs/k100ai/INSTALL.md#9-人工渲染并启动-qwen)。
+启动器检查设备占用和资产文件；按 `Ctrl-C` 停止服务。默认仅监听本机。手动 Docker 启动命令见[安装文档](k100ai/docs/k100ai/INSTALL.md#9-人工渲染并启动-qwen)。
 
 ### 4. 发送请求
 
@@ -154,7 +156,7 @@ curl --fail http://127.0.0.1:18097/v1/chat/completions \
 | Qwen 默认快速档 | `bin/strata` | 0.1.47 | MTP | 1× K100AI |
 | Qwen 对照档 | `bin/strata-0.1.55` | 0.1.55 | MTP | 1× K100AI |
 
-主要优化覆盖 gfx928 HIP 适配、Qwen 原生 prompt MMAC 与 fused expert、DeepSeek 四卡分层切分与专家驻留、FP4 KV，以及 MTP / DSpark 推测解码。内核路径和参数见[优化说明](docs/k100ai/OPTIMIZATION.md)。
+主要优化覆盖 gfx928 HIP 适配、Qwen 原生 prompt MMAC 与 fused expert、DeepSeek 四卡分层切分与专家驻留、FP4 KV，以及 MTP / DSpark 推测解码。内核路径和参数见[优化说明](k100ai/docs/k100ai/OPTIMIZATION.md)。
 
 ## 复现与文档
 
@@ -162,11 +164,11 @@ curl --fail http://127.0.0.1:18097/v1/chat/completions \
 
 | 文档 | 内容 |
 | --- | --- |
-| [完整手动安装](docs/k100ai/INSTALL.md) | 模型地址、文件校验、pack / MTP 生成、Docker 命令 |
-| [运行参数](docs/k100ai/README.md) | 引擎切换、启动器行为、API 验收 |
-| [源码复现](docs/k100ai/REPRODUCIBILITY.md) | 固定镜像、源码输入、从零构建 |
-| [验证记录](docs/k100ai/VALIDATION.md) | 性能、数值差异、算子与 API 测试 |
-| [来源与校验](docs/k100ai/PROVENANCE.md) | 二进制、模型与运行资产的来源和摘要 |
+| [完整手动安装](k100ai/docs/k100ai/INSTALL.md) | 模型地址、文件校验、pack / MTP 生成、Docker 命令 |
+| [运行参数](k100ai/docs/k100ai/README.md) | 引擎切换、启动器行为、API 验收 |
+| [源码复现](k100ai/docs/k100ai/REPRODUCIBILITY.md) | 固定镜像、源码输入、从零构建 |
+| [验证记录](k100ai/docs/k100ai/VALIDATION.md) | 性能、数值差异、算子与 API 测试 |
+| [来源与校验](k100ai/docs/k100ai/PROVENANCE.md) | 二进制、模型与运行资产的来源和摘要 |
 | [版本记录](CHANGELOG.md) | 版本变更 |
 
 ## 使用范围

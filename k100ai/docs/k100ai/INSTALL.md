@@ -1,6 +1,6 @@
 # K100AI 手动安装与运行
 
-[返回首页](../../README.md) · [运行参数](README.md) · [源码复现](REPRODUCIBILITY.md)
+[返回首页](../../../README.md) · [运行参数](README.md) · [源码复现](REPRODUCIBILITY.md)
 
 适用于 **v0.2.3**：Linux x86_64、K100AI/gfx928、DTK 2604。Qwen 需要一张 64 GiB 卡，DeepSeek 需要四张。模型下载、转换和 MTP 构造需要数百 GB 空间。
 
