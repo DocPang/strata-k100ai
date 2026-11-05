@@ -2,7 +2,7 @@
 
 发布包采用逐模型二进制分层。Qwen 默认快速档是本机已验证的 K100AI
 0.1.47；DeepSeek 和 Qwen 对照档来自
-`8544d2fa6cddf61fb47edc0c3bd8a5d7d638140e` 的 0.1.55。所有 GPU 测试只用
+`8c413cae0f5e9f88df784642772d78dff7bef428` 的 0.1.55。所有 GPU 测试只用
 HCU0-3；每个 case 前执行 preflight，结束后确认没有测试容器和 lease，三个
 研究容器保持 `exited`。
 
@@ -13,9 +13,9 @@ HCU0-3；每个 case 前执行 preflight，结束后确认没有测试容器和 
 | 目标 | 大小 | SHA-256 |
 | --- | ---: | --- |
 | Qwen 默认快速档 `strata`（0.1.47） | 45,674,152 B | `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9` |
-| Qwen 当前对照档 `strata-0.1.55` | 49,484,096 B | `437308792b7ec08724aa90e4b11736b4f40f41c10613faa9688fbdc1723ba7ab` |
-| DeepSeek `strata-dsv41` | 22,576,544 B | `6543311f453bee2c6d61653a24f0b6282f9cb3568b17a8b889c2c5e073b12286` |
-| DeepSeek `ds4_gguf_test` | 18,816,624 B | `0d6c8455d76815b810a38c5529bc868087e71641008e0c86843ecd8b34dd815c` |
+| Qwen 当前对照档 `strata-0.1.55` | 49,496,856 B | `25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e` |
+| DeepSeek `strata-dsv41` | 22,812,816 B | `1b0610416b3cce179983f3e439c2d4dc173122c9dc432b485450107b9116d811` |
+| DeepSeek `ds4_gguf_test` | 19,044,176 B | `6159e5e04a602f0362f23501194d63cce0bc47c2089f0b3be4dd088d486f9ee6` |
 
 最终包内 `ds4_gguf_test` 输出 `ALL OK (0 failed)`。覆盖 BF16、MXFP4、
 Q8_0、Q2_K、Q3_K、Q4_K、IQ4_XS、IQ3_S、IQ2_XXS、IQ2_S 的
@@ -101,7 +101,48 @@ profile。
 ## DeepSeek 四卡、DSpark 和长输入
 
 最终包的 `strata-dsv41` 在 HCU0-3 上完整放置四张卡，CPU lane 为 0。
-64-token smoke 中：
+
+### 单并发十档长输出
+
+服务使用四张 K100AI、IQ2_XXS、FP4 KV、1,048,576-token 配置上下文、
+DSpark Q8_0、6 experts 和 `--dspark-conf 0.65`。请求使用 OpenAI 兼容
+`/v1/chat/completions`，单并发、`temperature=0`、`top_p=1`、目标输出
+256 tokens，逐档冷启动，所有档 `cached_tokens=0`。输出速度使用服务端
+timings；TTFT 与总请求时间使用客户端墙钟。
+
+| 目标输入 | 实际 prompt | TTFT | 预填充 | 输出 | 输出 tokens | 说明 |
+| ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 512 | 556 | 2.079 s | 121.6 tok/s | 26.8 tok/s | 256 | 正常 |
+| 2,048 | 2,092 | 3.685 s | 274.9 tok/s | 14.5 tok/s | 256 | 正常 |
+| 4,096 | 4,141 | 5.768 s | 349.7 tok/s | 16.9 tok/s | 256 | 正常 |
+| 8,192 | 8,237 | 9.948 s | 415.0 tok/s | 22.0 tok/s | 160 | 自然 EOS |
+| 12,288 | 12,333 | 13.632 s | 452.4 tok/s | 25.8 tok/s | 256 | 正常 |
+| 16,384 | 16,429 | 37.289 s | 201.8 tok/s | **3.0 tok/s** | 256 | **异常，排除出正常区间统计** |
+| 32,768 | 32,813 | 38.409 s | 426.9 tok/s | 27.7 tok/s | 256 | 正常 |
+| 65,536 | 65,581 | 81.431 s | 399.8 tok/s | 26.0 tok/s | 256 | 正常 |
+| 131,072 | 131,117 | 191.209 s | 333.8 tok/s | 24.2 tok/s | 256 | 正常 |
+| 257,901 | 257,945 | 355.155 s | 363.5 tok/s | 26.3 tok/s | 256 | 正常 |
+
+正常档的输出范围是 14.5–27.7 tok/s，中位数约 25.8 tok/s。32K 及以上没有
+出现随上下文单调下降，说明这一组 mixed-content 请求的主要限制不是 KV
+长度。DSpark 每轮能接受多少 draft、输出本身是否可预测，仍是主要变量。
+
+16K 档是异常点：引擎日志前半段约 128 tokens / 75,664 ms，即 1.69 tok/s；
+后半段约 111 tokens / 4,037 ms，即 27.50 tok/s。两段合并得到报告中的
+3.0 tok/s。相邻的 12K 与 32K 档正常，因此该点不作为长上下文退化证据。
+
+### 69.19 tok/s 的准确口径
+
+发布 smoke 使用固定 25-token 输入和 64-token 输出。输出是以下 8-token
+序列连续重复 8 次：
+
+```text
+455,14083,2645,344,260,1688,2645,16
+```
+
+这种高度可预测的输出让 DSpark 在 11 轮内从 54 个 offered drafts 中接受
+52 个，命中率
+96.3%，最终 decode 为 64 tokens / 911 ms，即 69.19 tok/s。该次 smoke 中：
 
 - CUDA0 layers 0..9：4,224 / 4,224 experts，37.30 GB
 - CUDA1 layers 10..19：3,840 / 3,840 experts，33.12 GB
@@ -117,7 +158,7 @@ profile。
 | off A | 24.32 tok/s | off |
 | on B | 68.53 tok/s | 54 offered / 52 accepted |
 | off C | 24.25 tok/s | off |
-| on，最终包 smoke | 69.19 tok/s | 54 offered / 52 accepted |
+| on，最终包短输出峰值 | 69.19 tok/s | 54 offered / 52 accepted |
 
 on/off 平均加速为 `68.53 / ((24.32 + 24.25) / 2) = 2.82x`。off/on/off
 和最终包 smoke 的四组 64-token token ID 完全相同。profile 测试前后均为：
@@ -127,6 +168,11 @@ on/off 平均加速为 `68.53 / ((24.32 + 24.25) / 2) = 2.82x`。off/on/off
 ```
 
 服务使用冻结的 `data/dsv41/profile-2.00.bin` 和 `--profile-readonly`。
+
+因此 69.19 tok/s 和 2.82× 只描述上述重复短序列。它们不能写成任意内容、
+任意输出长度或长上下文的持续吞吐。较早日志中的 52 offered / 52 accepted
+属于不同的 21-token 调参运行，decode 为 62.75–65.00 tok/s；发布 smoke
+的最终证据是 25-token 输入与 54 offered / 52 accepted。
 
 有效 4,095-token DSV 长输入使用重复且已验证的 25-token DSV 序列：
 
@@ -143,18 +189,33 @@ on/off 平均加速为 `68.53 / ((24.32 + 24.25) / 2) = 2.82x`。off/on/off
 
 最终改动后的本地结果：
 
-- `python3 -m unittest tests.terminal.test_drafting -v`：40 tests，OK
-- `python3 -m unittest serve.test_dsv41`：64 tests，OK，1 skipped
-- `python3 -m unittest serve.test_server`：360 tests，OK
+- `python3 -m unittest tests.terminal.test_drafting serve.test_dsv41 serve.test_server`：
+  464 tests，OK；其中 `serve.test_dsv41` 的 1 项因 `STRATA_DSV41_PACK`
+  未设置而跳过
 - `bash -n scripts/k100ai/*.sh`
 - 所有 `scripts/k100ai/*.py` 通过 `py_compile`
 - 两个 server template 通过 `json.tool`
 - `git diff --check`
 - launcher、preflight、setup 脚本保持 executable
 
-发布包还在全新目录验证：
+本版发布归档：
 
-- `sha256sum -c SHA256SUMS`
+| 文件 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| `strata-v0.2.9-k100ai-dual.tar.gz` | 70,790,149 B | `e318437e0bd5aff676dd022a737267c933a5f0df9c393fb83f1b8603073e2871` |
+| `strata-v0.2.9-k100ai-dual-source.tar.gz` | 76,881,571 B | `deeffa4bc7086656b84ab8ec0507623a9fe78c44a46fdfff5c1a12038968e5b3` |
+| `validation-evidence.tar.gz` | 59,981 B | `702c54ebd44d40de2dc40b0dda6ab2ab7d02712761511f28a829a5c585c9c764` |
+
+运行包在全新目录验证：
+
+- 解压后 `sha256sum -c SHA256SUMS`：5,812 个文件条目全部 OK
+- 固定 DTK 2604 容器内 `--version`：`strata 0.1.47`、`strata 0.1.55`、
+  `strata-dsv41 0.1.55 build unknown`
+
+以下 API 和启动器 smoke 是 v0.2.2 发布包的历史验证记录，用于说明同源
+runtime 路径；本次 v0.2.3 没有连接 HCU，未重跑 GPU/API 验证，因此不把
+这些历史结果表述为本版最终包的实测：
+
 - DTK Python 3.10 中首次 runtime setup 和重复 setup/import marker
 - preflight 的 HCU0-3 占用检查
 - launcher 同名容器拒绝、SIGTERM 清理和研究容器保持

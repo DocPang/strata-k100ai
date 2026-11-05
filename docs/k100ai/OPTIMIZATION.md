@@ -3,7 +3,7 @@
 [返回首页](../../README.md) · [验证记录](VALIDATION.md)
 
 
-下表列出 v0.2.2 的运行路径，包括 gfx928 内核适配、布局与参数选择。性能结果见 [验证记录](VALIDATION.md)。
+下表列出 v0.2.3 的运行路径，包括 gfx928 内核适配、布局与参数选择。性能结果见 [验证记录](VALIDATION.md)。
 
 | 范围 | 本版采用的优化 |
 | --- | --- |
@@ -19,6 +19,7 @@
 | DeepSeek 四卡 | 每卡 10 层的 `10,10,10,10` 切分，全部 routed experts 驻留 HCU，1024-token prefill chunk |
 | DeepSeek KV 与 Engram | 1M-token FP4 KV、resident KV、2 层 Engram 和 48 次 lookup |
 | DeepSeek drafting | DSpark Q8_0 drafter，置信度 0.65；最终 profile 记录 CPU/RAM expert lane 为 0 |
+| DeepSeek gfx928 研究路径 | 显式开启的 prompt expert、dense、attention MMAC 与 QSA packed layout；精确路径保留为回退 |
 | 服务运行时 | OpenAI 与 Anthropic 兼容 API、健康检查、Prometheus metrics、MTP/DSpark draft 计数 |
 | 安全启动 | Qwen 只映射一张 HCU，DeepSeek 只映射四张；宿主端口绑定 127.0.0.1，不自动停止其他容器 |
 | 可复现发布 | 固定容器 digest、固定模型 revision、逐文件 SHA-256、canonical `/work/...` 构建路径和确定性 tar/gzip |

@@ -2,7 +2,7 @@
 
 [返回首页](../../README.md) · [运行参数](README.md) · [源码复现](REPRODUCIBILITY.md)
 
-适用于 **v0.2.2**：Linux x86_64、K100AI/gfx928、DTK 2604。Qwen 需要一张 64 GiB 卡，DeepSeek 需要四张。模型下载、转换和 MTP 构造需要数百 GB 空间。
+适用于 **v0.2.3**：Linux x86_64、K100AI/gfx928、DTK 2604。Qwen 需要一张 64 GiB 卡，DeepSeek 需要四张。模型下载、转换和 MTP 构造需要数百 GB 空间。
 
 
 本文列出模型下载、文件校验、pack 生成和 Docker 启动的完整步骤。需要减少重复输入时，可使用文末的便利脚本。
@@ -16,7 +16,7 @@
 - 需要自行重建时，同时下载 `strata-v0.2.9-k100ai-dual-source.tar.gz`
 
 ```bash
-VERSION=v0.2.2
+VERSION=v0.2.3-k100ai
 BASE_URL="https://github.com/DocPang/strata-k100ai/releases/download/$VERSION"
 
 curl -fL --retry 3 -O \
@@ -25,10 +25,10 @@ curl -fL --retry 3 -O \
   "$BASE_URL/strata-v0.2.9-k100ai-dual.tar.gz.sha256"
 
 sha256sum -c strata-v0.2.9-k100ai-dual.tar.gz.sha256
-mkdir -p /data/strata-k100ai-v0.2.2
+mkdir -p /data/strata-k100ai-v0.2.3
 tar -xzf strata-v0.2.9-k100ai-dual.tar.gz \
-  -C /data/strata-k100ai-v0.2.2 --strip-components=1
-cd /data/strata-k100ai-v0.2.2
+  -C /data/strata-k100ai-v0.2.3 --strip-components=1
+cd /data/strata-k100ai-v0.2.3
 sha256sum -c SHA256SUMS
 ```
 
@@ -72,7 +72,7 @@ docker run --rm --name strata-k100ai-python-check \
 安装完成后设置本页反复使用的变量：
 
 ```bash
-ROOT=/data/strata-k100ai-v0.2.2
+ROOT=/data/strata-k100ai-v0.2.3
 ASSETS=/data/k100ai-assets
 IMAGE=harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68
 RUN_DIR="$ROOT/run"

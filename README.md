@@ -10,14 +10,14 @@
 <p align="center">在海光 K100AI 上运行 DeepSeek V4.1 与 Qwen3.8，提供 OpenAI / Anthropic 兼容 API。</p>
 
 <p align="center">
-  <a href="https://github.com/DocPang/strata-k100ai/releases/latest"><b>下载 v0.2.2</b></a> ·
+  <a href="https://github.com/DocPang/strata-k100ai/releases/latest"><b>下载 v0.2.3</b></a> ·
   <a href="#实测性能">性能</a> ·
   <a href="#安装与运行">安装</a> ·
   <a href="docs/k100ai/INSTALL.md">完整手动步骤</a> ·
   <a href="docs/k100ai/REPRODUCIBILITY.md">源码复现</a>
 </p>
 
-K100AI 版本 **v0.2.2** · 上游基线 **Strata v0.2.9** · **Linux x86_64 / gfx928 / DTK 2604**
+K100AI 版本 **v0.2.3** · 上游基线 **Strata v0.2.9** · **Linux x86_64 / gfx928 / DTK 2604**
 
 ## 实测性能
 
@@ -27,12 +27,41 @@ K100AI 版本 **v0.2.2** · 上游基线 **Strata v0.2.9** · **Linux x86_64 / g
 
 | 项目 | 实测结果 | 测试条件 |
 | --- | ---: | --- |
-| **生成速度** | **69.19 tok/s** | 最终发布包，64-token 输出，DSpark 开启 |
-| **DSpark 加速** | **2.82×** | 相同 25-token 输入，off / on / off 对照 |
+| 混合内容长输出 | 14.5–27.7 tok/s | 256-token 输出，测速档 2K–32K、64K–256K；DSpark 开启 |
+| DSpark 关闭基线 | 24.32 / 24.25 tok/s | 相同 25-token 输入、64-token 输出 |
+| **短输出 DSpark 峰值** | **69.19 tok/s** | 25-token 输入，64-token 规则重复输出，DSpark 开启 |
+| DSpark 对照峰值 | 2.82× | 仅限上述 25-token 输入、64-token 输出的 off / on / off 对照 |
 | 输入处理速度 | 300.45 tok/s | 4,095-token prompt，13.629 秒 |
 | 长输入稳定性 | 120,029 tokens | 独特 prompt tokens，请求完成、服务稳定 |
 
-DSpark 对照的生成速度依次为 **24.32 → 68.53 → 24.25 tok/s**，三次 64-token 输出完全相同；最终发布包的输出也相同，draft 接受 **52 / 54**。2.82× 按对照轮次计算，69.19 tok/s 来自最终包的独立测试。
+69.19 tok/s 是真实测得的短输出峰值，不是适用于任意内容或任意输出长度的持续吞吐。
+该测试的 64-token 输出是 `455,14083,2645,344,260,1688,2645,16` 连续重复 8 次；
+DSpark 在 11 轮内从 **54 个 offered drafts 中接受 52 个**，命中率 96.3%。
+相同短序列在 DSpark 关闭时为 24.32 / 24.25 tok/s，因此 2.82× 也只描述
+这一有利工况。
+
+### DeepSeek-V4.1-Flash · 十档长输出
+
+单并发、`temperature=0`、`top_p=1`、DSpark 开启，257,945 token 以内各档均无 KV
+cache 命中。输出速度使用服务端 timings；TTFT 和总耗时使用客户端墙钟。
+
+| 目标输入 | 实际 prompt | TTFT | 预填充 | 输出 | 输出 tokens | 说明 |
+| ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 512 | 556 | 2.079 s | 121.6 tok/s | 26.8 tok/s | 256 | 正常 |
+| 2,048 | 2,092 | 3.685 s | 274.9 tok/s | 14.5 tok/s | 256 | 正常 |
+| 4,096 | 4,141 | 5.768 s | 349.7 tok/s | 16.9 tok/s | 256 | 正常 |
+| 8,192 | 8,237 | 9.948 s | 415.0 tok/s | 22.0 tok/s | 160 | 自然 EOS |
+| 12,288 | 12,333 | 13.632 s | 452.4 tok/s | 25.8 tok/s | 256 | 正常 |
+| 16,384 | 16,429 | 37.289 s | 201.8 tok/s | **3.0 tok/s** | 256 | **异常，排除出正常区间统计** |
+| 32,768 | 32,813 | 38.409 s | 426.9 tok/s | 27.7 tok/s | 256 | 正常 |
+| 65,536 | 65,581 | 81.431 s | 399.8 tok/s | 26.0 tok/s | 256 | 正常 |
+| 131,072 | 131,117 | 191.209 s | 333.8 tok/s | 24.2 tok/s | 256 | 正常 |
+| 257,901 | 257,945 | 355.155 s | 363.5 tok/s | 26.3 tok/s | 256 | 正常 |
+
+16K 档的 3.0 tok/s 是异常点：引擎日志的前约 128-token 阶段卡在 1.69 tok/s，
+随后约 111-token 阶段恢复到 27.50 tok/s。相邻 12K、32K 档分别正常，因此它不是
+上下文容量或单调长上下文退化。排除该异常后，正常档输出速度中位数约 **25.8 tok/s**。
+完整 1M 窗口尚未灌满做质量评测。
 
 配置上下文上限为 **1,048,576 tokens**；完整 1M 窗口尚未灌满做质量评测。[测试条件与验证记录 →](docs/k100ai/VALIDATION.md#deepseek-四卡dspark-和长输入)
 
@@ -56,18 +85,27 @@ DSpark 对照的生成速度依次为 **24.32 → 68.53 → 24.25 tok/s**，三�
 ### 1. 下载并安装运行包
 
 ```bash
-BASE_URL=https://github.com/DocPang/strata-k100ai/releases/download/v0.2.2
+BASE_URL=https://github.com/DocPang/strata-k100ai/releases/download/v0.2.3-k100ai
 curl -fLO "$BASE_URL/strata-v0.2.9-k100ai-dual.tar.gz"
 curl -fLO "$BASE_URL/strata-v0.2.9-k100ai-dual.tar.gz.sha256"
 sha256sum -c strata-v0.2.9-k100ai-dual.tar.gz.sha256
-mkdir /data/strata-k100ai-v0.2.2
-tar -xzf strata-v0.2.9-k100ai-dual.tar.gz -C /data/strata-k100ai-v0.2.2 --strip-components=1
-cd /data/strata-k100ai-v0.2.2
+mkdir /data/strata-k100ai-v0.2.3
+tar -xzf strata-v0.2.9-k100ai-dual.tar.gz -C /data/strata-k100ai-v0.2.3 --strip-components=1
+cd /data/strata-k100ai-v0.2.3
 sha256sum -c SHA256SUMS
 bash scripts/k100ai/setup-runtime.sh
 ```
 
-归档名中的 `v0.2.9` 是上游基线，下载链接中的 `v0.2.2` 是本仓库发布版本。
+归档名中的 `v0.2.9` 是上游基线；`v0.2.3-k100ai` 是本仓库的产品版本 v0.2.3
+对应的发布标签。
+
+发布归档：
+
+| 文件 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| `strata-v0.2.9-k100ai-dual.tar.gz` | 70,790,149 B | `e318437e0bd5aff676dd022a737267c933a5f0df9c393fb83f1b8603073e2871` |
+| `strata-v0.2.9-k100ai-dual-source.tar.gz` | 76,881,571 B | `deeffa4bc7086656b84ab8ec0507623a9fe78c44a46fdfff5c1a12038968e5b3` |
+| `validation-evidence.tar.gz` | 59,981 B | `702c54ebd44d40de2dc40b0dda6ab2ab7d02712761511f28a829a5c585c9c764` |
 
 ### 2. 准备模型资产
 

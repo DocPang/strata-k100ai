@@ -4,16 +4,18 @@
 
 - Upstream：`https://github.com/Niko1221/Strata.git`
 - v0.2.9 base：`c62d5e3a15b40ea51c96aae9e8d36928965f53ab`
-- Current engine source：`8544d2fa6cddf61fb47edc0c3bd8a5d7d638140e`
+- Current engine source：`8c413cae0f5e9f88df784642772d78dff7bef428`
 - Qwen 0.1.47 fast source：`2150b1acdb48c386a9afcd64e63e2369b5a5e108`
-- Branch：`k100ai/dsv41-v029`
-- Product version：`0.2.9`
+- Package source：`ae0abbd3a8dc198d0983ed5d947ad554a52330a3`
+- Branch：`release/v0.2.3`
+- Product version：`0.2.3`
 - Current engine version：`0.1.55`
 - Qwen default fast engine version：`0.1.47`
 
-当前引擎构建使用 `8544d2fa` 的干净源码树。该提交新增
-`src/prefill/k100ai_exact.cuh`，只对经过逐格式验证的 gate/up 与 down
-格式启用 gfx928 精确 MMAC，并保留原有升序 K、FP32 累加语义。
+当前引擎构建使用 `8c413cae` 的干净源码树。这条源码线保留
+`8544d2fa` 的 gfx928 精确 MMAC，并新增显式开启的 DeepSeek prefill
+MMAC、QSA、dense 和 attention 实验路径。近似路径不进入默认路径；
+QSA packed-layout 研究记录、质量门和回滚开关一并保留。
 
 运行和打包修复位于后续提交，最终包中的 `BUILD.json` 用
 `package_source_commit` 记录该树的准确提交。运行时、launcher、文档和
@@ -25,11 +27,20 @@ K100AI prompt 优化线；它不声称能从本包内 v0.2.9 源码直接重建�
 | 文件 | 大小 | SHA-256 |
 | --- | ---: | --- |
 | `bin/strata`（Qwen 默认快速档） | 45,674,152 B | `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9` |
-| `bin/strata-0.1.55`（Qwen 当前对照档） | 49,484,096 B | `437308792b7ec08724aa90e4b11736b4f40f41c10613faa9688fbdc1723ba7ab` |
-| `bin/strata-dsv41` | 22,576,544 B | `6543311f453bee2c6d61653a24f0b6282f9cb3568b17a8b889c2c5e073b12286` |
-| `bin/ds4_gguf_test` | 18,816,624 B | `0d6c8455d76815b810a38c5529bc868087e71641008e0c86843ecd8b34dd815c` |
+| `bin/strata-0.1.55`（Qwen 当前对照档） | 49,496,856 B | `25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e` |
+| `bin/strata-dsv41` | 22,812,816 B | `1b0610416b3cce179983f3e439c2d4dc173122c9dc432b485450107b9116d811` |
+| `bin/ds4_gguf_test` | 19,044,176 B | `6159e5e04a602f0362f23501194d63cce0bc47c2089f0b3be4dd088d486f9ee6` |
 
-0.1.55 的 Qwen 与 DeepSeek 二进制来自同一 DTK 2604/gfx928 构建。
+发布归档：
+
+| 文件 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| `strata-v0.2.9-k100ai-dual.tar.gz` | 70,790,149 B | `e318437e0bd5aff676dd022a737267c933a5f0df9c393fb83f1b8603073e2871` |
+| `strata-v0.2.9-k100ai-dual-source.tar.gz` | 76,881,571 B | `deeffa4bc7086656b84ab8ec0507623a9fe78c44a46fdfff5c1a12038968e5b3` |
+| `validation-evidence.tar.gz` | 59,981 B | `702c54ebd44d40de2dc40b0dda6ab2ab7d02712761511f28a829a5c585c9c764` |
+
+0.1.55 的 Qwen 对照档与 DeepSeek 二进制来自同一 DTK 2604/gfx928
+源码线和构建容器。Qwen 默认快速档仍为单独保留的 0.1.47 二进制。
 0.1.47 快速档是已有 K100AI 0.1.47 构建，也在同一 gfx928/DTK 2604 运行时
 上重新验证，并已从保留的 0.1.47 源码和固定 llama.cpp 快照按 canonical
 容器路径重建出相同 SHA-256。当前源码构建设置：
