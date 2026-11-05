@@ -99,14 +99,13 @@ bash scripts/k100ai/setup-runtime.sh
 归档名中的 `v0.2.9` 是上游基线；`v0.2.3-k100ai` 是本仓库的产品版本 v0.2.3
 对应的发布标签。
 
-### 发布内容
+发布归档：
 
-[查看全部发布资产](https://github.com/DocPang/strata-k100ai/releases/tag/v0.2.3-k100ai) ·
-[机器可读元数据](https://github.com/DocPang/strata-k100ai/releases/download/v0.2.3-k100ai/RELEASE.json)
-
-- **运行包**：[下载](https://github.com/DocPang/strata-k100ai/releases/download/v0.2.3-k100ai/strata-v0.2.9-k100ai-dual.tar.gz) · [SHA-256](https://github.com/DocPang/strata-k100ai/releases/download/v0.2.3-k100ai/strata-v0.2.9-k100ai-dual.tar.gz.sha256)：可直接部署的 K100AI 运行目录。
-- **源码包**：[下载](https://github.com/DocPang/strata-k100ai/releases/download/v0.2.3-k100ai/strata-v0.2.9-k100ai-dual-source.tar.gz) · [SHA-256](https://github.com/DocPang/strata-k100ai/releases/download/v0.2.3-k100ai/strata-v0.2.9-k100ai-dual-source.tar.gz.sha256)：包含主源码、Qwen 0.1.47 快速档源码和固定 llama.cpp 快照。
-- **验证证据**：[下载](https://github.com/DocPang/strata-k100ai/releases/download/v0.2.3-k100ai/validation-evidence.tar.gz) · [SHA-256](https://github.com/DocPang/strata-k100ai/releases/download/v0.2.3-k100ai/validation-evidence.tar.gz.sha256)：包含十档测速、16K 异常、短输出对照、测试日志和归档校验记录。
+| 文件 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| `strata-v0.2.9-k100ai-dual.tar.gz` | 70,790,149 B | `e318437e0bd5aff676dd022a737267c933a5f0df9c393fb83f1b8603073e2871` |
+| `strata-v0.2.9-k100ai-dual-source.tar.gz` | 76,881,571 B | `deeffa4bc7086656b84ab8ec0507623a9fe78c44a46fdfff5c1a12038968e5b3` |
+| `validation-evidence.tar.gz` | 59,981 B | `702c54ebd44d40de2dc40b0dda6ab2ab7d02712761511f28a829a5c585c9c764` |
 
 ### 2. 准备模型资产
 
