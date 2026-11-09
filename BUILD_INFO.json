@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "product": "strata-k100ai",
+  "version": "0.3.0",
+  "platform": "linux-x86_64-gfx928-dtk2604",
+  "container_image": "harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68",
+  "models": {
+    "qwen3.8-flash-next": {
+      "default": {
+        "binary": "bin/strata-0.1.47",
+        "version": "0.1.47",
+        "sha256": "bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9"
+      },
+      "current": {
+        "binary": "bin/strata-0.1.55",
+        "version": "0.1.55",
+        "sha256": "25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e"
+      }
+    },
+    "deepseek-v4.1-flash": {
+      "binary": "bin/strata-dsv41",
+      "sha256": "4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6",
+      "research_final_round": 179
+    }
+  },
+  "deepseek_configs": [
+    "configs/exl3-tp1-prod.json",
+    "configs/exl3-tp4-prod.json",
+    "configs/gguf-tp2-prod.json"
+  ]
+}

@@ -1,0 +1,2608 @@
+// Copyright (c) 2026 Peasant Smith and the Project Maya contributors (MIT; https://github.com/mw00/project-maya, v1.1.17).
+// Ported into Strata (third_party/project-maya/NOTICE.md, LICENSE); changes are in the git history of this file.
+// tests/ds4_gguf_test.cu - maya-ds4's GGUF kernels (src/ds4/ds4_gguf.cu, ds4_gguf_cpu.cpp) against a plain
+// double-precision reference of random BF16 matrices and MXFP4 experts: the GEMVs (BF16 / MXFP4, 1..16 activations,
+// aligned or not), the token experts (gate / up / swiglu / down / combine, experts off the device, the CPU part, the
+// shared expert), a window's grouped experts (bit for bit the token path's), the prompt path's expert sets and the CPU
+// lane's rows; and the KV caches' packed rows (ds4_kernels.cu) against the BF16 rows bit for bit.  Needs a GPU, no
+// model.  ds4_gguf_test [n_embd n_ff] | --kv (the caches alone)
+#include "../../src/dsv41/ds4_gguf.cuh"
+#include "../../src/dsv41/ds4_gguf_cpu.hpp"
+#include "../../src/dsv41/ds4_iq.cuh"
+#include "../../src/dsv41/ds4_kernels.cuh"
+#include "../../src/dsv41/ds4_q6k.cuh"
+
+#include "ggml.h"   // (the low-bit types' reference values: ggml's own dequantize_row_*)
+
+#include <cuda_fp16.h>
+
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <cstdio>
+#include <functional>
+#include <thread>
+#include <cstdlib>
+#include <cstring>
+#include <random>
+#include <vector>
+
+namespace gg = strata::ds4::gguf;
+namespace x3 = strata::dsv41k::exl3;
+
+namespace {
+
+int g_fail = 0;
+std::mt19937 rng(1234);
+
+#define CU(x)                                                                                  \
+    do {                                                                                       \
+        cudaError_t e_ = (x);                                                                  \
+        if (e_ != cudaSuccess) {                                                               \
+            std::printf("CUDA %s: %s (line %d)\n", #x, cudaGetErrorString(e_), __LINE__);      \
+            std::exit(1);                                                                      \
+        }                                                                                      \
+    } while (0)
+
+float frand(float a = 1.0f) { return std::uniform_real_distribution<float>(-a, a)(rng); }
+
+float bf16f(uint16_t b) {
+    uint32_t u = (uint32_t) b << 16;
+    float f;
+    std::memcpy(&f, &u, 4);
+    return f;
+}
+uint16_t f2bf(float f) {   // truncating is fine: the reference reads back the same bits
+    uint32_t u;
+    std::memcpy(&u, &f, 4);
+    return (uint16_t) (u >> 16);
+}
+const float kVal[16] = {0, 1, 2, 3, 4, 6, 8, 12, 0, -1, -2, -3, -4, -6, -8, -12};
+double e8m0_half(int e) { return std::ldexp(1.0, e - 128); }
+
+// random MXFP4 rows [n][k]: scales around 2^-6, every code
+std::vector<uint8_t> mx_rand(int n, int k) {
+    std::vector<uint8_t> w(gg::mx_bytes(n, k));
+    for (size_t b = 0; b < w.size() / 17; ++b) {
+        w[b * 17] = (uint8_t) (120 + rng() % 6);
+        for (int j = 1; j < 17; ++j) w[b * 17 + j] = (uint8_t) (rng() & 0xff);
+    }
+    return w;
+}
+double mx_val(const uint8_t* row, int j) {   // value j of a row
+    const uint8_t* p = row + (size_t) (j / 32) * 17;
+    const int jj = j % 32;
+    const int code = jj < 16 ? (p[1 + jj] & 15) : (p[1 + jj - 16] >> 4);
+    return kVal[code] * e8m0_half(p[0]);
+}
+// random Q8_0 rows [n][k], and a value of one
+std::vector<uint8_t> q8_rand(int n, int k) {
+    std::vector<uint8_t> w(gg::q8_row_bytes(k) * n);
+    for (size_t b = 0; b < w.size() / 34; ++b) {
+        const __half d = __float2half(0.001f + 0.002f * std::fabs(frand()));
+        std::memcpy(&w[b * 34], &d, 2);
+        for (int j = 2; j < 34; ++j) w[b * 34 + j] = (uint8_t) (rng() & 0xff);
+    }
+    return w;
+}
+double q8_val(const uint8_t* row, int j) {
+    const uint8_t* p = row + (size_t) (j / 32) * 34;
+    __half d;
+    std::memcpy(&d, p, 2);
+    return (double) __half2float(d) * (int8_t) p[2 + j % 32];
+}
+double mx_dot(const uint8_t* w, int k, int row, const float* x) {
+    const uint8_t* r = w + (size_t) row * gg::mx_row_bytes(k);
+    double s = 0;
+    for (int j = 0; j < k; ++j) s += mx_val(r, j) * x[j];
+    return s;
+}
+// x rounded as the kernels' q8_quant: per 32 values sc = max|x| / 127 (F32), q = round-half-even(x / sc)
+std::vector<float> q8_round(const float* x, int k) {
+    std::vector<float> v(k);
+    for (int b = 0; b < k / 32; ++b) {
+        float am = 0.0f;
+        for (int j = 0; j < 32; ++j) am = std::max(am, std::fabs(x[b * 32 + j]));
+        const float sc = am / 127.0f;
+        for (int j = 0; j < 32; ++j) {
+            const float q = am > 0.0f ? std::nearbyint(x[b * 32 + j] / sc) : 0.0f;
+            v[b * 32 + j] = (float) ((double) q * sc);
+        }
+    }
+    return v;
+}
+double swiglu(double g, double u, double lim) {
+    if (lim > 0) {
+        g = std::min(g, lim);
+        u = std::min(std::max(u, -lim), lim);
+    }
+    return g / (1.0 + std::exp(-g)) * u;
+}
+
+void expect(const char* what, const float* got, const double* want, size_t n, double rtol) {
+    double worst = 0, scale = 1e-30;
+    for (size_t i = 0; i < n; ++i) scale = std::max(scale, std::fabs(want[i]));
+    size_t at = 0;
+    for (size_t i = 0; i < n; ++i) {
+        const double e = std::fabs(got[i] - want[i]) / scale;
+        if (!(e <= worst)) {
+            worst = e;
+            at = i;
+        }
+    }
+    const bool ok = worst <= rtol;
+    if (!ok) ++g_fail;
+    std::printf("%-44s %s  max rel err %.2e (at %zu: %.6g vs %.6g)\n", what, ok ? "ok  " : "FAIL", worst, at,
+                (double) got[at], want[at]);
+}
+
+template <class T>
+T* dev(const std::vector<T>& h) {
+    T* p = nullptr;
+    CU(cudaMalloc(&p, std::max<size_t>(1, h.size()) * sizeof(T)));
+    if (!h.empty()) CU(cudaMemcpy(p, h.data(), h.size() * sizeof(T), cudaMemcpyHostToDevice));
+    return p;
+}
+template <class T>
+std::vector<T> host(const T* p, size_t n) {
+    std::vector<T> h(n);
+    CU(cudaMemcpy(h.data(), p, n * sizeof(T), cudaMemcpyDeviceToHost));
+    return h;
+}
+
+void test_mv(cudaStream_t s) {
+    for (int fmt : {gg::kFmtBF16, gg::kFmtMXFP4, gg::kFmtQ8_0})
+        for (int nc : {1, 3, 16})
+            for (int off : {0, 1}) {   // off 1: activations not 16-byte aligned (the scalar kernels)
+                const int k = 1280, n = 520;
+                std::vector<uint16_t> wb;
+                std::vector<uint8_t> wm;
+                if (fmt == gg::kFmtBF16) {
+                    wb.resize((size_t) n * k);
+                    for (auto& v : wb) v = f2bf(frand(0.05f));
+                } else {
+                    wm = fmt == gg::kFmtMXFP4 ? mx_rand(n, k) : q8_rand(n, k);
+                }
+                const size_t xcs = (size_t) k + 4 + off;
+                std::vector<float> x(xcs * nc + 8), bias(n);
+                for (auto& v : x) v = frand();
+                for (auto& v : bias) v = frand(0.1f);
+                float* dx = dev(x);
+                float* db = dev(bias);
+                std::vector<float> y0((size_t) n * nc, 0.0f);
+                float* dy = dev(y0);
+                void* dw = fmt == gg::kFmtBF16 ? (void*) dev(wb) : (void*) dev(wm);
+                x3::Mat m;
+                m.fmt = fmt;
+                m.raw = dw;
+                m.k = k;
+                m.n = n;
+                x3::MvJob j;
+                j.m = &m;
+                j.xf = dx + off;
+                j.y = dy;
+                j.bias = db;
+                j.alpha = 0.5f;
+                j.ncol = nc;
+                j.xf_cs = xcs;
+                j.y_cs = n;
+                if (!gg::mv(&j, 1, s)) ++g_fail;
+                CU(cudaStreamSynchronize(s));
+                std::vector<float> y = host(dy, (size_t) n * nc);
+                std::vector<double> want((size_t) n * nc);
+                for (int c = 0; c < nc; ++c)
+                    for (int r = 0; r < n; ++r) {
+                        const float* xc = x.data() + off + c * xcs;
+                        double d = 0;
+                        if (fmt == gg::kFmtBF16)
+                            for (int i = 0; i < k; ++i) d += (double) bf16f(wb[(size_t) r * k + i]) * xc[i];
+                        else if (fmt == gg::kFmtMXFP4)
+                            d = mx_dot(wm.data(), k, r, xc);
+                        else {
+                            const std::vector<float> xr = q8_round(xc, k);
+                            for (int i = 0; i < k; ++i) d += q8_val(wm.data() + (size_t) r * gg::q8_row_bytes(k), i) * xr[i];
+                        }
+                        want[(size_t) c * n + r] = 0.5 * d + bias[r];
+                    }
+                char what[96];
+                std::snprintf(what, sizeof(what), "mv %s, %d activations%s", fmt == gg::kFmtBF16 ? "BF16" : fmt == gg::kFmtMXFP4 ? "MXFP4" : "Q8_0", nc,
+                              off ? ", unaligned" : "");
+                expect(what, y.data(), want.data(), want.size(), 2e-5);
+                // the first activation alone gives the same bits as in the batch
+                if (nc > 1) {
+                    j.ncol = 1;
+                    std::vector<float> y1(n, 0.0f);
+                    float* dy1 = dev(y1);
+                    j.y = dy1;
+                    gg::mv(&j, 1, s);
+                    CU(cudaStreamSynchronize(s));
+                    y1 = host(dy1, n);
+                    const bool same = std::memcmp(y1.data(), y.data(), (size_t) n * 4) == 0;
+                    if (!same) ++g_fail;
+                    std::printf("%-44s %s\n", "  ... one activation alone, bit for bit", same ? "ok" : "FAIL");
+                    cudaFree(dy1);
+                }
+                cudaFree(dx), cudaFree(db), cudaFree(dy), cudaFree(dw);
+            }
+    // rows(): BF16 -> F16 of a view
+    {
+        const int k = 256, n = 384;
+        std::vector<uint16_t> wb((size_t) n * k);
+        for (auto& v : wb) v = f2bf(frand(2.0f));
+        uint16_t* dw = dev(wb);
+        x3::Mat m;
+        m.fmt = gg::kFmtBF16;
+        m.raw = dw;
+        m.k = k;
+        m.n = n;
+        const x3::Mat v = gg::view(m, 128, 128);
+        std::vector<uint16_t> z((size_t) 128 * k);
+        uint16_t* dd = dev(z);
+        gg::rows(v, dd, false, s);
+        CU(cudaStreamSynchronize(s));
+        z = host(dd, z.size());
+        std::vector<float> got(z.size());
+        std::vector<double> want(z.size());
+        for (size_t i = 0; i < z.size(); ++i) {
+            got[i] = __half2float(*(const __half*) &z[i]);
+            want[i] = bf16f(wb[(size_t) 128 * k + i]);
+        }
+        expect("rows BF16 -> F16 (a view)", got.data(), want.data(), want.size(), 1e-3);
+        cudaFree(dw), cudaFree(dd);
+    }
+    {   // rows(): Q8_0 -> F16 of a view
+        const int k = 256, n = 384;
+        std::vector<uint8_t> wq = q8_rand(n, k);
+        uint8_t* dw = dev(wq);
+        x3::Mat m;
+        m.fmt = gg::kFmtQ8_0;
+        m.raw = dw;
+        m.k = k;
+        m.n = n;
+        const x3::Mat v = gg::view(m, 128, 128);
+        std::vector<uint16_t> z((size_t) 128 * k);
+        uint16_t* dd = dev(z);
+        gg::rows(v, dd, false, s);
+        CU(cudaStreamSynchronize(s));
+        z = host(dd, z.size());
+        std::vector<float> got(z.size());
+        std::vector<double> want(z.size());
+        for (size_t i = 0; i < z.size(); ++i) {
+            got[i] = __half2float(*(const __half*) &z[i]);
+            want[i] = q8_val(wq.data() + (128 + i / k) * gg::q8_row_bytes(k), (int) (i % k));
+        }
+        expect("rows Q8_0 -> F16 (a view)", got.data(), want.data(), want.size(), 1e-3);
+        cudaFree(dw), cudaFree(dd);
+    }
+}
+
+struct Experts {
+    int D, F, n_exp;
+    x3::ExpertLayout lay;
+    size_t blob;
+    std::vector<uint8_t> host;   // n_exp blobs
+    uint8_t* dev = nullptr;
+};
+Experts make_experts(int D, int F, int n_exp) {
+    Experts E{D, F, n_exp, {}, 0, {}, nullptr};
+    size_t off = 0;
+    for (int r = 0; r < 3; ++r) {
+        E.lay.trellis[r] = off;
+        off += (gg::mx_bytes(r < 2 ? F : D, r < 2 ? D : F) + 255) / 256 * 256;
+    }
+    E.lay.fmt = gg::kFmtMXFP4;
+    E.blob = off;
+    E.host.assign(E.blob * n_exp, 0);
+    for (int e = 0; e < n_exp; ++e)
+        for (int r = 0; r < 3; ++r) {
+            const std::vector<uint8_t> m = mx_rand(r < 2 ? F : D, r < 2 ? D : F);
+            std::memcpy(E.host.data() + e * E.blob + E.lay.trellis[r], m.data(), m.size());
+        }
+    E.dev = dev(E.host);
+    return E;
+}
+const uint8_t* emat(const Experts& E, int e, int r) { return E.host.data() + e * E.blob + E.lay.trellis[r]; }
+// reference of one token's expert e: h then the down output
+// (x and h rounded to int8 per 32 first, as the dp4a kernels round them)
+void ref_expert(const Experts& E, int e, const float* x, double lim, std::vector<float>& h, std::vector<double>& y) {
+    const std::vector<float> xr = q8_round(x, E.D);
+    h.resize(E.F);
+    for (int f = 0; f < E.F; ++f)
+        h[f] = (float) swiglu(mx_dot(emat(E, e, 0), E.D, f, xr.data()), mx_dot(emat(E, e, 1), E.D, f, xr.data()), lim);
+    const std::vector<float> hr = q8_round(h.data(), E.F);
+    y.resize(E.D);
+    for (int d = 0; d < E.D; ++d) y[d] = mx_dot(emat(E, e, 2), E.F, d, hr.data());
+}
+
+void test_experts(int D, int F, cudaStream_t s) {
+    const int n_exp = 12, k = 6, T = 5;
+    const float lim = 10.0f;
+    Experts E = make_experts(D, F, n_exp);
+    // T tokens' plans [T][8]: picks, weights, some picks off the device (ptr 0), token 1 with a CPU part
+    std::vector<int> pick((size_t) T * 8, 0);
+    std::vector<float> pw((size_t) T * 8, 0.0f);
+    std::vector<unsigned long long> pp((size_t) T * 8, 0ull);
+    for (int t = 0; t < T; ++t) {
+        std::vector<int> all(n_exp);
+        for (int i = 0; i < n_exp; ++i) all[i] = i;
+        std::shuffle(all.begin(), all.end(), rng);
+        for (int i = 0; i < k; ++i) {
+            pick[t * 8 + i] = all[i];
+            pw[t * 8 + i] = 0.2f + 0.1f * frand();
+            const bool on = !(t == 2 && i == 3) && !(t == 4 && i == 0);
+            pp[t * 8 + i] = on ? (unsigned long long) (E.dev + (size_t) all[i] * E.blob) : 0ull;
+        }
+    }
+    std::vector<float> x((size_t) T * D), sh((size_t) T * D), cpu((size_t) T * D);
+    for (auto& v : x) v = frand();
+    for (auto& v : sh) v = frand(0.1f);
+    for (auto& v : cpu) v = frand(0.1f);
+    std::vector<int> cflag(T, 0);
+    cflag[1] = 1;
+    float *dx = dev(x), *dsh = dev(sh), *dcpu = dev(cpu), *dpw = dev(pw);
+    unsigned long long* dpp = dev(pp);
+    int* dflag = dev(cflag);
+    // reference outputs
+    std::vector<double> want((size_t) T * D, 0.0);
+    std::vector<float> hh;
+    std::vector<double> yy;
+    for (int t = 0; t < T; ++t) {
+        for (int d = 0; d < D; ++d) want[(size_t) t * D + d] = 0;
+        for (int i = 0; i < k; ++i) {
+            if (pp[t * 8 + i] == 0ull) continue;
+            ref_expert(E, pick[t * 8 + i], x.data() + (size_t) t * D, lim, hh, yy);
+            for (int d = 0; d < D; ++d) want[(size_t) t * D + d] += pw[t * 8 + i] * yy[d];
+        }
+        for (int d = 0; d < D; ++d)
+            want[(size_t) t * D + d] += (cflag[t] ? cpu[(size_t) t * D + d] : 0.0f) + sh[(size_t) t * D + d];
+    }
+    // the token path, token by token
+    std::vector<float> tok((size_t) T * D);
+    float* dh = dev(std::vector<float>((size_t) 8 * F));
+    float* dout = dev(std::vector<float>(D));
+    for (int t = 0; t < T; ++t) {
+        x3::MoeArgs a;
+        a.plan_ptr = dpp + t * 8;
+        a.plan_w = dpw + t * 8;
+        a.cpu_part = dcpu + (size_t) t * D;
+        a.cpu_flag = dflag + t;
+        a.lay = E.lay;
+        a.k = k;
+        a.n_embd = D;
+        a.n_ff = F;
+        a.limit = lim;
+        gg::moe_gate_up(a, dx + (size_t) t * D, dh, s);
+        gg::moe_down(a, dh, dsh + (size_t) t * D, dout, s);
+        CU(cudaStreamSynchronize(s));
+        CU(cudaMemcpy(tok.data() + (size_t) t * D, dout, (size_t) D * 4, cudaMemcpyDeviceToHost));
+    }
+    char what[96];
+    std::snprintf(what, sizeof(what), "token experts (D %d, F %d)", D, F);
+    expect(what, tok.data(), want.data(), want.size(), 1e-3);   // (an h value can round to its other int8)
+    // the window: groups by expert (the device ones), entries e = t * 8 + i
+    std::vector<unsigned long long> gptr;
+    std::vector<int> gstart, gent;
+    for (int x0 = 0; x0 < n_exp; ++x0) {
+        std::vector<int> ents;
+        for (int t = 0; t < T; ++t)
+            for (int i = 0; i < k; ++i)
+                if (pick[t * 8 + i] == x0 && pp[t * 8 + i] != 0ull) ents.push_back(t * 8 + i);
+        if (ents.empty()) continue;
+        gptr.push_back((unsigned long long) (E.dev + (size_t) x0 * E.blob));
+        gstart.push_back((int) gent.size());
+        for (int e : ents) gent.push_back(e);
+    }
+    gstart.push_back((int) gent.size());
+    std::vector<int> ng(1, (int) gptr.size());
+    unsigned long long* dgp = dev(gptr);
+    int *dgs = dev(gstart), *dge = dev(gent), *dng = dev(ng);
+    float* dwh = dev(std::vector<float>((size_t) T * 8 * F));
+    float* dpart = dev(std::vector<float>((size_t) T * 8 * D));
+    float* dwo = dev(std::vector<float>((size_t) T * D));
+    x3::WinArgs w;
+    w.grp_ptr = dgp;
+    w.grp_start = dgs;
+    w.grp_ent = dge;
+    w.n_groups = dng;
+    w.plan_ptr = dpp;
+    w.plan_w = dpw;
+    w.cpu_part = dcpu;
+    w.cpu_stride = D;
+    w.cpu_flag = dflag;
+    w.x = dx;
+    w.x_stride = D;
+    w.h = dwh;
+    w.part = dpart;
+    w.sh_out = dsh;
+    w.out = dwo;
+    w.out_stride = D;
+    w.lay = E.lay;
+    w.T = T;
+    w.k = k;
+    w.n_embd = D;
+    w.n_ff = F;
+    w.limit = lim;
+    if (!gg::win_experts(w, s)) ++g_fail;
+    CU(cudaStreamSynchronize(s));
+    std::vector<float> win = host(dwo, (size_t) T * D);
+    std::snprintf(what, sizeof(what), "window experts (T %d)", T);
+    expect(what, win.data(), want.data(), want.size(), 1e-3);
+    const bool same = std::memcmp(win.data(), tok.data(), win.size() * 4) == 0;
+    if (!same) ++g_fail;
+    std::printf("%-44s %s\n", "  ... bit for bit the token path's", same ? "ok" : "FAIL");
+
+    // the prompt path's set: rows sorted by expert (bounds), each row a token index (row_idx) - experts of a few rows (the
+    // light kernels), then of more (the tiles)
+    for (int R : {100, 200, 400}) {
+        std::vector<int> owner(R), idx(R);
+        for (int r = 0; r < R; ++r) owner[r] = (int) (rng() % n_exp);
+        std::sort(owner.begin(), owner.end());
+        std::vector<int> bounds(n_exp + 1, 0);
+        for (int e = 0, r = 0; e <= n_exp; ++e) {
+            while (r < R && owner[r] < e) ++r;
+            bounds[e] = r;
+        }
+        int max_rows = 0;
+        for (int e = 0; e < n_exp; ++e) max_rows = std::max(max_rows, bounds[e + 1] - bounds[e]);
+        const int NT = 40;
+        std::vector<float> xs((size_t) NT * D);
+        for (auto& v : xs) v = frand();
+        for (int r = 0; r < R; ++r) idx[r] = (int) (rng() % NT);
+        float* dxs = dev(xs);
+        int *dbd = dev(bounds), *didx = dev(idx);
+        uint16_t* dh16 = dev(std::vector<uint16_t>((size_t) R * F));
+        float* dy = dev(std::vector<float>((size_t) R * D));
+        x3::SetArgs sa;
+        sa.wbase = E.dev;
+        sa.stride = E.blob;
+        sa.lay = E.lay;
+        sa.n_exp = n_exp;
+        sa.bounds = dbd;
+        sa.row0 = 0;
+        sa.max_rows = max_rows;
+        sa.n_embd = D;
+        sa.n_ff = F;
+        sa.limit = lim;
+        gg::set_gate_up(sa, dxs, D, didx, dh16, F, s);
+        gg::set_down(sa, dh16, F, dy, D, s);
+        CU(cudaStreamSynchronize(s));
+        std::vector<uint16_t> h16 = host(dh16, (size_t) R * F);
+        std::vector<float> y = host(dy, (size_t) R * D);
+        std::vector<float> hgot((size_t) R * F);
+        std::vector<double> hwant((size_t) R * F), ywant((size_t) R * D);
+        // (an expert of at most 16 rows takes the light kernels: its inputs rounded to int8 per 32, as the token path's)
+        int n_light = 0;
+        for (int e = 0; e < n_exp; ++e) n_light += bounds[e + 1] - bounds[e] <= 16 ? bounds[e + 1] - bounds[e] : 0;
+        for (int r = 0; r < R; ++r) {
+            const bool light = bounds[owner[r] + 1] - bounds[owner[r]] <= 16;
+            const std::vector<float> xq = light ? q8_round(xs.data() + (size_t) idx[r] * D, D) : std::vector<float>();
+            const float* xr = light ? xq.data() : xs.data() + (size_t) idx[r] * D;
+            std::vector<float> hr(F);
+            for (int f = 0; f < F; ++f) {
+                hwant[(size_t) r * F + f] =
+                    swiglu(mx_dot(emat(E, owner[r], 0), D, f, xr), mx_dot(emat(E, owner[r], 1), D, f, xr), lim);
+                hgot[(size_t) r * F + f] = __half2float(*(const __half*) &h16[(size_t) r * F + f]);
+                hr[f] = hgot[(size_t) r * F + f];   // the down from the F16 h the kernel kept
+            }
+            if (light) hr = q8_round(hr.data(), F);
+            for (int d = 0; d < D; ++d) ywant[(size_t) r * D + d] = mx_dot(emat(E, owner[r], 2), F, d, hr.data());
+        }
+        char sw[64];
+        std::snprintf(sw, sizeof(sw), "set gate/up (F16 h), %d rows, %d light", R, n_light);
+        expect(sw, hgot.data(), hwant.data(), hwant.size(), 2e-3);
+        std::snprintf(sw, sizeof(sw), "set down, %d rows, %d light", R, n_light);
+        expect(sw, y.data(), ywant.data(), ywant.size(), n_light > 0 ? 1e-4 : 5e-5);
+        cudaFree(dxs), cudaFree(dbd), cudaFree(didx), cudaFree(dh16), cudaFree(dy);
+    }
+    // the CPU lane's rows
+    {
+        const int n = 3;
+        const float* xp[n] = {x.data(), x.data() + D, x.data() + 2 * D};
+        std::vector<float> y((size_t) n * 100);
+        float* yp[n] = {y.data(), y.data() + 100, y.data() + 200};
+        gg::mx_cpu_rows(emat(E, 5, 0), gg::mx_row_bytes(D), D, 7, 107, xp, n, yp);
+        std::vector<double> want2((size_t) n * 100);
+        for (int i = 0; i < n; ++i)
+            for (int r = 7; r < 107; ++r) want2[(size_t) i * 100 + r - 7] = mx_dot(emat(E, 5, 0), D, r, xp[i]);
+        expect("CPU lane rows", y.data(), want2.data(), want2.size(), 5e-5);
+    }
+    // the CPU lane's int8 rows (gg::mx_rows), every tier this CPU runs: the gate and the down shapes, 1..9 tokens (past
+    // a call's 8), against the double reference on the q8-rounded activations; the tiers against the scalar one; the
+    // activation's bytes (vector and scalar quant, whole and by bands) against q8_round's values
+    {
+        const int NT = 9, R0 = 5, R1 = 69;
+        for (int down = 0; down < 2; ++down) {
+            const int k = down ? F : D;
+            const uint8_t* w = emat(E, 7, down ? 2 : 0);
+            const size_t rb = gg::mx_row_bytes(k), ab = gg::mx_act_bytes(k);
+            std::vector<float> xs((size_t) NT * k);
+            for (auto& v : xs) v = down ? frand(0.05f) : frand();
+            for (int j = 0; j < 32; ++j) xs[(size_t) 2 * k + 32 + j] = 0.0f;   // (an all-zero block: scale 0)
+            std::vector<uint8_t> act((size_t) NT * ab), act_s(ab), act_b(ab);
+            const void* ap[NT];
+            bool q_ok = true;
+            for (int i = 0; i < NT; ++i) {
+                uint8_t* a = act.data() + (size_t) i * ab;
+                gg::mx_quant(xs.data() + (size_t) i * k, k, a);
+                gg::mx_quant_blocks_scalar(xs.data() + (size_t) i * k, 0, k / 32, act_s.data(), k);
+                for (int b0 = 0; b0 < k / 32; b0 += 2)   // (by bands of 2 blocks, as the lane's jobs write h)
+                    gg::mx_quant_blocks(xs.data() + (size_t) i * k + 32 * b0, b0, b0 + 2, act_b.data(), k);
+                q_ok = q_ok && std::memcmp(a, act_s.data(), ab) == 0 && std::memcmp(a, act_b.data(), ab) == 0;
+                const std::vector<float> xr = q8_round(xs.data() + (size_t) i * k, k);
+                for (int b = 0; b < k / 32; ++b)
+                    for (int j = 0; j < 32; ++j) {
+                        const int q = gg::mx_act_value(a, b, j);
+                        const float sc = gg::mx_act_scale(a, k, b);
+                        q_ok = q_ok && (float) ((double) q * sc) == xr[(size_t) b * 32 + j];
+                    }
+                ap[i] = a;
+            }
+            if (!q_ok) ++g_fail;
+            std::printf("%-44s %s\n", down ? "CPU int8 quant (down's k)" : "CPU int8 quant (gate's k)",
+                        q_ok ? "ok    vector = scalar = bands = q8_round" : "FAIL");
+            std::vector<double> want3((size_t) NT * (R1 - R0));
+            for (int i = 0; i < NT; ++i) {
+                const std::vector<float> xr = q8_round(xs.data() + (size_t) i * k, k);
+                for (int r = R0; r < R1; ++r) want3[(size_t) i * (R1 - R0) + r - R0] = mx_dot(w, k, r, xr.data());
+            }
+            std::vector<float> ref((size_t) NT * (R1 - R0));
+            for (int t = 0; t < gg::kMxTiers; ++t) {
+                if (!gg::mx_tier_ok(t)) continue;
+                for (int n : {1, 2, 3, 8, 9}) {
+                    std::vector<float> y((size_t) n * (R1 - R0));
+                    std::vector<float*> yp((size_t) n);
+                    for (int i = 0; i < n; ++i) yp[(size_t) i] = y.data() + (size_t) i * (R1 - R0);
+                    gg::mx_rows_tier(t, w, rb, k, R0, R1, ap, n, yp.data(), t == gg::kMxScalar ? 0 : 256);
+                    char what[96];
+                    std::snprintf(what, sizeof what, "CPU int8 rows %s %s n=%d", down ? "down" : "gate",
+                                  gg::mx_tier_name(t), n);
+                    expect(what, y.data(), want3.data(), y.size(), 5e-5);
+                    if (t == gg::kMxScalar && n == NT) ref = y;
+                    if (t != gg::kMxScalar && !ref.empty()) {   // (every tier the same bits as the scalar one)
+                        const bool same = std::memcmp(y.data(), ref.data(), y.size() * sizeof(float)) == 0;
+                        if (!same) ++g_fail;
+                        std::printf("  %-42s %s\n", what, same ? "ok    bit-identical to the scalar tier" : "FAIL  differs from the scalar tier");
+                    }
+                }
+            }
+        }
+        std::printf("CPU int8 rows: this CPU's tier %s\n", gg::mx_tier_name(gg::mx_tier()));
+    }
+    cudaFree(E.dev), cudaFree(dx), cudaFree(dsh), cudaFree(dcpu), cudaFree(dpw), cudaFree(dpp), cudaFree(dflag);
+    cudaFree(dh), cudaFree(dout), cudaFree(dgp), cudaFree(dgs), cudaFree(dge), cudaFree(dng), cudaFree(dwh);
+    cudaFree(dpart), cudaFree(dwo);
+}
+
+// ---------------------------------------------------------------- the low-bit types (ds4_iq)
+// random blocks of a type: random bytes, the block scales small normal values (every grid index, sign and code)
+std::vector<uint8_t> q_rand(int type, int n, int k) {
+    const size_t rb = gg::type_row_bytes(type, k), bb = (size_t) gg::iq::block_bytes(type);
+    std::vector<uint8_t> w(rb * n);
+    for (auto& v : w) v = (uint8_t) (rng() & 0xff);
+    auto put = [&](size_t at, float f) {
+        const __half h = __float2half(f);
+        std::memcpy(&w[at], &h, 2);
+    };
+    for (size_t o = 0; o < w.size(); o += bb) {
+        const float d = 0.001f + 0.002f * std::fabs(frand());
+        switch (type) {
+            case gg::iq::kQ4_K: put(o, d), put(o + 2, 0.5f * d); break;
+            case gg::iq::kQ2_K: put(o + 80, d), put(o + 82, 0.5f * d); break;
+            case gg::iq::kQ3_K: put(o + 108, d); break;
+            default: put(o, d); break;   // (the i-quants: d first)
+        }
+    }
+    return w;
+}
+// a row's dot with x in double, the weights ggml's dequantize_row_* values
+double q_dot(int type, const uint8_t* row, int k, const float* x) {
+    static thread_local std::vector<float> w;
+    w.resize(k);
+    ggml_get_type_traits((ggml_type) type)->to_float(row, w.data(), k);
+    double s = 0;
+    for (int i = 0; i < k; ++i) s += (double) w[i] * x[i];
+    return s;
+}
+const char* tn(int t) { return gg::type_name(t); }
+
+void test_mv_q(int type, cudaStream_t s) {
+    for (int nc : {1, 3, 16}) {
+        const int k = 768, n = 136;
+        std::vector<uint8_t> wq = q_rand(type, n, k);
+        const size_t xcs = (size_t) k + 8;
+        std::vector<float> x(xcs * nc), bias(n);
+        for (auto& v : x) v = frand();
+        for (auto& v : bias) v = frand(0.1f);
+        float *dx = dev(x), *db = dev(bias), *dy = dev(std::vector<float>((size_t) n * nc));
+        uint8_t* dw = dev(wq);
+        x3::Mat m;
+        m.fmt = gg::kFmtGG;
+        m.K = type;
+        m.raw = dw;
+        m.k = k;
+        m.n = n;
+        x3::MvJob j;
+        j.m = &m;
+        j.xf = dx;
+        j.y = dy;
+        j.bias = db;
+        j.alpha = 0.5f;
+        j.ncol = nc;
+        j.xf_cs = xcs;
+        j.y_cs = n;
+        if (!gg::mv(&j, 1, s)) ++g_fail;
+        CU(cudaStreamSynchronize(s));
+        std::vector<float> y = host(dy, (size_t) n * nc);
+        std::vector<double> want((size_t) n * nc);
+        for (int c = 0; c < nc; ++c) {
+            const std::vector<float> xr = q8_round(x.data() + c * xcs, k);
+            for (int r = 0; r < n; ++r)
+                want[(size_t) c * n + r] = 0.5 * q_dot(type, wq.data() + r * gg::type_row_bytes(type, k), k, xr.data()) + bias[r];
+        }
+        char what[96];
+        std::snprintf(what, sizeof(what), "mv %s, %d activations", tn(type), nc);
+        expect(what, y.data(), want.data(), want.size(), 2e-5);
+        cudaFree(dx), cudaFree(db), cudaFree(dy), cudaFree(dw);
+    }
+}
+
+struct QExperts {
+    int D, F, n_exp, tg, td;
+    x3::ExpertLayout lay;
+    size_t blob;
+    std::vector<uint8_t> host;
+    uint8_t* dev = nullptr;
+    const uint8_t* mat(int e, int r) const { return host.data() + e * blob + lay.trellis[r]; }
+    size_t rb(int r) const { return gg::type_row_bytes(r < 2 ? tg : td, r < 2 ? D : F); }
+    double dot(int e, int r, int row, const float* x) const {
+        return q_dot(r < 2 ? tg : td, mat(e, r) + row * rb(r), r < 2 ? D : F, x);
+    }
+};
+QExperts make_q(int D, int F, int n_exp, int tg, int td) {
+    QExperts E{D, F, n_exp, tg, td, {}, 0, {}, nullptr};
+    size_t off = 0;
+    for (int r = 0; r < 3; ++r) {
+        E.lay.trellis[r] = off;
+        E.lay.K[r] = r < 2 ? tg : td;
+        off += ((r < 2 ? F : D) * gg::type_row_bytes(E.lay.K[r], r < 2 ? D : F) + 255) / 256 * 256;
+    }
+    E.lay.fmt = gg::kFmtMXFP4;
+    E.blob = off;
+    E.host.assign(E.blob * n_exp, 0);
+    for (int e = 0; e < n_exp; ++e)
+        for (int r = 0; r < 3; ++r) {
+            const std::vector<uint8_t> m = q_rand(E.lay.K[r], r < 2 ? F : D, r < 2 ? D : F);
+            std::memcpy(E.host.data() + e * E.blob + E.lay.trellis[r], m.data(), m.size());
+        }
+    E.dev = dev(E.host);
+    return E;
+}
+
+// test_experts' checks for low-bit experts: the token path, the window (bit for bit the token path's), the prompt sets
+// and the CPU lane (ggml-cpu's arithmetic: Q8_K activations, so against a reference on those)
+void test_experts_q(int D, int F, int tg, int td, cudaStream_t s) {
+    const int n_exp = 10, k = 6, T = 4;
+    const float lim = 10.0f;
+    QExperts E = make_q(D, F, n_exp, tg, td);
+    std::vector<int> pick((size_t) T * 8, 0);
+    std::vector<float> pw((size_t) T * 8, 0.0f);
+    std::vector<unsigned long long> pp((size_t) T * 8, 0ull);
+    for (int t = 0; t < T; ++t) {
+        std::vector<int> all(n_exp);
+        for (int i = 0; i < n_exp; ++i) all[i] = i;
+        std::shuffle(all.begin(), all.end(), rng);
+        for (int i = 0; i < k; ++i) {
+            pick[t * 8 + i] = all[i];
+            pw[t * 8 + i] = 0.2f + 0.1f * frand();
+            const bool on = !(t == 2 && i == 3);
+            pp[t * 8 + i] = on ? (unsigned long long) (E.dev + (size_t) all[i] * E.blob) : 0ull;
+        }
+    }
+    std::vector<float> x((size_t) T * D), sh((size_t) T * D), cpu((size_t) T * D);
+    for (auto& v : x) v = frand();
+    for (auto& v : sh) v = frand(0.1f);
+    for (auto& v : cpu) v = frand(0.1f);
+    std::vector<int> cflag(T, 0);
+    cflag[1] = 1;
+    float *dx = dev(x), *dsh = dev(sh), *dcpu = dev(cpu), *dpw = dev(pw);
+    unsigned long long* dpp = dev(pp);
+    int* dflag = dev(cflag);
+    std::vector<double> want((size_t) T * D, 0.0);
+    for (int t = 0; t < T; ++t) {
+        const std::vector<float> xr = q8_round(x.data() + (size_t) t * D, D);
+        for (int i = 0; i < k; ++i) {
+            if (pp[t * 8 + i] == 0ull) continue;
+            const int e = pick[t * 8 + i];
+            std::vector<float> h(F);
+            for (int f = 0; f < F; ++f) h[f] = (float) swiglu(E.dot(e, 0, f, xr.data()), E.dot(e, 1, f, xr.data()), lim);
+            const std::vector<float> hr = q8_round(h.data(), F);
+            for (int d = 0; d < D; ++d) want[(size_t) t * D + d] += pw[t * 8 + i] * E.dot(e, 2, d, hr.data());
+        }
+        for (int d = 0; d < D; ++d)
+            want[(size_t) t * D + d] += (cflag[t] ? cpu[(size_t) t * D + d] : 0.0f) + sh[(size_t) t * D + d];
+    }
+    std::vector<float> tok((size_t) T * D);
+    float* dh = dev(std::vector<float>((size_t) 8 * F));
+    float* dout = dev(std::vector<float>(D));
+    for (int t = 0; t < T; ++t) {
+        x3::MoeArgs a;
+        a.plan_ptr = dpp + t * 8;
+        a.plan_w = dpw + t * 8;
+        a.cpu_part = dcpu + (size_t) t * D;
+        a.cpu_flag = dflag + t;
+        a.lay = E.lay;
+        a.k = k;
+        a.n_embd = D;
+        a.n_ff = F;
+        a.limit = lim;
+        gg::moe_gate_up(a, dx + (size_t) t * D, dh, s);
+        gg::moe_down(a, dh, dsh + (size_t) t * D, dout, s);
+        CU(cudaStreamSynchronize(s));
+        CU(cudaMemcpy(tok.data() + (size_t) t * D, dout, (size_t) D * 4, cudaMemcpyDeviceToHost));
+    }
+    char what[96];
+    std::snprintf(what, sizeof(what), "%s/%s token experts (D %d, F %d)", tn(tg), tn(td), D, F);
+    expect(what, tok.data(), want.data(), want.size(), 1e-3);
+    // the window
+    std::vector<unsigned long long> gptr;
+    std::vector<int> gstart, gent;
+    for (int x0 = 0; x0 < n_exp; ++x0) {
+        std::vector<int> ents;
+        for (int t = 0; t < T; ++t)
+            for (int i = 0; i < k; ++i)
+                if (pick[t * 8 + i] == x0 && pp[t * 8 + i] != 0ull) ents.push_back(t * 8 + i);
+        if (ents.empty()) continue;
+        gptr.push_back((unsigned long long) (E.dev + (size_t) x0 * E.blob));
+        gstart.push_back((int) gent.size());
+        for (int e : ents) gent.push_back(e);
+    }
+    gstart.push_back((int) gent.size());
+    std::vector<int> ng(1, (int) gptr.size());
+    unsigned long long* dgp = dev(gptr);
+    int *dgs = dev(gstart), *dge = dev(gent), *dng = dev(ng);
+    float* dwh = dev(std::vector<float>((size_t) T * 8 * F));
+    float* dpart = dev(std::vector<float>((size_t) T * 8 * D));
+    float* dwo = dev(std::vector<float>((size_t) T * D));
+    x3::WinArgs w;
+    w.grp_ptr = dgp;
+    w.grp_start = dgs;
+    w.grp_ent = dge;
+    w.n_groups = dng;
+    w.plan_ptr = dpp;
+    w.plan_w = dpw;
+    w.cpu_part = dcpu;
+    w.cpu_stride = D;
+    w.cpu_flag = dflag;
+    w.x = dx;
+    w.x_stride = D;
+    w.h = dwh;
+    w.part = dpart;
+    w.sh_out = dsh;
+    w.out = dwo;
+    w.out_stride = D;
+    w.lay = E.lay;
+    w.T = T;
+    w.k = k;
+    w.n_embd = D;
+    w.n_ff = F;
+    w.limit = lim;
+    if (!gg::win_experts(w, s)) ++g_fail;
+    CU(cudaStreamSynchronize(s));
+    std::vector<float> win = host(dwo, (size_t) T * D);
+    std::snprintf(what, sizeof(what), "  window experts (T %d)", T);
+    expect(what, win.data(), want.data(), want.size(), 1e-3);
+    const bool same = std::memcmp(win.data(), tok.data(), win.size() * 4) == 0;
+    if (!same) ++g_fail;
+    std::printf("%-44s %s\n", "  ... bit for bit the token path's", same ? "ok" : "FAIL");
+    for (int R : {90, 200, 400}) {   // the prompt path's set: experts of a few rows (the light kernels), then of more
+        const int NT = 30;
+        std::vector<int> owner(R), idx(R);
+        for (int r = 0; r < R; ++r) owner[r] = (int) (rng() % n_exp);
+        std::sort(owner.begin(), owner.end());
+        std::vector<int> bounds(n_exp + 1, 0);
+        for (int e = 0, r = 0; e <= n_exp; ++e) {
+            while (r < R && owner[r] < e) ++r;
+            bounds[e] = r;
+        }
+        int max_rows = 0;
+        for (int e = 0; e < n_exp; ++e) max_rows = std::max(max_rows, bounds[e + 1] - bounds[e]);
+        std::vector<float> xs((size_t) NT * D);
+        for (auto& v : xs) v = frand();
+        for (int r = 0; r < R; ++r) idx[r] = (int) (rng() % NT);
+        float* dxs = dev(xs);
+        int *dbd = dev(bounds), *didx = dev(idx);
+        uint16_t* dh16 = dev(std::vector<uint16_t>((size_t) R * F));
+        float* dy = dev(std::vector<float>((size_t) R * D));
+        x3::SetArgs sa;
+        sa.wbase = E.dev;
+        sa.stride = E.blob;
+        sa.lay = E.lay;
+        sa.n_exp = n_exp;
+        sa.bounds = dbd;
+        sa.row0 = 0;
+        sa.max_rows = max_rows;
+        sa.n_embd = D;
+        sa.n_ff = F;
+        sa.limit = lim;
+        gg::set_gate_up(sa, dxs, D, didx, dh16, F, s);
+        gg::set_down(sa, dh16, F, dy, D, s);
+        CU(cudaStreamSynchronize(s));
+        std::vector<uint16_t> h16 = host(dh16, (size_t) R * F);
+        std::vector<float> y = host(dy, (size_t) R * D);
+        std::vector<float> hgot((size_t) R * F);
+        std::vector<double> hwant((size_t) R * F), ywant((size_t) R * D);
+        // (the light kernels, experts of <= 16 rows: the inputs rounded to int8 per 32 as the token path rounds them; the
+        // GEMM tiles: F16 inputs and weights - a low-bit weight is not always an F16 value)
+        int n_light = 0;
+        for (int e = 0; e < n_exp; ++e) n_light += bounds[e + 1] - bounds[e] <= 16 ? bounds[e + 1] - bounds[e] : 0;
+        for (int r = 0; r < R; ++r) {
+            const bool light = bounds[owner[r] + 1] - bounds[owner[r]] <= 16;
+            const std::vector<float> xq = light ? q8_round(xs.data() + (size_t) idx[r] * D, D) : std::vector<float>();
+            const float* xr = light ? xq.data() : xs.data() + (size_t) idx[r] * D;
+            std::vector<float> hr(F);
+            for (int f = 0; f < F; ++f) {
+                hwant[(size_t) r * F + f] = swiglu(E.dot(owner[r], 0, f, xr), E.dot(owner[r], 1, f, xr), lim);
+                hgot[(size_t) r * F + f] = __half2float(*(const __half*) &h16[(size_t) r * F + f]);
+                hr[f] = hgot[(size_t) r * F + f];
+            }
+            if (light) hr = q8_round(hr.data(), F);
+            for (int d = 0; d < D; ++d) ywant[(size_t) r * D + d] = E.dot(owner[r], 2, d, hr.data());
+        }
+        char sw[64];
+        std::snprintf(sw, sizeof(sw), "  set gate/up (F16 h), %d rows, %d light", R, n_light);
+        expect(sw, hgot.data(), hwant.data(), hwant.size(), n_light == R ? 2e-3 : 8e-3);   // (IQ4_XS: the widest weights in F16)
+        std::snprintf(sw, sizeof(sw), "  set down, %d rows, %d light", R, n_light);
+        expect(sw, y.data(), ywant.data(), ywant.size(), n_light == R ? 1e-4 : 2e-3);
+        cudaFree(dxs), cudaFree(dbd), cudaFree(didx), cudaFree(dh16), cudaFree(dy);
+    }
+    {   // the CPU lane: 3 tokens of expert 4, gate / up rows [7, 107) then all its down rows from the CPU's own h
+        gg::IqCpu fm;
+        std::string err;
+        if (!gg::iq_cpu_fmt(tg, td, D, F, fm, err)) {
+            std::printf("%-44s FAIL  %s\n", "  CPU lane", err.c_str());
+            ++g_fail;
+        } else {
+            const int n = 3, e = 4, r0 = 7, r1 = std::min(107, F);
+            std::vector<std::vector<uint8_t>> aq(n, std::vector<uint8_t>(fm.act_bytes)),
+                hq(n, std::vector<uint8_t>(fm.h_bytes));
+            std::vector<std::vector<float>> ff(n, std::vector<float>(F, 0.0f)), yo(n, std::vector<float>(D, 0.0f));
+            const void* ap[n];
+            const void* hp[n];
+            float* fp[n];
+            float* yp[n];
+            for (int i = 0; i < n; ++i) {
+                gg::iq_cpu_quant(fm.gu_act, x.data() + (size_t) i * D, D, aq[i].data());
+                ap[i] = aq[i].data();
+                fp[i] = ff[i].data();
+            }
+            gg::iq_cpu_gate_up(fm, E.mat(e, 0), E.mat(e, 1), ap, n, fp, r0, r1, lim);
+            gg::iq_cpu_gate_up(fm, E.mat(e, 0), E.mat(e, 1), ap, n, fp, 0, r0, lim);
+            gg::iq_cpu_gate_up(fm, E.mat(e, 0), E.mat(e, 1), ap, n, fp, r1, F, lim);
+            for (int i = 0; i < n; ++i) {
+                gg::iq_cpu_quant(fm.d_act, ff[i].data(), F, hq[i].data());
+                hp[i] = hq[i].data();
+                yp[i] = yo[i].data();
+            }
+            gg::iq_cpu_down(fm, E.mat(e, 2), hp, n, yp, 0, D);
+            // the reference on the Q8_K values the CPU took (block_q8_K: F32 d, int8 qs[256], int16 bsums[16])
+            auto q8k = [](const std::vector<uint8_t>& q, int kk) {
+                std::vector<float> v(kk);
+                for (int b = 0; b < kk / 256; ++b) {
+                    const uint8_t* p = q.data() + (size_t) b * 292;
+                    float d;
+                    std::memcpy(&d, p, 4);
+                    for (int j = 0; j < 256; ++j) v[b * 256 + j] = d * (float) (int8_t) p[4 + j];
+                }
+                return v;
+            };
+            const bool k8 = fm.gu_act == GGML_TYPE_Q8_K && fm.d_act == GGML_TYPE_Q8_K;
+            std::vector<float> got_h, got_y;
+            std::vector<double> want_h, want_y;
+            for (int i = 0; i < n && k8; ++i) {
+                const std::vector<float> xa = q8k(aq[i], D), ha = q8k(hq[i], F);
+                for (int f = 0; f < F; ++f) {
+                    got_h.push_back(ff[i][f]);
+                    want_h.push_back(swiglu(E.dot(e, 0, f, xa.data()), E.dot(e, 1, f, xa.data()), lim));
+                }
+                for (int d = 0; d < D; ++d) {
+                    got_y.push_back(yo[i][d]);
+                    want_y.push_back(E.dot(e, 2, d, ha.data()));
+                }
+            }
+            if (!k8) {
+                std::printf("%-44s FAIL  activation types %d / %d\n", "  CPU lane", fm.gu_act, fm.d_act);
+                ++g_fail;
+            } else {
+                expect("  CPU lane gate/up (Q8_K)", got_h.data(), want_h.data(), want_h.size(), 1e-4);
+                expect("  CPU lane down (Q8_K)", got_y.data(), want_y.data(), want_y.size(), 1e-4);
+            }
+        }
+    }
+    cudaFree(E.dev), cudaFree(dx), cudaFree(dsh), cudaFree(dcpu), cudaFree(dpw), cudaFree(dpp), cudaFree(dflag);
+    cudaFree(dh), cudaFree(dout), cudaFree(dgp), cudaFree(dgs), cudaFree(dge), cudaFree(dng), cudaFree(dwh);
+    cudaFree(dpart), cudaFree(dwo);
+}
+
+// the role pairs the tests take: every type as gate / up and as down
+const std::pair<int, int> kQPairs[] = {
+    {gg::iq::kIQ2_XXS, gg::iq::kIQ3_XXS}, {gg::iq::kIQ2_S, gg::iq::kIQ3_S},  {gg::iq::kIQ3_XXS, gg::iq::kIQ3_S},
+    {gg::iq::kIQ4_XS, gg::iq::kQ4_K},     {gg::iq::kQ2_K, gg::iq::kQ3_K},    {gg::iq::kQ4_K, gg::iq::kIQ4_XS},
+    {gg::iq::kQ3_K, gg::iq::kQ2_K},       {gg::iq::kIQ3_S, gg::iq::kIQ2_XXS}, {gg::iq::kIQ3_S, gg::iq::kIQ2_S}};
+
+__global__ void rows_f16_test_kernel(const float* __restrict__ x, int ldx, int ncols, uint16_t* __restrict__ out) {
+    const int r = blockIdx.y;
+    const float* src = x + (size_t) r * ldx;
+    uint16_t* dst = out + (size_t) r * ncols;
+    for (int c = blockIdx.x * blockDim.x + threadIdx.x; c < ncols; c += gridDim.x * blockDim.x)
+        dst[c] = __half_as_ushort(__float2half_rn(src[c]));
+}
+
+void bench_finish_f16(cudaStream_t s) {
+    constexpr int NH = 64, HD = 512, REPS = 20;
+    cudaEvent_t e0, e1;
+    CU(cudaEventCreate(&e0));
+    CU(cudaEventCreate(&e1));
+    std::vector<float> freqs(32);
+    for (int i = 0; i < 32; ++i) freqs[(size_t) i] = std::pow(10000.0f, -2.0f * i / 64.0f);
+    float* d_freqs = dev(freqs);
+    for (int T : {16, 64, 256}) {
+        const int nvec = T * NH;
+        const size_t n = (size_t) nvec * HD;
+        std::vector<float> x(n);
+        for (float& v : x) v = frand();
+        float* x_split = dev(x);
+        float* x_fused = dev(x);
+        uint16_t* out_split = dev(std::vector<uint16_t>(n));
+        uint16_t* out_fused = dev(std::vector<uint16_t>(n));
+        strata::ds4::Finish f;
+        f.rd = 64;
+        f.pos = 1234;
+        f.inverse = 1;
+        f.vpp = NH;
+        f.freqs = d_freqs;
+        f.quant = 1;
+        strata::ds4::finish(x_split, nvec, HD, HD, f, s);
+        rows_f16_test_kernel<<<dim3((unsigned) std::min(8, (HD + 255) / 256), (unsigned) nvec), 256, 0, s>>>(
+            x_split, HD, HD, out_split);
+        strata::ds4::Finish ff = f;
+        ff.dst16 = out_fused;
+        ff.dst16_stride = NH * HD;
+        ff.dst16_heads = NH;
+        strata::ds4::finish(x_fused, nvec, HD, HD, ff, s);
+        CU(cudaStreamSynchronize(s));
+        std::vector<uint16_t> hs = host(out_split, n);
+        std::vector<uint16_t> hf = host(out_fused, n);
+        const bool same = std::memcmp(hs.data(), hf.data(), n * sizeof(uint16_t)) == 0;
+        if (!same) ++g_fail;
+        std::printf("%-52s %s\n", "finish+rows_f16 vs fused F16, bit for bit", same ? "ok  " : "FAIL");
+
+        CU(cudaEventRecord(e0, s));
+        for (int i = 0; i < REPS; ++i) {
+            strata::ds4::finish(x_split, nvec, HD, HD, f, s);
+            rows_f16_test_kernel<<<dim3((unsigned) std::min(8, (HD + 255) / 256), (unsigned) nvec), 256, 0, s>>>(
+                x_split, HD, HD, out_split);
+        }
+        CU(cudaEventRecord(e1, s));
+        CU(cudaEventSynchronize(e1));
+        float split_ms = 0.0f;
+        CU(cudaEventElapsedTime(&split_ms, e0, e1));
+
+        CU(cudaEventRecord(e0, s));
+        for (int i = 0; i < REPS; ++i) strata::ds4::finish(x_fused, nvec, HD, HD, ff, s);
+        CU(cudaEventRecord(e1, s));
+        CU(cudaEventSynchronize(e1));
+        float fused_ms = 0.0f;
+        CU(cudaEventElapsedTime(&fused_ms, e0, e1));
+        const double split_us = split_ms * 1000.0 / REPS;
+        const double fused_us = fused_ms * 1000.0 / REPS;
+        std::printf("bench finish+F16, %3d queries: split %9.1f us, fused %9.1f us, %+7.2f%%\n", T, split_us,
+                    fused_us, 100.0 * (fused_us / split_us - 1.0));
+        cudaFree(x_split), cudaFree(x_fused), cudaFree(out_split), cudaFree(out_fused);
+    }
+    cudaFree(d_freqs);
+    cudaEventDestroy(e0), cudaEventDestroy(e1);
+}
+
+// a token's 6 low-bit experts at full size: GB/s of the weights read
+void bench_q(cudaStream_t s) {
+    cudaEvent_t a, b;
+    cudaEventCreate(&a);
+    cudaEventCreate(&b);
+    const int D = 5120, F = 2304;
+    for (const auto& pr : kQPairs) {
+        QExperts E = make_q(D, F, 6, pr.first, pr.second);
+        std::vector<unsigned long long> pp(8, 0ull);
+        std::vector<float> pw(8, 0.1f);
+        for (int i = 0; i < 6; ++i) pp[i] = (unsigned long long) (E.dev + (size_t) i * E.blob);
+        unsigned long long* dpp = dev(pp);
+        float* dpw = dev(pw);
+        float* dx = dev(std::vector<float>(D, 0.01f));
+        float* dh = dev(std::vector<float>((size_t) 8 * F));
+        float* dout = dev(std::vector<float>(D));
+        x3::MoeArgs ma;
+        ma.plan_ptr = dpp;
+        ma.plan_w = dpw;
+        ma.lay = E.lay;
+        ma.k = 6;
+        ma.n_embd = D;
+        ma.n_ff = F;
+        ma.limit = 10.0f;
+        const double gu = 6.0 * 2 * F * E.rb(0), dn = 6.0 * D * E.rb(2);
+        auto timed = [&](const char* what, double bytes, auto&& fn) {
+            fn();
+            CU(cudaStreamSynchronize(s));
+            cudaEventRecord(a, s);
+            for (int i = 0; i < 50; ++i) fn();
+            cudaEventRecord(b, s);
+            CU(cudaEventSynchronize(b));
+            float ms = 0;
+            cudaEventElapsedTime(&ms, a, b);
+            std::printf("bench %-40s %8.1f us  %6.0f GB/s\n", what, ms * 1000 / 50, bytes / (ms / 50 * 1e-3) / 1e9);
+        };
+        char what[96];
+        std::snprintf(what, sizeof(what), "6 %s/%s experts (gate/up + down)", tn(pr.first), tn(pr.second));
+        timed(what, gu + dn, [&] {
+            gg::moe_gate_up(ma, dx, dh, s);
+            gg::moe_down(ma, dh, nullptr, dout, s);
+        });
+        timed("  gate/up alone", gu, [&] { gg::moe_gate_up(ma, dx, dh, s); });
+        timed("  down + combine alone", dn, [&] { gg::moe_down(ma, dh, nullptr, dout, s); });
+        cudaFree(E.dev), cudaFree(dpp), cudaFree(dpw), cudaFree(dx), cudaFree(dh), cudaFree(dout);
+    }
+    // the prompt path's sets: 32 experts x R rows (128: an 8K chunk's share of 384 experts; 8: a short prompt's - the
+    // weights' bandwidth), the MXFP4 ones first
+    for (int R : {128, 8}) {
+        const int NE = 32;
+        for (int pi = -1; pi < (int) (sizeof(kQPairs) / sizeof(kQPairs[0])); ++pi) {
+            x3::ExpertLayout lay;
+            size_t blob;
+            double wbytes;
+            uint8_t* wdev;
+            char what[96];
+            if (pi < 0) {
+                Experts M = make_experts(D, F, NE);
+                lay = M.lay, blob = M.blob, wdev = M.dev;
+                wbytes = 3.0 * gg::mx_bytes(F, D);
+                std::snprintf(what, sizeof(what), "set MXFP4, %d experts x %d rows", NE, R);
+            } else {
+                QExperts E = make_q(D, F, NE, kQPairs[pi].first, kQPairs[pi].second);
+                lay = E.lay, blob = E.blob, wdev = E.dev;
+                wbytes = 2.0 * F * E.rb(0) + (double) D * E.rb(2);
+                std::snprintf(what, sizeof(what), "set %s/%s, %d experts x %d rows", tn(kQPairs[pi].first),
+                              tn(kQPairs[pi].second), NE, R);
+            }
+            std::vector<int> bounds(NE + 1), idx(NE * R);
+            for (int e = 0; e <= NE; ++e) bounds[e] = e * R;
+            for (int i = 0; i < NE * R; ++i) idx[i] = i;
+            int *db = dev(bounds), *di = dev(idx);
+            float* xs = dev(std::vector<float>((size_t) NE * R * D, 0.01f));
+            uint16_t* h16 = dev(std::vector<uint16_t>((size_t) NE * R * F));
+            float* y = dev(std::vector<float>((size_t) NE * R * D));
+            x3::SetArgs sa;
+            sa.wbase = wdev;
+            sa.stride = blob;
+            sa.lay = lay;
+            sa.n_exp = NE;
+            sa.bounds = db;
+            sa.max_rows = R;
+            sa.n_embd = D;
+            sa.n_ff = F;
+            sa.limit = 10.0f;
+            auto one = [&] {
+                gg::set_gate_up(sa, xs, D, di, h16, F, s);
+                gg::set_down(sa, h16, F, y, D, s);
+            };
+            one();
+            CU(cudaStreamSynchronize(s));
+            cudaEventRecord(a, s);
+            for (int i = 0; i < 5; ++i) one();
+            cudaEventRecord(b, s);
+            CU(cudaEventSynchronize(b));
+            float ms = 0;
+            cudaEventElapsedTime(&ms, a, b);
+            ms /= 5;
+            std::printf("bench %-40s %8.2f ms  %6.1f TFLOP/s  %6.0f GB/s of weights\n", what, ms,
+                        2.0 * NE * R * 3.0 * D * F / (ms * 1e-3) / 1e12, NE * wbytes / (ms * 1e-3) / 1e9);
+            cudaFree(wdev), cudaFree(db), cudaFree(di), cudaFree(xs), cudaFree(h16), cudaFree(y);
+        }
+    }
+}
+
+// The Q5_K GEMVs that dominate DeepSeek V4.1 Flash attention: q_b, eight wo_a
+// slices, and wo_b.  The sizes and types match the IST-DAS 2.00 pack metadata.
+void bench_q5_attention(cudaStream_t s) {
+    cudaEvent_t a, b;
+    CU(cudaEventCreate(&a));
+    CU(cudaEventCreate(&b));
+    auto timed = [&](const char* what, double bytes, int warps, auto&& fn) {
+        fn();
+        CU(cudaStreamSynchronize(s));
+        cudaEventRecord(a, s);
+        for (int i = 0; i < 50; ++i) fn();
+        cudaEventRecord(b, s);
+        CU(cudaEventSynchronize(b));
+        float ms = 0;
+        CU(cudaEventElapsedTime(&ms, a, b));
+        const double us = ms * 1000.0 / 50.0;
+        char label[96];
+        std::snprintf(label, sizeof(label), "%s, %d logical warps", what, warps);
+        std::printf("bench %-52s %8.1f us  %6.0f GB/s\n", label, us,
+                    bytes / (us * 1e-6) / 1e9);
+    };
+    auto run = [&](const char* what, int jobs, int n, int k, int warps) {
+        const size_t rb = gg::iq::row_bytes(gg::iq::kQ5_K, k);
+        std::vector<uint8_t> w = q_rand(gg::iq::kQ5_K, jobs * n, k);
+        uint8_t* dw = dev(w);
+        std::vector<float> x(k, 0.01f), y((size_t) jobs * n);
+        float* dx = dev(x);
+        float* dy = dev(y);
+        std::vector<x3::Mat> mats((size_t) jobs);
+        std::vector<x3::MvJob> mj((size_t) jobs);
+        for (int i = 0; i < jobs; ++i) {
+            mats[(size_t) i].fmt = gg::kFmtGG;
+            mats[(size_t) i].K = gg::iq::kQ5_K;
+            mats[(size_t) i].raw = dw + (size_t) i * n * rb;
+            mats[(size_t) i].k = k;
+            mats[(size_t) i].n = n;
+            mj[(size_t) i].m = &mats[(size_t) i];
+            mj[(size_t) i].xf = dx;
+            mj[(size_t) i].y = dy + (size_t) i * n;
+            mj[(size_t) i].y_cs = n;
+        }
+        timed(what, (double) jobs * n * rb, warps, [&] {
+            if (!gg::mv(mj.data(), jobs, s)) ++g_fail;
+        });
+        cudaFree(dw), cudaFree(dx), cudaFree(dy);
+    };
+    for (int warps : {2, 4, 8}) {
+        const std::string value = std::to_string(warps);
+        setenv("DS4_Q5_WARPS", value.c_str(), 1);
+        run("q_b Q5_K 32768x1280", 1, 32768, 1280, warps);
+        run("wo_a Q5_K 8 x 1024x4096", 8, 1024, 4096, warps);
+        run("wo_b Q5_K 5120x8192", 1, 5120, 8192, warps);
+        run("shared gate/up Q5_K 2 x 2304x5120", 2, 2304, 5120, warps);
+        run("shared down Q5_K 5120x2304", 1, 5120, 2304, warps);
+    }
+    unsetenv("DS4_Q5_WARPS");
+    CU(cudaEventDestroy(a));
+    CU(cudaEventDestroy(b));
+}
+
+// The exact M=1 q_b path: Q5_K 32768x1280 followed by RoPE over the last 64
+// values of each 512-value head.  Off is the production GEMV plus the separate
+// finish launch; on is the opt-in fused epilogue.  The outputs must be bit
+// identical before the timing gate runs.
+void test_qb_rope(cudaStream_t s, bool bench, const char* dump_prefix) {
+    constexpr int k = 1280, n = 32768, head_dim = 512, rope_dim = 64, heads = 64, pos = 1234;
+    std::vector<uint8_t> w = q_rand(gg::iq::kQ5_K, n, k);
+    std::vector<float> x(k), freqs(rope_dim / 2);
+    for (auto& v : x) v = frand();
+    for (int i = 0; i < rope_dim / 2; ++i)
+        freqs[(size_t) i] = (float) std::pow(10000.0, -2.0 * (double) i / (double) rope_dim);
+    uint8_t* dw = dev(w);
+    float* dx = dev(x);
+    float* df = dev(freqs);
+    float* dy0 = nullptr;
+    float* dy1 = nullptr;
+    CU(cudaMalloc(&dy0, (size_t) n * sizeof(float)));
+    CU(cudaMalloc(&dy1, (size_t) n * sizeof(float)));
+
+    x3::Mat m;
+    m.fmt = gg::kFmtGG;
+    m.K = gg::iq::kQ5_K;
+    m.raw = dw;
+    m.k = k;
+    m.n = n;
+    x3::MvJob j;
+    j.m = &m;
+    j.xf = dx;
+    j.y = dy0;
+
+    auto split = [&] {
+        j.y = dy0;
+        if (!gg::mv(&j, 1, s)) ++g_fail;
+        strata::ds4::Finish f;
+        f.rd = rope_dim;
+        f.pos = pos;
+        f.vpp = heads;
+        f.freqs = df;
+        strata::ds4::finish(dy0, heads, head_dim, head_dim, f, s);
+    };
+    auto fused = [&] {
+        if (!gg::mv_q5_rope(m, dx, dy1, df, rope_dim, pos, head_dim, heads, s)) ++g_fail;
+    };
+
+    split();
+    fused();
+    CU(cudaStreamSynchronize(s));
+    const std::vector<float> y0 = host(dy0, n), y1 = host(dy1, n);
+    const bool same = std::memcmp(y0.data(), y1.data(), y0.size() * sizeof(float)) == 0;
+    if (!same) ++g_fail;
+    std::printf("qb_rope correctness: %s (bit-identical=%d)\n", same ? "ok" : "FAIL", same ? 1 : 0);
+    if (dump_prefix != nullptr) {
+        const std::string off = std::string(dump_prefix) + "-off.bin";
+        const std::string on = std::string(dump_prefix) + "-on.bin";
+        std::FILE* fo = std::fopen(off.c_str(), "wb");
+        std::FILE* fn = std::fopen(on.c_str(), "wb");
+        if (fo == nullptr || fn == nullptr ||
+            std::fwrite(y0.data(), sizeof(float), y0.size(), fo) != y0.size() ||
+            std::fwrite(y1.data(), sizeof(float), y1.size(), fn) != y1.size()) {
+            std::printf("qb_rope dump: FAIL\n");
+            ++g_fail;
+        }
+        if (fo != nullptr) std::fclose(fo);
+        if (fn != nullptr) std::fclose(fn);
+    }
+
+    if (bench) {
+        cudaEvent_t e0, e1;
+        CU(cudaEventCreate(&e0));
+        CU(cudaEventCreate(&e1));
+        auto timed_us = [&](auto&& fn) {
+            for (int i = 0; i < 3; ++i) fn();
+            CU(cudaStreamSynchronize(s));
+            CU(cudaEventRecord(e0, s));
+            constexpr int reps = 50;
+            for (int i = 0; i < reps; ++i) fn();
+            CU(cudaEventRecord(e1, s));
+            CU(cudaEventSynchronize(e1));
+            float ms = 0.0f;
+            CU(cudaEventElapsedTime(&ms, e0, e1));
+            return 1000.0f * ms / (float) reps;
+        };
+        std::vector<float> gemv, finish_only, split_us, fused_us;
+        for (int pair = 1; pair <= 5; ++pair) {
+            const float g = timed_us([&] {
+                j.y = dy0;
+                if (!gg::mv(&j, 1, s)) ++g_fail;
+            });
+            strata::ds4::Finish f;
+            f.rd = rope_dim;
+            f.pos = pos;
+            f.vpp = heads;
+            f.freqs = df;
+            const float r = timed_us([&] {
+                strata::ds4::finish(dy0, heads, head_dim, head_dim, f, s);
+            });
+            const float b = timed_us(split);
+            const float u = timed_us(fused);
+            gemv.push_back(g);
+            finish_only.push_back(r);
+            split_us.push_back(b);
+            fused_us.push_back(u);
+            std::printf("QB_ROPE_PAIR=%d gemv_us=%.3f finish_us=%.3f split_us=%.3f fused_us=%.3f\n",
+                        pair, g, r, b, u);
+        }
+        auto median = [](std::vector<float> v) {
+            std::sort(v.begin(), v.end());
+            return v[v.size() / 2];
+        };
+        const float b = median(split_us), u = median(fused_us);
+        std::printf("QB_ROPE_MEDIAN gemv_us=%.3f finish_us=%.3f split_us=%.3f fused_us=%.3f change_pct=%.6f\n",
+                    median(gemv), median(finish_only), b, u, (u / b - 1.0f) * 100.0f);
+        CU(cudaEventDestroy(e0));
+        CU(cudaEventDestroy(e1));
+    }
+
+    CU(cudaFree(dw));
+    CU(cudaFree(dx));
+    CU(cudaFree(df));
+    CU(cudaFree(dy0));
+    CU(cudaFree(dy1));
+}
+
+// the CPU lane's speed: one full-size expert (gate / up rows, then down rows) for 1 and 4 tokens, on `nth` threads (rows
+// split between them), GB/s of weights read - MXFP4 (mx_cpu_rows) and the low-bit pairs (ggml-cpu's rows)
+void bench_cpu(int nth) {
+    const int D = 5120, F = 2304, reps = 6;
+    auto run = [&](const char* what, double bytes, const std::function<void(int, int)>& rows, int n_rows) {
+        auto pass = [&] {
+            std::vector<std::thread> th;
+            for (int t = 0; t < nth; ++t)
+                th.emplace_back([&, t] { rows(n_rows * t / nth, n_rows * (t + 1) / nth); });
+            for (auto& x : th) x.join();
+        };
+        pass();
+        const auto t0 = std::chrono::steady_clock::now();
+        for (int i = 0; i < reps; ++i) pass();
+        const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() / reps;
+        std::printf("cpu %-46s %8.2f ms  %6.1f GB/s (%d threads)\n", what, s * 1e3, bytes / s / 1e9, nth);
+    };
+    std::vector<float> x((size_t) 4 * D), h((size_t) 4 * F);
+    for (auto& v : x) v = frand();
+    for (auto& v : h) v = frand(0.2f);
+    for (int n : {1, 4}) {
+        Experts M = make_experts(D, F, 1);
+        const float* xp[4] = {x.data(), x.data() + D, x.data() + 2 * D, x.data() + 3 * D};
+        const float* hp[4] = {h.data(), h.data() + F, h.data() + 2 * F, h.data() + 3 * F};
+        std::vector<float> yo((size_t) 4 * D), yg((size_t) 4 * F);
+        char what[96];
+        std::snprintf(what, sizeof(what), "MXFP4 expert, %d token%s", n, n > 1 ? "s" : "");
+        run(what, 2.0 * gg::mx_bytes(F, D), [&](int r0, int r1) {
+            float* yp[4] = {yg.data(), yg.data() + F, yg.data() + 2 * F, yg.data() + 3 * F};
+            for (int i = 0; i < n; ++i) yp[i] += r0;
+            gg::mx_cpu_rows(emat(M, 0, 0), gg::mx_row_bytes(D), D, r0, r1, xp, n, yp);
+            gg::mx_cpu_rows(emat(M, 0, 1), gg::mx_row_bytes(D), D, r0, r1, xp, n, yp);
+        }, F);
+        run("  down", (double) gg::mx_bytes(D, F), [&](int r0, int r1) {
+            float* yp[4] = {yo.data() + r0, yo.data() + D + r0, yo.data() + 2 * D + r0, yo.data() + 3 * D + r0};
+            gg::mx_cpu_rows(emat(M, 0, 2), gg::mx_row_bytes(F), F, r0, r1, hp, n, yp);
+        }, D);
+        cudaFree(M.dev);
+        for (const auto& pr : kQPairs) {
+            QExperts E = make_q(D, F, 1, pr.first, pr.second);
+            gg::IqCpu fm;
+            std::string err;
+            if (!gg::iq_cpu_fmt(pr.first, pr.second, D, F, fm, err)) continue;
+            std::vector<uint8_t> aq((size_t) 4 * fm.act_bytes), hq((size_t) 4 * fm.h_bytes);
+            const void* ap[4];
+            const void* hqp[4];
+            for (int i = 0; i < 4; ++i) {
+                gg::iq_cpu_quant(fm.gu_act, xp[i], D, aq.data() + i * fm.act_bytes);
+                gg::iq_cpu_quant(fm.d_act, hp[i], F, hq.data() + i * fm.h_bytes);
+                ap[i] = aq.data() + i * fm.act_bytes;
+                hqp[i] = hq.data() + i * fm.h_bytes;
+            }
+            std::snprintf(what, sizeof(what), "%s/%s expert, %d token%s", tn(pr.first), tn(pr.second), n, n > 1 ? "s" : "");
+            run(what, 2.0 * F * E.rb(0), [&](int r0, int r1) {
+                float* fp[4] = {yg.data(), yg.data() + F, yg.data() + 2 * F, yg.data() + 3 * F};
+                gg::iq_cpu_gate_up(fm, E.mat(0, 0), E.mat(0, 1), ap, n, fp, r0, r1, 10.0f);
+            }, F);
+            run("  down", (double) D * E.rb(2), [&](int r0, int r1) {
+                float* yp[4] = {yo.data(), yo.data() + D, yo.data() + 2 * D, yo.data() + 3 * D};
+                gg::iq_cpu_down(fm, E.mat(0, 2), hqp, n, yp, r0, r1);
+            }, D);
+            cudaFree(E.dev);
+        }
+    }
+}
+
+// the decode kernels' speed: GB/s of weights read (a token's dense GEMVs and its experts)
+void bench(cudaStream_t s) {
+    cudaEvent_t a, b;
+    cudaEventCreate(&a);
+    cudaEventCreate(&b);
+    auto timed = [&](const char* what, double bytes, auto&& fn) {
+        fn();
+        CU(cudaStreamSynchronize(s));
+        cudaEventRecord(a, s);
+        const int reps = 50;
+        for (int i = 0; i < reps; ++i) fn();
+        cudaEventRecord(b, s);
+        CU(cudaEventSynchronize(b));
+        float ms = 0;
+        cudaEventElapsedTime(&ms, a, b);
+        std::printf("bench %-40s %8.1f us  %6.0f GB/s\n", what, ms * 1000 / reps, bytes / (ms / reps * 1e-3) / 1e9);
+    };
+    const std::pair<int, int> shapes[] = {{1280, 32768}, {5120, 1280}, {8192, 5120}, {5120, 129280}};
+    for (int fmt : {gg::kFmtBF16, gg::kFmtQ8_0})
+        for (const auto& kn : shapes) {
+            const int k = kn.first, n = kn.second;
+            const size_t bytes = fmt == gg::kFmtBF16 ? (size_t) n * k * 2 : gg::q8_row_bytes(k) * n;
+            uint8_t* dw;
+            CU(cudaMalloc(&dw, bytes));
+            CU(cudaMemset(dw, 0, bytes));
+            float *dx, *dy;
+            CU(cudaMalloc(&dx, (size_t) k * 4));
+            CU(cudaMemset(dx, 0, (size_t) k * 4));
+            CU(cudaMalloc(&dy, (size_t) n * 4));
+            x3::Mat m;
+            m.fmt = fmt;
+            m.raw = dw;
+            m.k = k;
+            m.n = n;
+            x3::MvJob j;
+            j.m = &m;
+            j.xf = dx;
+            j.y = dy;
+            char what[64];
+            std::snprintf(what, sizeof(what), "mv %s %dx%d", fmt == gg::kFmtBF16 ? "BF16" : "Q8_0", n, k);
+            timed(what, (double) bytes, [&] { gg::mv(&j, 1, s); });
+            cudaFree(dw), cudaFree(dx), cudaFree(dy);
+        }
+    {   // a token's 6 experts at full size
+        const int D = 5120, F = 2304;
+        Experts E = make_experts(D, F, 6);
+        std::vector<unsigned long long> pp(8, 0ull);
+        std::vector<float> pw(8, 0.1f);
+        for (int i = 0; i < 6; ++i) pp[i] = (unsigned long long) (E.dev + (size_t) i * E.blob);
+        unsigned long long* dpp = dev(pp);
+        float* dpw = dev(pw);
+        float* dx = dev(std::vector<float>(D, 0.01f));
+        float* dh = dev(std::vector<float>((size_t) 8 * F));
+        float* dout = dev(std::vector<float>(D));
+        x3::MoeArgs ma;
+        ma.plan_ptr = dpp;
+        ma.plan_w = dpw;
+        ma.lay = E.lay;
+        ma.k = 6;
+        ma.n_embd = D;
+        ma.n_ff = F;
+        ma.limit = 10.0f;
+        timed("6 MXFP4 experts (gate/up + down)", 6.0 * (2 * gg::mx_bytes(F, D) + gg::mx_bytes(D, F)), [&] {
+            gg::moe_gate_up(ma, dx, dh, s);
+            gg::moe_down(ma, dh, nullptr, dout, s);
+        });
+        cudaFree(E.dev);
+        {   // the prompt path: 32 experts x 128 rows each (an 8K chunk's share of 384 experts)
+            const int NE = 32, R = 128;
+            Experts S = make_experts(D, F, NE);
+            std::vector<int> bounds(NE + 1), idx(NE * R);
+            for (int e = 0; e <= NE; ++e) bounds[e] = e * R;
+            for (int i = 0; i < NE * R; ++i) idx[i] = i;
+            int *db = dev(bounds), *di = dev(idx);
+            float* xs = dev(std::vector<float>((size_t) NE * R * D, 0.01f));
+            uint16_t* h16 = dev(std::vector<uint16_t>((size_t) NE * R * F));
+            float* y = dev(std::vector<float>((size_t) NE * R * D));
+            x3::SetArgs sa;
+            sa.wbase = S.dev;
+            sa.stride = S.blob;
+            sa.lay = S.lay;
+            sa.n_exp = NE;
+            sa.bounds = db;
+            sa.max_rows = R;
+            sa.n_embd = D;
+            sa.n_ff = F;
+            sa.limit = 10.0f;
+            const double flops = 2.0 * NE * R * 3.0 * D * F;
+            cudaEvent_t a0, a1;
+            cudaEventCreate(&a0);
+            cudaEventCreate(&a1);
+            gg::set_gate_up(sa, xs, D, di, h16, F, s);
+            gg::set_down(sa, h16, F, y, D, s);
+            cudaEventRecord(a0, s);
+            for (int i = 0; i < 5; ++i) {
+                gg::set_gate_up(sa, xs, D, di, h16, F, s);
+                gg::set_down(sa, h16, F, y, D, s);
+            }
+            cudaEventRecord(a1, s);
+            CU(cudaEventSynchronize(a1));
+            float ms = 0;
+            cudaEventElapsedTime(&ms, a0, a1);
+            std::printf("bench %-40s %8.1f ms  %6.1f TFLOP/s\n", "prompt set: 32 experts x 128 rows", ms / 5,
+                        flops / (ms / 5 * 1e-3) / 1e12);
+            cudaFree(S.dev), cudaFree(db), cudaFree(di), cudaFree(xs), cudaFree(h16), cudaFree(y);
+        }
+        E.dev = nullptr;
+        E = make_experts(D, F, 6);
+        for (int i = 0; i < 6; ++i) pp[i] = (unsigned long long) (E.dev + (size_t) i * E.blob);
+        CU(cudaMemcpy(dpp, pp.data(), pp.size() * 8, cudaMemcpyHostToDevice));
+        timed("  gate/up alone", 6.0 * 2 * gg::mx_bytes(F, D), [&] { gg::moe_gate_up(ma, dx, dh, s); });
+        timed("  down + combine alone", 6.0 * gg::mx_bytes(D, F), [&] { gg::moe_down(ma, dh, nullptr, dout, s); });
+        cudaFree(E.dev), cudaFree(dpp), cudaFree(dpw), cudaFree(dx), cudaFree(dh), cudaFree(dout);
+    }
+}
+
+// ---- the caches' packed rows (ds4_kernels.cu): DeepSeek's FP8 / FP4 roundings kept as codes and scales.  Each packed
+// row against the BF16 row the same finish writes - a host decode of every value bit for bit - then the readers (the
+// window ring and its rollback, the sparse attention over the compressed KV, the indexer's scores) the same bits from
+// either, at full size (a 64K context's compressed rows)
+namespace dk = strata::ds4;
+
+void bench_router_gemv(cudaStream_t s) {
+    const int n = 384, k = 5120, layers = 10, iters = 100;
+    std::vector<float> w((size_t) n * k), x(k);
+    for (float& v : w) v = frand(0.02f);
+    for (float& v : x) v = frand();
+    std::vector<float*> dw((size_t) layers);
+    for (float*& p : dw) p = dev(w);
+    float* dx = dev(x);
+    float *dy_w2 = nullptr, *dy_w8 = nullptr;
+    CU(cudaMalloc(&dy_w2, (size_t) n * sizeof(float)));
+    CU(cudaMalloc(&dy_w8, (size_t) n * sizeof(float)));
+    cudaEvent_t e0, e1;
+    CU(cudaEventCreate(&e0));
+    CU(cudaEventCreate(&e1));
+
+    auto time = [&](bool warps8) {
+        if (warps8) setenv("DS4_GEMV_F32_WARPS8", "1", 1);
+        else unsetenv("DS4_GEMV_F32_WARPS8");
+        float* out = warps8 ? dy_w8 : dy_w2;
+        for (float* wp : dw) dk::gemv_f32(wp, dx, n, k, 1, out, n, s);
+        CU(cudaStreamSynchronize(s));
+        CU(cudaEventRecord(e0, s));
+        for (int i = 0; i < iters; ++i)
+            for (float* wp : dw) dk::gemv_f32(wp, dx, n, k, 1, out, n, s);
+        CU(cudaEventRecord(e1, s));
+        CU(cudaEventSynchronize(e1));
+        float ms = 0.0f;
+        CU(cudaEventElapsedTime(&ms, e0, e1));
+        return ms * 1000.0f / (iters * layers);
+    };
+
+    const float w2_us = time(false), w8_us = time(true);
+    unsetenv("DS4_GEMV_F32_WARPS8");
+    const bool same = std::memcmp(host(dy_w2, n).data(), host(dy_w8, n).data(), (size_t) n * sizeof(float)) == 0;
+    const double gb = (double) n * k * sizeof(float) / 1e9;
+    if (!same) ++g_fail;
+    std::printf("router F32 GEMV 384x5120, 10 matrices: warps2 %.1f us/layer (%.0f GB/s), warps8 %.1f us, %s\n",
+                w2_us, gb / (w2_us * 1e-6), w8_us, same ? "bit-identical" : "DIFFERS");
+    CU(cudaEventDestroy(e0));
+    CU(cudaEventDestroy(e1));
+    for (float* p : dw) CU(cudaFree(p));
+    CU(cudaFree(dx));
+    CU(cudaFree(dy_w2));
+    CU(cudaFree(dy_w8));
+}
+
+void bench_route(cudaStream_t s) {
+    const int n = 384, k = 6, layers = 10, iters = 100;
+    std::vector<float> logits((size_t) layers * 1024), bias(n);
+    for (float& v : logits) v = frand(4.0f);
+    for (float& v : bias) v = frand(0.2f);
+    float* dl = dev(logits);
+    float* db = dev(bias);
+    int* di[2] = {};
+    float* dw[2] = {};
+    for (int v = 0; v < 2; ++v) {
+        CU(cudaMalloc(&di[v], (size_t) dk::kPicks * sizeof(int)));
+        CU(cudaMalloc(&dw[v], (size_t) dk::kPicks * sizeof(float)));
+    }
+    cudaEvent_t e0, e1;
+    CU(cudaEventCreate(&e0));
+    CU(cudaEventCreate(&e1));
+    auto time = [&](bool warps16) {
+        if (warps16) setenv("DS4_ROUTE_WARPS16", "1", 1);
+        else unsetenv("DS4_ROUTE_WARPS16");
+        const int variant = warps16 ? 1 : 0;
+        for (int l = 0; l < layers; ++l)
+            dk::route(dl + (size_t) l * 1024, db, n, k, 1, 1.0f, di[variant], dw[variant], s);
+        CU(cudaStreamSynchronize(s));
+        CU(cudaEventRecord(e0, s));
+        for (int i = 0; i < iters; ++i)
+            for (int l = 0; l < layers; ++l)
+                dk::route(dl + (size_t) l * 1024, db, n, k, 1, 1.0f, di[variant], dw[variant], s);
+        CU(cudaEventRecord(e1, s));
+        CU(cudaEventSynchronize(e1));
+        float ms = 0.0f;
+        CU(cudaEventElapsedTime(&ms, e0, e1));
+        return ms * 1000.0f / (iters * layers);
+    };
+    const float w4 = time(false), w16 = time(true);
+    unsetenv("DS4_ROUTE_WARPS16");
+    const bool same = std::memcmp(host(di[0], k).data(), host(di[1], k).data(), (size_t) k * sizeof(int)) == 0 &&
+                      std::memcmp(host(dw[0], k).data(), host(dw[1], k).data(), (size_t) k * sizeof(float)) == 0;
+    if (!same) ++g_fail;
+    std::printf("DS4 route, n=%d k=%d: warps4 %.2f us, warps16 %.2f; %s\n", n, k, w4, w16,
+                same ? "bit-identical" : "DIFFERS");
+    CU(cudaEventDestroy(e0));
+    CU(cudaEventDestroy(e1));
+    CU(cudaFree(dl));
+    CU(cudaFree(db));
+    for (int v = 0; v < 2; ++v) CU(cudaFree(di[v]));
+    for (int v = 0; v < 2; ++v) CU(cudaFree(dw[v]));
+}
+
+void bench_route_ahead(cudaStream_t s) {
+    const int n = 384, m = 16, layers = 10, iters = 100;
+    std::vector<float> logits((size_t) layers * 1024), bias(n);
+    for (float& v : logits) v = frand(4.0f);
+    for (float& v : bias) v = frand(0.2f);
+    float* dl = dev(logits);
+    float* db = dev(bias);
+    dk::Req* req[2] = {};
+    for (int v = 0; v < 2; ++v) {
+        CU(cudaMalloc(&req[v], sizeof(dk::Req)));
+        CU(cudaMemset(req[v], 0, sizeof(dk::Req)));
+    }
+    cudaEvent_t e0, e1;
+    CU(cudaEventCreate(&e0));
+    CU(cudaEventCreate(&e1));
+    auto time = [&](bool warps16) {
+        if (warps16) setenv("DS4_ROUTE_AHEAD_WARPS16", "1", 1);
+        else unsetenv("DS4_ROUTE_AHEAD_WARPS16");
+        const int v = warps16 ? 1 : 0;
+        for (int l = 0; l < layers; ++l)
+            dk::route_ahead(dl + (size_t) l * 1024, db, n, m, 1, req[v], 0, s);
+        CU(cudaStreamSynchronize(s));
+        CU(cudaEventRecord(e0, s));
+        for (int i = 0; i < iters; ++i)
+            for (int l = 0; l < layers; ++l)
+                dk::route_ahead(dl + (size_t) l * 1024, db, n, m, 1, req[v], 0, s);
+        CU(cudaEventRecord(e1, s));
+        CU(cudaEventSynchronize(e1));
+        float ms = 0.0f;
+        CU(cudaEventElapsedTime(&ms, e0, e1));
+        return ms * 1000.0f / (iters * layers);
+    };
+    const float w4 = time(false), w16 = time(true);
+    unsetenv("DS4_ROUTE_AHEAD_WARPS16");
+    std::vector<int> a(16), b(16);
+    CU(cudaMemcpy(a.data(), req[0]->ahead[0], a.size() * sizeof(int), cudaMemcpyDeviceToHost));
+    CU(cudaMemcpy(b.data(), req[1]->ahead[0], b.size() * sizeof(int), cudaMemcpyDeviceToHost));
+    const bool same = std::memcmp(a.data(), b.data(), a.size() * sizeof(int)) == 0;
+    if (!same) ++g_fail;
+    std::printf("DS4 route_ahead, n=%d m=%d: warps4 %.2f us, warps16 %.2f; %s\n", n, m, w4, w16,
+                same ? "bit-identical" : "DIFFERS");
+    CU(cudaEventDestroy(e0));
+    CU(cudaEventDestroy(e1));
+    CU(cudaFree(dl));
+    CU(cudaFree(db));
+    for (dk::Req*& p : req) CU(cudaFree(p));
+}
+
+void bench_route_publish(cudaStream_t s) {
+    const int n = 384, k = 6, layers = 10, dim = 5120, iters = 100;
+    std::vector<float> logits((size_t) layers * 1024), bias(n), x(dim);
+    std::vector<unsigned long long> vram(n);
+    for (float& v : logits) v = frand(4.0f);
+    for (float& v : bias) v = frand(0.2f);
+    for (float& v : x) v = frand();
+    for (unsigned long long& v : vram) v = (unsigned long long) (1 + rng() % 4096u);
+    float* dl = dev(logits);
+    float* db = dev(bias);
+    float* dx = dev(x);
+    unsigned long long* dv = dev(vram);
+    int* di[2] = {};
+    float* dw[2] = {};
+    unsigned long long* dp[2] = {};
+    for (int v = 0; v < 2; ++v) {
+        CU(cudaMalloc(&di[v], (size_t) dk::kPicks * sizeof(int)));
+        CU(cudaMalloc(&dw[v], (size_t) dk::kPicks * sizeof(float)));
+        CU(cudaMalloc(&dp[v], (size_t) dk::kPicks * sizeof(unsigned long long)));
+    }
+    cudaEvent_t e0, e1;
+    CU(cudaEventCreate(&e0));
+    CU(cudaEventCreate(&e1));
+    auto time = [&](bool warps16) {
+        if (warps16) setenv("DS4_ROUTE_PUBLISH_WARPS16", "1", 1);
+        else unsetenv("DS4_ROUTE_PUBLISH_WARPS16");
+        const int v = warps16 ? 1 : 0;
+        for (int l = 0; l < layers; ++l)
+            dk::route_publish(dl + (size_t) l * 1024, db, n, k, 1, 1.0f, dv, dx, dim, di[v], dw[v], dp[v], nullptr, 0, s);
+        CU(cudaStreamSynchronize(s));
+        CU(cudaEventRecord(e0, s));
+        for (int i = 0; i < iters; ++i)
+            for (int l = 0; l < layers; ++l)
+                dk::route_publish(dl + (size_t) l * 1024, db, n, k, 1, 1.0f, dv, dx, dim, di[v], dw[v], dp[v], nullptr, 0, s);
+        CU(cudaEventRecord(e1, s));
+        CU(cudaEventSynchronize(e1));
+        float ms = 0.0f;
+        CU(cudaEventElapsedTime(&ms, e0, e1));
+        return ms * 1000.0f / (iters * layers);
+    };
+    const float w4 = time(false), w16 = time(true);
+    unsetenv("DS4_ROUTE_PUBLISH_WARPS16");
+    const bool same = std::memcmp(host(di[0], k).data(), host(di[1], k).data(), (size_t) k * sizeof(int)) == 0 &&
+                      std::memcmp(host(dw[0], k).data(), host(dw[1], k).data(), (size_t) k * sizeof(float)) == 0 &&
+                      std::memcmp(host(dp[0], k).data(), host(dp[1], k).data(), (size_t) k * sizeof(unsigned long long)) == 0;
+    if (!same) ++g_fail;
+    std::printf("DS4 route_publish, n=%d k=%d: warps4 %.2f us, warps16 %.2f; %s\n", n, k, w4, w16,
+                same ? "ids/weights/plans bit-identical" : "DIFFERS");
+    CU(cudaEventDestroy(e0));
+    CU(cudaEventDestroy(e1));
+    CU(cudaFree(dl));
+    CU(cudaFree(db));
+    CU(cudaFree(dx));
+    CU(cudaFree(dv));
+    for (int v = 0; v < 2; ++v) CU(cudaFree(di[v]));
+    for (int v = 0; v < 2; ++v) CU(cudaFree(dw[v]));
+    for (int v = 0; v < 2; ++v) CU(cudaFree(dp[v]));
+}
+
+void bench_iq1m_precomp(cudaStream_t s) {
+    const int D = 5120, F = 2304;
+    QExperts E = make_q(D, F, 6, gg::iq::kIQ1_M, gg::iq::kIQ1_M);
+    std::vector<unsigned long long> pp(8, 0ull);
+    std::vector<float> pw(8, 0.1f);
+    for (int i = 0; i < 6; ++i) pp[(size_t) i] = (unsigned long long) (E.dev + (size_t) i * E.blob);
+    unsigned long long* dpp = dev(pp);
+    float* dpw = dev(pw);
+    float* dx = dev(std::vector<float>(D, 0.01f));
+    float* dh = dev(std::vector<float>((size_t) 8 * F));
+    float* dout = dev(std::vector<float>(D));
+    x3::MoeArgs ma;
+    ma.plan_ptr = dpp;
+    ma.plan_w = dpw;
+    ma.lay = E.lay;
+    ma.k = 6;
+    ma.n_embd = D;
+    ma.n_ff = F;
+    ma.limit = 10.0f;
+    cudaEvent_t a, b;
+    CU(cudaEventCreate(&a));
+    CU(cudaEventCreate(&b));
+    auto timed = [&](const char* what, auto&& fn) {
+        fn();
+        CU(cudaStreamSynchronize(s));
+        CU(cudaEventRecord(a, s));
+        for (int i = 0; i < 100; ++i) fn();
+        CU(cudaEventRecord(b, s));
+        CU(cudaEventSynchronize(b));
+        float ms = 0;
+        CU(cudaEventElapsedTime(&ms, a, b));
+        std::printf("bench %-40s %8.1f us\n", what, ms * 1000.0f / 100.0f);
+    };
+    timed("IQ1_M precomputed-table 6 experts", [&] {
+        gg::moe_gate_up(ma, dx, dh, s);
+        gg::moe_down(ma, dh, nullptr, dout, s);
+    });
+    timed("IQ1_M precomputed-table gate/up", [&] { gg::moe_gate_up(ma, dx, dh, s); });
+    timed("IQ1_M precomputed-table down + combine", [&] { gg::moe_down(ma, dh, nullptr, dout, s); });
+    auto hash = [](const std::vector<float>& v) {
+        const uint8_t* p = (const uint8_t*) v.data();
+        uint64_t h = 1469598103934665603ull;
+        for (size_t i = 0; i < v.size() * sizeof(float); ++i) h = (h ^ p[i]) * 1099511628211ull;
+        return h;
+    };
+    const std::vector<float> hh = host(dh, (size_t) 8 * F), oo = host(dout, D);
+    std::printf("iq1m-precomp hashes: h %016llx out %016llx\n", (unsigned long long) hash(hh),
+                (unsigned long long) hash(oo));
+    CU(cudaEventDestroy(a));
+    CU(cudaEventDestroy(b));
+    cudaFree(E.dev), cudaFree(dpp), cudaFree(dpw), cudaFree(dx), cudaFree(dh), cudaFree(dout);
+}
+
+float h_e2m1(uint32_t c) {
+    static const float m[8] = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 6.0f};
+    const float v = m[c & 7u];
+    return (c & 8u) ? -v : v;
+}
+float h_e4m3(uint32_t q) {
+    const int e = (int) ((q >> 3) & 15u), m = (int) (q & 7u);
+    const float v = e == 0 ? std::ldexp((float) m, -9) : std::ldexp(1.0f + (float) m / 8.0f, e - 7);
+    return (q & 0x80u) ? -v : v;
+}
+float h_ue8m0(uint32_t b) {
+    const uint32_t u = b << 23;
+    float f;
+    std::memcpy(&f, &u, 4);
+    return f;
+}
+// value i of a packed row of d values
+float h_unpack(int fmt, const uint8_t* row, int d, int i) {
+    if (fmt == dk::kKvFp8) return h_e4m3(row[i]) * h_ue8m0(row[d + i / 32]);
+    const uint32_t c = (uint32_t) row[i / 2] >> (4 * (i & 1));
+    return h_e2m1(c) * (fmt == dk::kKvFp4 ? h_e4m3(row[d / 2 + i / 16]) : h_ue8m0(row[d / 2 + i / 32]));
+}
+
+// n rows of d values: groups of 16 at scales 2^-30 .. 2^10, some all zero, some with negative zeros, some tiny
+std::vector<float> kv_rows(int n, int d) {
+    std::vector<float> x((size_t) n * d);
+    for (int r = 0; r < n; ++r)
+        for (int g0 = 0; g0 < d; g0 += 16) {
+            const int kind = (int) (rng() % 16u);
+            const float sc = std::ldexp(1.0f, (int) (rng() % 41u) - 30);
+            for (int e = g0; e < g0 + 16; ++e) {
+                float v = frand(sc);
+                if (kind == 0) v = 0.0f;
+                else if (kind == 1 && e % 3 == 0) v = -0.0f;
+                else if (kind == 2) v = frand(1e-7f);
+                else if (kind == 3 && e == g0) v = sc * 1000.0f;   // (one value far above the rest)
+                x[(size_t) r * d + e] = v;
+            }
+        }
+    return x;
+}
+
+// finish(quant) of n rows of d: the BF16 rows (dst) and the packed rows (pdst), both from the same input
+void kv_finish(const float* x, int n, int d, int quant, uint16_t* bf, uint8_t* pk, cudaStream_t s) {
+    dk::Finish f;
+    f.quant = quant;
+    f.dst = bf;
+    f.dst_stride = d;
+    dk::finish(const_cast<float*>(x), n, d, d, f, s);
+    dk::Finish p;
+    p.quant = quant;
+    p.pdst = pk;
+    p.pdst_stride = (long long) dk::kv_row_bytes(quant, d);
+    dk::finish(const_cast<float*>(x), n, d, d, p, s);
+}
+
+// every packed value decoded on the host against the BF16 row's bits
+void kv_check_rows(const char* what, int fmt, const std::vector<uint16_t>& bf, const std::vector<uint8_t>& pk, int n,
+                   int d) {
+    const size_t rb = dk::kv_row_bytes(fmt, d);
+    size_t bad = 0, at = 0;
+    for (int r = 0; r < n; ++r)
+        for (int i = 0; i < d; ++i) {
+            const float v = h_unpack(fmt, pk.data() + (size_t) r * rb, d, i);
+            uint32_t u;
+            std::memcpy(&u, &v, 4);
+            if ((u & 0xffffu) != 0u || (uint16_t) (u >> 16) != bf[(size_t) r * d + i]) {
+                if (bad++ == 0) at = (size_t) r * d + i;
+            }
+        }
+    if (bad) ++g_fail;
+    std::printf("%-44s %s  %d rows x %d, %zu of %zu values differ (first at %zu), %zu B a row vs %d\n", what,
+                bad ? "FAIL" : "ok  ", n, d, bad, (size_t) n * d, at, rb, d * 2);
+}
+
+void kv_same(const char* what, const void* a, const void* b, size_t bytes) {
+    const bool ok = std::memcmp(a, b, bytes) == 0;
+    if (!ok) ++g_fail;
+    std::printf("%-44s %s  %zu bytes %s\n", what, ok ? "ok  " : "FAIL", bytes, ok ? "identical" : "DIFFER");
+}
+
+// Native M=1 sparse attention: 64 heads x 512, 128 BF16 window rows and 512
+// FP4 compressed rows.  Off is sparse_attn followed by the inverse-RoPE + FP8
+// finish; on writes the same values from the attention kernel's registers.
+void test_sparse_rope(cudaStream_t s, bool bench, const char* dump_prefix) {
+    constexpr int HD = 512, NH = 64, WIN = 128, SEL = 512, NC = 512, pos = 1234;
+    std::vector<float> q((size_t) NH * HD), sink(NH), freqs(32);
+    for (float& v : q) v = frand(0.2f);
+    for (float& v : sink) v = frand(1.0f);
+    for (int i = 0; i < 32; ++i)
+        freqs[(size_t) i] = (float) std::pow(10000.0, -2.0 * (double) i / 64.0);
+    std::vector<int> sel(SEL);
+    for (int& v : sel) v = (int) (rng() % NC);
+    std::vector<float> xw = kv_rows(WIN, HD), xc = kv_rows(NC, HD);
+    float* d_q = dev(q);
+    float* d_sink = dev(sink);
+    float* d_freqs = dev(freqs);
+    float* d_xw = dev(xw);
+    float* d_xc = dev(xc);
+    int* d_sel = dev(sel);
+    uint16_t* ext = nullptr;
+    uint16_t* c16 = nullptr;
+    uint8_t* ring = nullptr;
+    uint8_t* c4 = nullptr;
+    float* off = nullptr;
+    float* on = nullptr;
+    CU(cudaMalloc(&ext, (size_t) WIN * HD * 2));
+    CU(cudaMalloc(&c16, (size_t) NC * HD * 2));
+    CU(cudaMalloc(&ring, (size_t) WIN * dk::kv_row_bytes(dk::kKvFp8, HD)));
+    CU(cudaMalloc(&c4, (size_t) NC * dk::kv_row_bytes(dk::kKvFp4, HD)));
+    CU(cudaMalloc(&off, (size_t) NH * HD * 4));
+    CU(cudaMalloc(&on, (size_t) NH * HD * 4));
+    kv_finish(d_xw, WIN, HD, dk::kKvFp8, ext, ring, s);
+    kv_finish(d_xc, NC, HD, dk::kKvFp4, c16, c4, s);
+    dk::AttnRows ar;
+    ar.win0[0] = 0;
+    ar.nwin[0] = WIN;
+    ar.nsel[0] = SEL;
+    dk::AttnScratch scr;
+    scr.max_t = 1;
+    scr.cap = SEL;
+    CU(cudaMalloc(&scr.rows, (size_t) SEL * HD * 2));
+    const float scale = 1.0f / std::sqrt((float) HD);
+
+    auto sparse = [&] {
+        dk::sparse_attn(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, 1, scale, off, s, dk::kKvFp4, 0, &scr);
+    };
+    auto split = [&] {
+        sparse();
+        dk::Finish f;
+        f.rd = 64;
+        f.pos = pos;
+        f.vpp = NH;
+        f.freqs = d_freqs;
+        f.inverse = 1;
+        f.quant = 1;
+        dk::finish(off, NH, HD, HD, f, s);
+    };
+    auto fused = [&] {
+        if (!dk::sparse_attn_rope(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, 1, scale, on, d_freqs, 64, pos,
+                                  HD, NH, scr, s))
+            ++g_fail;
+    };
+
+    split();
+    fused();
+    CU(cudaStreamSynchronize(s));
+    const std::vector<float> y0 = host(off, (size_t) NH * HD), y1 = host(on, (size_t) NH * HD);
+    const bool same = std::memcmp(y0.data(), y1.data(), y0.size() * sizeof(float)) == 0;
+    if (!same) ++g_fail;
+    std::printf("sparse_rope correctness: %s (bit-identical=%d)\n", same ? "ok" : "FAIL", same ? 1 : 0);
+    if (dump_prefix != nullptr) {
+        const std::string a = std::string(dump_prefix) + "-off.bin";
+        const std::string b = std::string(dump_prefix) + "-on.bin";
+        std::FILE* fa = std::fopen(a.c_str(), "wb");
+        std::FILE* fb = std::fopen(b.c_str(), "wb");
+        if (fa == nullptr || fb == nullptr ||
+            std::fwrite(y0.data(), sizeof(float), y0.size(), fa) != y0.size() ||
+            std::fwrite(y1.data(), sizeof(float), y1.size(), fb) != y1.size()) {
+            std::printf("sparse_rope dump: FAIL\n");
+            ++g_fail;
+        }
+        if (fa != nullptr) std::fclose(fa);
+        if (fb != nullptr) std::fclose(fb);
+    }
+
+    if (bench) {
+        cudaEvent_t e0, e1;
+        CU(cudaEventCreate(&e0));
+        CU(cudaEventCreate(&e1));
+        auto timed_us = [&](auto&& fn) {
+            for (int i = 0; i < 3; ++i) fn();
+            CU(cudaStreamSynchronize(s));
+            CU(cudaEventRecord(e0, s));
+            constexpr int reps = 100;
+            for (int i = 0; i < reps; ++i) fn();
+            CU(cudaEventRecord(e1, s));
+            CU(cudaEventSynchronize(e1));
+            float ms = 0.0f;
+            CU(cudaEventElapsedTime(&ms, e0, e1));
+            return 1000.0f * ms / (float) reps;
+        };
+        dk::Finish f;
+        f.rd = 64;
+        f.pos = pos;
+        f.vpp = NH;
+        f.freqs = d_freqs;
+        f.inverse = 1;
+        f.quant = 1;
+        std::vector<float> sparse_us, finish_us, split_us, fused_us;
+        for (int pair = 1; pair <= 5; ++pair) {
+            const float a = timed_us(sparse);
+            const float b = timed_us([&] { dk::finish(off, NH, HD, HD, f, s); });
+            const float c = timed_us(split);
+            const float d = timed_us(fused);
+            sparse_us.push_back(a);
+            finish_us.push_back(b);
+            split_us.push_back(c);
+            fused_us.push_back(d);
+            std::printf("SPARSE_ROPE_PAIR=%d sparse_us=%.3f finish_us=%.3f split_us=%.3f fused_us=%.3f\n",
+                        pair, a, b, c, d);
+        }
+        auto median = [](std::vector<float> v) {
+            std::sort(v.begin(), v.end());
+            return v[v.size() / 2];
+        };
+        const float a = median(split_us), b = median(fused_us);
+        std::printf("SPARSE_ROPE_MEDIAN sparse_us=%.3f finish_us=%.3f split_us=%.3f fused_us=%.3f change_pct=%.6f\n",
+                    median(sparse_us), median(finish_us), a, b, (b / a - 1.0f) * 100.0f);
+        CU(cudaEventDestroy(e0));
+        CU(cudaEventDestroy(e1));
+    }
+
+    CU(cudaFree(d_q));
+    CU(cudaFree(d_sink));
+    CU(cudaFree(d_freqs));
+    CU(cudaFree(d_xw));
+    CU(cudaFree(d_xc));
+    CU(cudaFree(d_sel));
+    CU(cudaFree(ext));
+    CU(cudaFree(c16));
+    CU(cudaFree(ring));
+    CU(cudaFree(c4));
+    CU(cudaFree(off));
+    CU(cudaFree(on));
+    CU(cudaFree(scr.rows));
+}
+
+// Chunked MMAC928 sparse attention: sparse_attn + inverse-RoPE/FP8 finish in
+// one kernel versus the split implementation.  Nonzero F16 values match
+// finish exactly; signed zero may differ.
+void bench_attn_epilogue_f16(cudaStream_t s) {
+    constexpr int HD = 512, NH = 64, WIN = 128, MAX_T = 256, SEL = 256, NC = 1024;
+    constexpr int pos = 40000, R = 4;
+    std::vector<float> sink(NH), freqs(32);
+    for (float& v : sink) v = frand(1.0f);
+    for (int i = 0; i < 32; ++i)
+        freqs[(size_t) i] = (float) std::pow(10000.0, -2.0 * (double) i / 64.0);
+    std::vector<int> sel((size_t) 256 * SEL);
+    for (int& v : sel) v = (int) (rng() % NC);
+    std::vector<float> xw = kv_rows(WIN + MAX_T, HD), xc = kv_rows(NC, HD);
+    float* d_sink = dev(sink);
+    float* d_freqs = dev(freqs);
+    float* d_xw = dev(xw);
+    float* d_xc = dev(xc);
+    int* d_sel = dev(sel);
+    uint16_t* ext = nullptr;
+    uint16_t* c16 = nullptr;
+    uint8_t* ring = nullptr;
+    uint8_t* c4 = nullptr;
+    CU(cudaMalloc(&ext, (size_t) (WIN + MAX_T) * HD * 2));
+    CU(cudaMalloc(&c16, (size_t) NC * HD * 2));
+    CU(cudaMalloc(&ring, (size_t) (WIN + MAX_T) * dk::kv_row_bytes(dk::kKvFp8, HD)));
+    CU(cudaMalloc(&c4, (size_t) NC * dk::kv_row_bytes(dk::kKvFp4, HD)));
+    kv_finish(d_xw, WIN + MAX_T, HD, dk::kKvFp8, ext, ring, s);
+    kv_finish(d_xc, NC, HD, dk::kKvFp4, c16, c4, s);
+    CU(cudaStreamSynchronize(s));
+    const float scale = 1.0f / std::sqrt((float) HD);
+
+    for (int T : {16, 64, 256}) {
+        const size_t nval = (size_t) T * NH * HD;
+        std::vector<float> q(nval);
+        for (float& v : q) v = frand(0.2f);
+        float* d_q = dev(q);
+        float* off = dev(std::vector<float>(nval));
+        uint16_t* split = nullptr;
+        uint16_t* fused = nullptr;
+        CU(cudaMalloc(&split, nval * sizeof(uint16_t)));
+        CU(cudaMalloc(&fused, nval * sizeof(uint16_t)));
+        dk::AttnRows ar;
+        ar.gen = 1;
+        ar.p0 = pos;
+        ar.t0 = 0;
+        ar.win = WIN;
+        ar.R = R;
+        ar.kcap = SEL;
+        dk::Finish finish;
+        finish.rd = 64;
+        finish.pos = pos;
+        finish.vpp = NH;
+        finish.freqs = d_freqs;
+        finish.inverse = 1;
+        auto sparse_run = [&] {
+            dk::sparse_attn(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, T, scale, off, s,
+                            dk::kKvFp4, 0);
+        };
+        auto split_run = [&] {
+            sparse_run();
+            finish.quant = 1;
+            finish.dst16 = split;
+            finish.dst16_stride = NH * HD;
+            finish.dst16_heads = NH;
+            dk::finish(off, T * NH, HD, HD, finish, s);
+        };
+        auto fused_run = [&] {
+            if (!dk::sparse_attn_finish_f16(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, T, scale,
+                                            fused, d_freqs, 64, pos, NH, s))
+                ++g_fail;
+        };
+        split_run();
+        fused_run();
+        CU(cudaStreamSynchronize(s));
+        const std::vector<uint16_t> hs = host(split, nval), hf = host(fused, nval);
+        const bool same = std::memcmp(hs.data(), hf.data(), nval * sizeof(uint16_t)) == 0;
+        size_t nonzero = 0, signed_zero = 0, at = 0;
+        for (size_t i = 0; i < nval; ++i)
+            if (hs[i] != hf[i]) {
+                if ((hs[i] & 0x7fffu) == 0u && (hf[i] & 0x7fffu) == 0u) ++signed_zero;
+                else if (nonzero++ == 0) at = i;
+            }
+        if (nonzero != 0) ++g_fail;
+        std::printf("%-52s %s  T=%d, nonzero=%zu signed_zero=%zu\n",
+                    "attn MMAC928 epilogue F16 vs sparse+finish", nonzero == 0 ? "ok  " : "FAIL", T,
+                    nonzero, signed_zero);
+        if (nonzero != 0)
+            std::printf("  first=%zu got=%04x want=%04x vector=%zu dim=%zu\n",
+                        at, hf[at], hs[at], at / HD, at % HD);
+        if (same) std::printf("  epilogue F16 bit pattern: identical\n");
+
+        cudaEvent_t e0, e1;
+        CU(cudaEventCreate(&e0));
+        CU(cudaEventCreate(&e1));
+        auto timed_us = [&](auto&& fn) {
+            for (int i = 0; i < 2; ++i) fn();
+            CU(cudaStreamSynchronize(s));
+            CU(cudaEventRecord(e0, s));
+            constexpr int reps = 20;
+            for (int i = 0; i < reps; ++i) fn();
+            CU(cudaEventRecord(e1, s));
+            CU(cudaEventSynchronize(e1));
+            float ms = 0.0f;
+            CU(cudaEventElapsedTime(&ms, e0, e1));
+            return 1000.0f * ms / (float) reps;
+        };
+        const float a = timed_us(split_run);
+        const float b = timed_us(fused_run);
+        std::printf("bench attn epilogue F16, %3d queries: split %9.1f us, fused %9.1f us, %+7.2f%%\n",
+                    T, a, b, 100.0f * (b / a - 1.0f));
+        CU(cudaEventDestroy(e0));
+        CU(cudaEventDestroy(e1));
+        CU(cudaFree(d_q));
+        CU(cudaFree(off));
+        CU(cudaFree(split));
+        CU(cudaFree(fused));
+    }
+
+    CU(cudaFree(d_sink));
+    CU(cudaFree(d_freqs));
+    CU(cudaFree(d_xw));
+    CU(cudaFree(d_xc));
+    CU(cudaFree(d_sel));
+    CU(cudaFree(ext));
+    CU(cudaFree(c16));
+    CU(cudaFree(ring));
+    CU(cudaFree(c4));
+}
+
+void test_kv_pack(cudaStream_t s) {
+    const int HD = 512, IX = 128, NC = 65536 / 4 + 1, WIN = 128;
+    // the compressed KV (FP4, an E4M3 scale per 16) and the index keys (FP4, a power-of-two scale per 32)
+    std::vector<float> xc = kv_rows(NC, HD), xi = kv_rows(NC, IX);
+    float *d_xc = dev(xc), *d_xi = dev(xi);
+    uint16_t *c16 = nullptr, *i16 = nullptr;
+    uint8_t *c4 = nullptr, *i4 = nullptr;
+    CU(cudaMalloc(&c16, (size_t) NC * HD * 2));
+    CU(cudaMalloc(&i16, (size_t) NC * IX * 2));
+    CU(cudaMalloc(&c4, (size_t) NC * dk::kv_row_bytes(dk::kKvFp4, HD)));
+    CU(cudaMalloc(&i4, (size_t) NC * dk::kv_row_bytes(dk::kKvFp4p, IX)));
+    kv_finish(d_xc, NC, HD, dk::kKvFp4, c16, c4, s);
+    kv_finish(d_xi, NC, IX, dk::kKvFp4p, i16, i4, s);
+    CU(cudaStreamSynchronize(s));
+    kv_check_rows("kv pack: compressed KV (FP4 + E4M3 / 16)", dk::kKvFp4, host(c16, (size_t) NC * HD),
+                  host(c4, (size_t) NC * dk::kv_row_bytes(dk::kKvFp4, HD)), NC, HD);
+    kv_check_rows("kv pack: index keys (FP4 + 2^k / 32)", dk::kKvFp4p, host(i16, (size_t) NC * IX),
+                  host(i4, (size_t) NC * dk::kv_row_bytes(dk::kKvFp4p, IX)), NC, IX);
+    kv_same("kv pack: finish leaves its input", xc.data(), host(d_xc, xc.size()).data(), xc.size() * 4);
+
+    // the window ring (FP8, a power-of-two scale per 32): batches of 128 rows through the finish's BF16 rows, into the
+    // ring (its scales derived from the BF16 values) and back out
+    {
+        const size_t rb = dk::kv_row_bytes(dk::kKvFp8, HD);
+        std::vector<float> xw = kv_rows(WIN, HD);
+        float* d_xw = dev(xw);
+        uint16_t *ext = nullptr, *ext2 = nullptr;
+        uint8_t *ring = nullptr, *pk = nullptr, *bak = nullptr;
+        CU(cudaMalloc(&ext, (size_t) 2 * WIN * HD * 2));
+        CU(cudaMalloc(&ext2, (size_t) WIN * HD * 2));
+        CU(cudaMalloc(&ring, (size_t) WIN * rb));
+        CU(cudaMalloc(&pk, (size_t) WIN * rb));
+        CU(cudaMalloc(&bak, (size_t) dk::kWin * rb));
+        size_t bad = 0, bad_pk = 0, n_vals = 0;
+        for (int b = 0; b < 64; ++b) {
+            if (b > 0) {
+                xw = kv_rows(WIN, HD);
+                CU(cudaMemcpy(d_xw, xw.data(), xw.size() * 4, cudaMemcpyHostToDevice));
+            }
+            kv_finish(d_xw, WIN, HD, dk::kKvFp8, ext + (size_t) WIN * HD, pk, s);
+            dk::ext_to_ring(ext, ring, 0, WIN, WIN, HD, s);
+            dk::ring_to_ext(ring, ext2, WIN, WIN, HD, s);   // (p0 = n: the rows as they lie)
+            CU(cudaStreamSynchronize(s));
+            const std::vector<uint16_t> want = host(ext + (size_t) WIN * HD, (size_t) WIN * HD),
+                                        got = host(ext2, (size_t) WIN * HD);
+            for (size_t i = 0; i < want.size(); ++i) bad += want[i] != got[i];
+            const std::vector<uint8_t> hr = host(ring, (size_t) WIN * rb), hp = host(pk, (size_t) WIN * rb);
+            for (int r = 0; r < WIN; ++r)   // the ring's codes against the finish's own packing: the same values
+                for (int i = 0; i < HD; ++i)
+                    bad_pk += h_unpack(dk::kKvFp8, hr.data() + (size_t) r * rb, HD, i) !=
+                                  h_unpack(dk::kKvFp8, hp.data() + (size_t) r * rb, HD, i) ||
+                              std::signbit(h_unpack(dk::kKvFp8, hr.data() + (size_t) r * rb, HD, i)) !=
+                                  std::signbit(h_unpack(dk::kKvFp8, hp.data() + (size_t) r * rb, HD, i));
+            n_vals += want.size();
+        }
+        if (bad || bad_pk) ++g_fail;
+        std::printf("%-44s %s  %zu values, %zu differ through the ring, %zu from the finish's packing; %zu B a row vs %d\n",
+                    "kv pack: window ring (FP8 + 2^k / 32)", bad || bad_pk ? "FAIL" : "ok  ", n_vals, bad, bad_pk, rb,
+                    HD * 2);
+        // a speculative window's rollback: 16 rows over the ring at position 1000 (backed up), the first 5 kept
+        const std::vector<uint8_t> before = host(ring, (size_t) WIN * rb);
+        xw = kv_rows(dk::kWin, HD);
+        CU(cudaMemcpy(d_xw, xw.data(), (size_t) dk::kWin * HD * 4, cudaMemcpyHostToDevice));
+        kv_finish(d_xw, dk::kWin, HD, dk::kKvFp8, ext + (size_t) WIN * HD, pk, s);
+        dk::ext_to_ring(ext, ring, 1000, WIN, dk::kWin, HD, s, bak);
+        CU(cudaStreamSynchronize(s));
+        std::vector<uint8_t> want = before;
+        const std::vector<uint8_t> after = host(ring, (size_t) WIN * rb);
+        for (int t = 0; t < 5; ++t) {
+            const size_t r = (size_t) ((1000 + t) % WIN);
+            std::memcpy(want.data() + r * rb, after.data() + r * rb, rb);
+        }
+        dk::ring_restore(ring, bak, 1000, WIN, 5, dk::kWin, HD, s);
+        CU(cudaStreamSynchronize(s));
+        kv_same("kv pack: window ring rollback", want.data(), host(ring, (size_t) WIN * rb).data(), want.size());
+        CU(cudaFree(d_xw));
+        CU(cudaFree(ext));
+        CU(cudaFree(ext2));
+        CU(cudaFree(ring));
+        CU(cudaFree(pk));
+        CU(cudaFree(bak));
+    }
+
+    // the sparse attention: the window rows and 512 selected compressed rows each, 64 heads - the BF16 rows' kernel
+    // against the packed rows' every way (decoded once a query into the scratch; staged, every number of heads a
+    // block), and the time of each (a decode step's query, a few, a verification's 16, chunk slabs of 16 and 256)
+    {
+        const int TM = 256, NH = 64, SEL = 512, ST = 16;
+        std::vector<float> q((size_t) TM * NH * HD), sink(NH);
+        for (float& v : q) v = frand(0.2f);
+        for (float& v : sink) v = frand(1.0f);
+        std::vector<int> sel((size_t) TM * SEL);
+        for (int& v : sel) v = (int) (rng() % (unsigned) NC);
+        std::vector<float> xw = kv_rows(WIN + TM, HD);
+        float *d_q = dev(q), *d_sink = dev(sink), *d_xw = dev(xw), *o1 = nullptr, *o2 = nullptr;
+        int* d_sel = dev(sel);
+        uint16_t* ext = nullptr;
+        uint8_t* pk = nullptr;
+        const char* attn_mmac_env = std::getenv("STRATA_DS4_ATTN_MMAC928");
+        const bool attn_mmac = attn_mmac_env != nullptr && attn_mmac_env[0] == '1';
+        dk::AttnScratch scr;
+        scr.max_t = ST;
+        scr.cap = SEL;
+        CU(cudaMalloc(&scr.rows, (size_t) ST * SEL * HD * 2));
+        CU(cudaMalloc(&ext, (size_t) (WIN + TM) * HD * 2));
+        CU(cudaMalloc(&pk, (size_t) (WIN + TM) * dk::kv_row_bytes(dk::kKvFp8, HD)));
+        CU(cudaMalloc(&o1, q.size() * 4));
+        CU(cudaMalloc(&o2, q.size() * 4));
+        kv_finish(d_xw, WIN + TM, HD, dk::kKvFp8, ext, pk, s);
+        cudaEvent_t e0, e1;
+        CU(cudaEventCreate(&e0));
+        CU(cudaEventCreate(&e1));
+        const float scale = 1.0f / std::sqrt((float) HD);
+        const struct {
+            int T, gen, iters;
+            const char* what;
+        } shapes[] = {{1, 0, 400, "1 query"},   {2, 0, 400, "2 queries"},  {4, 0, 200, "4 queries"},
+                      {8, 0, 200, "8 queries"}, {16, 0, 100, "16 queries"}, {16, 1, 100, "a chunk slab of 16"},
+                      {256, 1, 10, "a chunk slab of 256"}};
+        for (const auto& sh : shapes) {
+            const int T = sh.T;
+            dk::AttnRows ar;
+            if (sh.gen) {   // a chunk's rows at 40000.. (ratio 4: every query its 512)
+                ar.gen = 1;
+                ar.p0 = 40000;
+                ar.t0 = 0;
+                ar.win = WIN;
+                ar.R = 4;
+                ar.kcap = SEL;
+            } else
+                for (int t = 0; t < T; ++t) {
+                    ar.win0[t] = t + 1;
+                    ar.nwin[t] = WIN;
+                    ar.nsel[t] = SEL - 31 * t;
+                }
+            const size_t n = (size_t) T * NH * HD;
+            dk::sparse_attn(d_q, ext, c16, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o1, s, dk::kKvBf16, -1);
+            CU(cudaStreamSynchronize(s));
+            const std::vector<float> want = host(o1, n);
+            bool same = true;
+            const bool mmac_shape = attn_mmac && sh.gen && T >= 16 && NH % 16 == 0;
+            if (mmac_shape) {
+                CU(cudaMemset(o2, 0xff, n * 4));
+                dk::sparse_attn(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o2, s, dk::kKvFp4, 0);
+                CU(cudaStreamSynchronize(s));
+                const std::vector<float> got = host(o2, n);
+                double error2 = 0.0, reference2 = 0.0, worst_abs = 0.0;
+                int got_nonfinite = 0, want_nonfinite = 0;
+                for (size_t i = 0; i < n; ++i) {
+                    const double error = (double) got[i] - want[i];
+                    error2 += error * error;
+                    reference2 += (double) want[i] * want[i];
+                    worst_abs = std::max(worst_abs, std::fabs(error));
+                    got_nonfinite += !std::isfinite(got[i]);
+                    want_nonfinite += !std::isfinite(want[i]);
+                }
+                const double rel_l2 = std::sqrt(error2 / (reference2 + 1e-30));
+                same = got_nonfinite == 0 && want_nonfinite == 0 && rel_l2 <= 5e-4;
+                std::printf("kv pack: sparse attention %d queries MMAC928 accuracy: rel L2 %.3e, max %.3e, "
+                            "nonfinite got/want %d/%d%s\n",
+                            T, rel_l2, worst_abs, got_nonfinite, want_nonfinite, same ? "" : " FAIL");
+                if (!same) {
+                    for (size_t i = 0, shown = 0; i < n && shown < 8; ++i)
+                        if (!std::isfinite(got[i]) || !std::isfinite(want[i])) {
+                            std::printf("  sample[%zu] got %.9g want %.9g\n", i, got[i], want[i]);
+                            ++shown;
+                        }
+                }
+                CU(cudaMemset(o2, 0xff, n * 4));
+                dk::sparse_attn(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o2, s, dk::kKvFp4, 1);
+            } else {
+                for (int g : {-1, 0, 1, 2, 4, 8}) {
+                    CU(cudaMemset(o2, 0xff, n * 4));
+                    dk::sparse_attn(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o2, s, dk::kKvFp4, g, &scr);
+                    CU(cudaStreamSynchronize(s));
+                    same = same && std::memcmp(want.data(), host(o2, n).data(), n * 4) == 0;
+                }
+            }
+            if (mmac_shape) {
+                CU(cudaStreamSynchronize(s));
+                same = same && std::memcmp(want.data(), host(o2, n).data(), n * 4) == 0;
+            }
+            // the time: BF16 rows; packed as the engine runs it (0), through the scratch (-1), staged (its own G)
+            float us[4];
+            const int ways[4] = {99, 0, -1, -2};
+            for (int w = 0; w < 4; ++w) {
+                CU(cudaEventRecord(e0, s));
+                for (int it = 0; it < sh.iters; ++it) {
+                    if (ways[w] == 99)
+                        dk::sparse_attn(d_q, ext, c16, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o1, s, dk::kKvBf16, -1);
+                    else
+                        dk::sparse_attn(d_q, ext, c4, d_sel, SEL, ar, d_sink, NH, HD, T, scale, o1, s, dk::kKvFp4,
+                                        ways[w] == -2 ? 0 : ways[w], ways[w] == -2 ? nullptr : &scr);
+                }
+                CU(cudaEventRecord(e1, s));
+                CU(cudaEventSynchronize(e1));
+                float ms = 0.0f;
+                CU(cudaEventElapsedTime(&ms, e0, e1));
+                us[w] = ms * 1000.0f / sh.iters;
+            }
+            if (!same) ++g_fail;
+            char what[96];
+            std::snprintf(what, sizeof what, "kv pack: sparse attention, %s", sh.what);
+            std::printf("%-44s %s  %s every way; BF16 rows %.1f us a call, packed %.1f (decoded once a query %.1f, "
+                        "staged %.1f)\n",
+                        what, same ? "ok  " : "FAIL", same ? "identical" : "DIFFER", us[0], us[1], us[2], us[3]);
+        }
+        CU(cudaEventDestroy(e0));
+        CU(cudaEventDestroy(e1));
+        CU(cudaFree(d_q));
+        CU(cudaFree(d_sink));
+        CU(cudaFree(d_xw));
+        CU(cudaFree(d_sel));
+        CU(cudaFree(ext));
+        CU(cudaFree(pk));
+        CU(cudaFree(o1));
+        CU(cudaFree(o2));
+        CU(cudaFree(scr.rows));
+    }
+
+    // the indexer's scores over every key (32 heads), BF16 vs packed keys.
+    // T=32 matches the chunk path's 32-query indexer slab.
+    {
+        const int T = 32, NH = 32;
+        std::vector<float> q((size_t) T * NH * IX), w((size_t) T * 64);
+        for (float& v : q) v = frand(1.0f);
+        for (float& v : w) v = frand(0.3f);
+        float *d_q = dev(q), *d_w = dev(w), *o1 = nullptr, *o2 = nullptr;
+        const long long ss = NC + 64;
+        CU(cudaMalloc(&o1, (size_t) T * ss * 4));
+        CU(cudaMalloc(&o2, (size_t) T * ss * 4));
+        CU(cudaMemset(o1, 0, (size_t) T * ss * 4));
+        CU(cudaMemset(o2, 0, (size_t) T * ss * 4));
+        dk::Rows lim;
+        lim.gen = 1;
+        lim.R = 1;
+        lim.p0 = NC - T;
+        lim.kcap = 512;
+        dk::index_score(d_q, d_w, i16, NH, IX, T, NC, nullptr, 0, 1, lim, o1, ss, s, dk::kKvBf16);
+        dk::index_score(d_q, d_w, i4, NH, IX, T, NC, nullptr, 0, 1, lim, o2, ss, s, dk::kKvFp4p);
+        CU(cudaStreamSynchronize(s));
+        kv_same("kv pack: index scores", host(o1, (size_t) T * ss).data(), host(o2, (size_t) T * ss).data(),
+                (size_t) T * ss * 4);
+        {
+            const int CB = 2048, BLK = 8, CN = CB * BLK;
+            dk::Rows cl = lim;
+            cl.gen = 2;
+            cl.kcap = 512;
+            cl.ccap = CB;
+            cl.blk = BLK;
+            std::vector<int> cand((size_t) T * CB);
+            for (int t = 0; t < T; ++t) {
+                const int nn = (cl.p0 + t + 1) / cl.R;
+                const int nb = (nn + BLK - 1) / BLK;
+                const int live = std::min(CB, nb);
+                for (int b = 0; b < live; ++b)
+                    cand[(size_t) t * CB + b] = (b * 977 + t * 131) % nb;
+            }
+            int* d_cand = dev(cand);
+            float *co1 = nullptr, *co2 = nullptr;
+            CU(cudaMalloc(&co1, (size_t) T * ss * 4));
+            CU(cudaMalloc(&co2, (size_t) T * ss * 4));
+            CU(cudaMemset(co1, 0, (size_t) T * ss * 4));
+            CU(cudaMemset(co2, 0, (size_t) T * ss * 4));
+            unsetenv("STRATA_DS4_QSA_MMAC928_CANDIDATE");
+            dk::index_score(d_q, d_w, i16, NH, IX, T, CN, d_cand, CB, BLK, cl, co1, ss, s, dk::kKvBf16);
+            setenv("STRATA_DS4_QSA_MMAC928_CANDIDATE", "1", 1);
+            dk::index_score(d_q, d_w, i4, NH, IX, T, CN, d_cand, CB, BLK, cl, co2, ss, s, dk::kKvFp4p);
+            CU(cudaStreamSynchronize(s));
+            const std::vector<float> generic = host(co1, (size_t) T * ss);
+            const std::vector<float> optimized = host(co2, (size_t) T * ss);
+            double diff2 = 0, ref2 = 0, max_abs = 0;
+            for (size_t k = 0; k < generic.size(); ++k) {
+                if (!std::isfinite(generic[k]) || !std::isfinite(optimized[k])) continue;
+                const double d = (double) optimized[k] - generic[k];
+                diff2 += d * d;
+                ref2 += (double) generic[k] * generic[k];
+                max_abs = std::max(max_abs, std::fabs(d));
+            }
+            const double rel_l2 = std::sqrt(diff2 / (ref2 + 1e-30));
+            std::printf("%-44s %s  rel L2 %.3e, max %.3e\n", "kv pack: candidate index scores",
+                        rel_l2 <= 1e-6 ? "ok  " : "FAIL", rel_l2, max_abs);
+            if (rel_l2 > 1e-6) ++g_fail;
+
+            const std::vector<uint16_t> keys = host(i16, (size_t) NC * IX);
+            double worst = 0;
+            for (int t = 0; t < T; ++t)
+                for (int i = 0; i < 128; ++i) {
+                    const int p = cand[(size_t) t * CB + i / BLK] * BLK + i % BLK;
+                    float acc[NH] = {};
+                    double denom = 0;
+                    for (int h = 0; h < NH; ++h)
+                        for (int c = 0; c < IX; ++c) {
+                            const uint32_t bits = (uint32_t) keys[(size_t) p * IX + c] << 16;
+                            float kv;
+                            std::memcpy(&kv, &bits, sizeof(kv));
+                            const float qv = q[(size_t) t * NH * IX + h * IX + c];
+                            acc[h] = std::fmaf(qv, kv, acc[h]);
+                            denom += std::fabs((double) qv * kv * w[(size_t) t * 64 + h]);
+                        }
+                    float ref = 0;
+                    for (int h = 0; h < NH; ++h)
+                        ref = std::fmaf(fmaxf(acc[h], 0.0f), w[(size_t) t * 64 + h], ref);
+                    worst = std::max(worst,
+                                     std::fabs(optimized[(size_t) t * ss + i] - ref) / (denom + 1e-30));
+                }
+            std::printf("%-44s       CPU worst %.3e relative\n", "kv pack: candidate index accuracy", worst);
+            if (worst > 1e-5) ++g_fail;
+
+            cudaEvent_t ce0, ce1;
+            CU(cudaEventCreate(&ce0));
+            CU(cudaEventCreate(&ce1));
+            float us[2];
+            for (int mode = 0; mode < 2; ++mode) {
+                if (mode == 0) unsetenv("STRATA_DS4_QSA_MMAC928_CANDIDATE");
+                else setenv("STRATA_DS4_QSA_MMAC928_CANDIDATE", "1", 1);
+                CU(cudaEventRecord(ce0, s));
+                constexpr int iters = 20;
+                for (int it = 0; it < iters; ++it)
+                    dk::index_score(d_q, d_w, i4, NH, IX, T, CN, d_cand, CB, BLK, cl, co2, ss, s, dk::kKvFp4p);
+                CU(cudaEventRecord(ce1, s));
+                CU(cudaEventSynchronize(ce1));
+                float ms = 0;
+                CU(cudaEventElapsedTime(&ms, ce0, ce1));
+                us[mode] = ms * 1000.0f / iters;
+            }
+            std::printf("%-44s       candidate off %.1f us, on %.1f us\n", "kv pack: candidate index time",
+                        us[0], us[1]);
+            unsetenv("STRATA_DS4_QSA_MMAC928_CANDIDATE");
+            CU(cudaEventDestroy(ce0));
+            CU(cudaEventDestroy(ce1));
+            CU(cudaFree(d_cand));
+            CU(cudaFree(co1));
+            CU(cudaFree(co2));
+        }
+        {
+            // A CPU reference over a prefix catches a fast path that agrees
+            // with itself for both key formats but computes the wrong dot.
+            const std::vector<uint16_t> keys = host(i16, (size_t) NC * IX);
+            const std::vector<float> scores = host(o1, (size_t) T * ss);
+            const char* qsa_mmac_env = std::getenv("STRATA_DS4_QSA_MMAC928");
+            double worst = 0, worst_abs = 0;
+            double sum_got2 = 0, sum_ref2 = 0, sum_got_ref = 0;
+            for (int t = 0; t < T; ++t)
+                for (int p = 0; p < 128; ++p) {
+                    float acc[NH] = {};
+                    double denom = 0;
+                    for (int h = 0; h < NH; ++h) {
+                        for (int c = 0; c < IX; ++c) {
+                            const uint32_t bits = (uint32_t) keys[(size_t) p * IX + c] << 16;
+                            float kv;
+                            std::memcpy(&kv, &bits, sizeof(kv));
+                            const float qv = q[(size_t) t * NH * IX + h * IX + c];
+                            acc[h] = std::fmaf(qv, kv, acc[h]);
+                            denom += std::fabs((double) qv * kv * w[(size_t) t * 64 + h]);
+                        }
+                    }
+                    float ref = 0;
+                    for (int h = 0; h < NH; ++h) ref = std::fmaf(fmaxf(acc[h], 0.0f), w[(size_t) t * 64 + h], ref);
+                    const float got = scores[(size_t) t * ss + p];
+                    const double err = std::fabs(got - ref);
+                    sum_got2 += (double) got * got;
+                    sum_ref2 += (double) ref * ref;
+                    sum_got_ref += (double) got * ref;
+                    worst_abs = std::max(worst_abs, err);
+                    const double rel = err / (denom + 1e-30);
+                    worst = std::max(worst, rel);
+                }
+            const bool mmac = qsa_mmac_env != nullptr && qsa_mmac_env[0] != '0';
+            std::printf("%-44s       CPU worst %.3e relative, %.3e absolute%s\n", "kv pack: index score accuracy",
+                        worst, worst_abs, mmac ? " (MMAC928)" : "");
+            std::printf("%-44s       correlation %.6f, norms got %.6g ref %.6g\n", "kv pack: index score accuracy detail",
+                        sum_got_ref / std::sqrt((sum_got2 + 1e-30) * (sum_ref2 + 1e-30)), std::sqrt(sum_got2),
+                        std::sqrt(sum_ref2));
+            if (worst > (mmac ? 1e-4 : 1e-5)) ++g_fail;
+        }
+        {   // (the time of each over the 16385 keys, 50 times)
+            cudaEvent_t e0, e1;
+            CU(cudaEventCreate(&e0));
+            CU(cudaEventCreate(&e1));
+            float ms[2];
+            for (int f = 0; f < 2; ++f) {
+                CU(cudaEventRecord(e0, s));
+                for (int it = 0; it < 50; ++it)
+                    dk::index_score(d_q, d_w, f ? (const void*) i4 : (const void*) i16, NH, IX, T, NC, nullptr, 0, 1, lim,
+                                    o1, ss, s, f ? dk::kKvFp4p : dk::kKvBf16);
+                CU(cudaEventRecord(e1, s));
+                CU(cudaEventSynchronize(e1));
+                CU(cudaEventElapsedTime(&ms[f], e0, e1));
+            }
+            std::printf("%-44s       BF16 keys %.1f us a call, packed %.1f us\n", "kv pack: index score time", ms[0] * 20.0f,
+                        ms[1] * 20.0f);
+            CU(cudaEventDestroy(e0));
+            CU(cudaEventDestroy(e1));
+        }
+        CU(cudaFree(d_q));
+        CU(cudaFree(d_w));
+        CU(cudaFree(o1));
+        CU(cudaFree(o2));
+    }
+    CU(cudaFree(d_xc));
+    CU(cudaFree(d_xi));
+    CU(cudaFree(c16));
+    CU(cudaFree(i16));
+    CU(cudaFree(c4));
+    CU(cudaFree(i4));
+    const cudaError_t e = cudaGetLastError();
+    if (e != cudaSuccess) {
+        std::printf("kv pack: %s\n", cudaGetErrorString(e));
+        ++g_fail;
+    }
+}
+
+}  // namespace
+
+// ---------------------------------------------------------------- Engram rows in Q6_K
+__global__ void q6k_rows_kernel(const uint8_t* rows, int hd, float* out) {   // (engram_dequant's Q6_K branch)
+    const int r = blockIdx.x;
+    for (int e = threadIdx.x; e < hd; e += blockDim.x)
+        out[(size_t) r * hd + e] =
+            strata::ds4::q6k_value(rows + (size_t) r * hd + (size_t) (e / 256) * strata::ds4::kQ6kBytes, e % 256);
+}
+void test_engram_q6k(cudaStream_t s) {
+    const int n = 64, hd = 512, sb = hd / 256;   // rows of two superblocks, each row hd bytes apart (as the engine keeps)
+    std::vector<uint8_t> rows((size_t) n * hd, 0), packed((size_t) n * sb * 210);
+    for (auto& v : packed) v = (uint8_t) (rng() & 0xff);
+    for (size_t b = 0; b < (size_t) n * sb; ++b) {   // d: a small normal F16
+        const __half h = __float2half(0.0005f + 0.002f * std::fabs(frand()));
+        std::memcpy(&packed[b * 210 + 208], &h, 2);
+    }
+    for (int r = 0; r < n; ++r) std::memcpy(&rows[(size_t) r * hd], &packed[(size_t) r * sb * 210], (size_t) sb * 210);
+    std::vector<float> want((size_t) n * hd);
+    ggml_get_type_traits(GGML_TYPE_Q6_K)->to_float(packed.data(), want.data(), (int64_t) n * hd);
+    uint8_t* d_rows = dev(rows);
+    float* d_out = dev(std::vector<float>((size_t) n * hd));
+    q6k_rows_kernel<<<n, 256, 0, s>>>(d_rows, hd, d_out);
+    CU(cudaStreamSynchronize(s));
+    const std::vector<float> got = host(d_out, (size_t) n * hd);
+    const bool same = std::memcmp(got.data(), want.data(), got.size() * 4) == 0;
+    if (!same) ++g_fail;
+    std::printf("%-44s %s\n", "Engram Q6_K rows = ggml's, bit for bit", same ? "ok" : "FAIL");
+    cudaFree(d_rows), cudaFree(d_out);
+}
+
+int main(int argc, char** argv) {
+    cudaStream_t s;
+    CU(cudaStreamCreate(&s));
+    if (!gg::prepare(s)) return 1;
+    if (argc >= 2 && std::strcmp(argv[1], "--bench") == 0) {
+        bench(s);
+        bench_q(s);
+        return 0;
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--bench-q") == 0) {
+        bench_q(s);
+        return 0;
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--bench-finish-f16") == 0) {
+        bench_finish_f16(s);
+        return g_fail ? 1 : 0;
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--bench-attn-epilogue-f16") == 0) {
+        bench_attn_epilogue_f16(s);
+        return g_fail ? 1 : 0;
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--bench-q5-attn") == 0) {
+        bench_q5_attention(s);
+        return g_fail ? 1 : 0;
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--qb-rope") == 0) {
+        test_qb_rope(s, true, argc >= 3 ? argv[2] : nullptr);
+        return g_fail ? 1 : 0;
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--sparse-rope") == 0) {
+        test_sparse_rope(s, true, argc >= 3 ? argv[2] : nullptr);
+        return g_fail ? 1 : 0;
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--bench-router") == 0) {
+        bench_router_gemv(s);
+        bench_route(s);
+        bench_route_ahead(s);
+        bench_route_publish(s);
+        return g_fail ? 1 : 0;
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--bench-iq1m-precomp") == 0) {
+        bench_iq1m_precomp(s);
+        return g_fail ? 1 : 0;
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--bench-cpu") == 0) {   // [threads]
+        bench_cpu(argc >= 3 ? std::atoi(argv[2]) : 1);
+        return 0;
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--kv") == 0) {   // the caches' packing alone
+        test_kv_pack(s);
+        std::printf("%s (%d failed)\n", g_fail ? "FAILED" : "ALL OK", g_fail);
+        return g_fail ? 1 : 0;
+    }
+    test_kv_pack(s);
+    test_mv(s);
+    test_engram_q6k(s);
+    test_experts(512, 256, s);
+    for (int t : {gg::iq::kIQ2_XXS, gg::iq::kIQ2_S, gg::iq::kIQ3_XXS, gg::iq::kIQ3_S, gg::iq::kIQ4_XS, gg::iq::kQ2_K,
+                  gg::iq::kQ3_K, gg::iq::kQ4_K, gg::iq::kQ5_K})
+        test_mv_q(t, s);
+    for (const auto& pr : kQPairs) test_experts_q(512, 256, pr.first, pr.second, s);
+    if (argc >= 3) {
+        test_experts(std::atoi(argv[1]), std::atoi(argv[2]), s);
+        for (int i : {0, 4}) test_experts_q(std::atoi(argv[1]), std::atoi(argv[2]), kQPairs[i].first, kQPairs[i].second, s);
+    }
+    if (gg::launch_errors() != 0) {
+        std::printf("launch errors: %d\n", gg::launch_errors());
+        ++g_fail;
+    }
+    std::printf("%s (%d failed)\n", g_fail ? "FAILED" : "ALL OK", g_fail);
+    return g_fail ? 1 : 0;
+}

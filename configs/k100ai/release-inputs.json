@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "platform": "linux-x86_64-gfx928-dtk2604",
+  "container_image": "harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68",
+  "strata": {
+    "base_version": "0.2.9",
+    "base_commit": "c62d5e3a15b40ea51c96aae9e8d36928965f53ab",
+    "current_engine_source_commit": "8c413cae0f5e9f88df784642772d78dff7bef428",
+    "qwen_fast_source_commit": "2150b1acdb48c386a9afcd64e63e2369b5a5e108",
+    "qwen_fast_base_version": "0.2.2",
+    "qwen_fast_base_commit": "011c9e600a93bbc9fd451c563501b5831c32bbca"
+  },
+  "deepseek_v41": {
+    "product_version": "0.3.0",
+    "research_final_round": 179,
+    "clean_binary_sha256": "4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6",
+    "source_root": "/data/dsv41-opt-v022-20261104/src",
+    "ds4_model_sha256": "fa4644560c1fd3bd7e1aa259791b817a001a9d7ee48b1206ecd5cb228b0a548a",
+    "production_configs": [
+      "configs/exl3-tp1-prod.json",
+      "configs/exl3-tp4-prod.json",
+      "configs/gguf-tp2-prod.json"
+    ]
+  },
+  "qwen": {
+    "repository": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF",
+    "source": "https://www.modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF",
+    "snapshot_commit": "1868010e27505d4b8cc15970cdcc4dd76005d7de",
+    "mtp_checkpoint_revision": "de4b8e4d43b917e7706784d8bb445c9af86a3540",
+    "model_files": {
+      "IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf": {
+        "size": 47039860096,
+        "sha256": "219ea929900dfa9ef091f3aa473fdba6874b65fcb36526d7d851ac9e95856d15"
+      },
+      "IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf": {
+        "size": 28800138432,
+        "sha256": "316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113"
+      }
+    },
+    "pack_files": {
+      "experts.bin": {
+        "size": 42912972800,
+        "sha256": "e76956703f0cb960fa959cc0c33b0e38284ee98c8eb360417c74e7238c7bf005"
+      },
+      "dense.bin": {
+        "size": 1538035200,
+        "sha256": "d2af3d8331e5c7a1985d1d589747230f9d56719a6d33c7cddc9ee6b81cde6b13"
+      },
+      "index.txt": {
+        "size": 93687,
+        "sha256": "1afe12b36cd2d13bf122b741fa0e81e1f751319cc3c451e54ba75524d825f148"
+      },
+      "native_experts.txt": {
+        "size": 3296,
+        "sha256": "ae28cf7a2a1c9063c4b55d6c8cf86d4d079dcddcf597f9e8697c9157d462c0ee"
+      },
+      "conversions.json": {
+        "size": 310,
+        "sha256": "68beec784ea64aeecace591b33debb8ba331a9ad257a3e1b68c5c701dd22b267"
+      },
+      "experts.bin.src.json": {
+        "sha256": "30bf3328b49b4b3444dbe29bdae9b1fe65e86d33fda10fffbdb70bb9a5316644"
+      }
+    },
+    "mtp_runtime_files": {
+      "experts.bin": {
+        "size": 707788800,
+        "sha256": "09398406be61f1f54c93861f449e48b8df0bfccbc9ec9b2b7636775a6ea9244f"
+      },
+      "dense.bin": {
+        "size": 116099072,
+        "sha256": "c724dc0b0822ada5d2977bf5bde821605feabaa64ea2e0045b67ca656329070a"
+      },
+      "dense.txt": {
+        "size": 1851,
+        "sha256": "991456cf4eb266eb8a888c349e548d11bc640f5dbd9149439aa9786af0f732fd"
+      },
+      "draft_vocab.bin": {
+        "size": 425196,
+        "sha256": "b1e1d3a7a9e4bf862dcd5923ce661fb59bbd07907e594df5cf86a62ac235cb91",
+        "source": "https://raw.githubusercontent.com/Niko1221/Strata/c62d5e3a15b40ea51c96aae9e8d36928965f53ab/data/draft_vocab.bin"
+      }
+    }
+  },
+  "deepseek": {
+    "repository": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+    "source": "https://www.modelscope.cn/models/ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+    "revision": "per-file revisions",
+    "file_revisions": {
+      "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00001-of-00006.gguf": "40d2af57944f5a4a5d7cb17f921f30db8c45ecf3",
+      "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00002-of-00006.gguf": "40d2af57944f5a4a5d7cb17f921f30db8c45ecf3",
+      "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00003-of-00006.gguf": "08d153046911aec47936988a9897a8b9598adffd",
+      "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00004-of-00006.gguf": "08d153046911aec47936988a9897a8b9598adffd",
+      "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00005-of-00006.gguf": "20577e0adcacb9ce9c225debe076fbd4b974fffe",
+      "DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf": "20577e0adcacb9ce9c225debe076fbd4b974fffe"
+    },
+    "dspark_repository": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+    "dspark_source": "https://www.modelscope.cn/models/unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+    "dspark_file": "dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf",
+    "dspark_revision": "6cd2eacaad3f5d9b61e6913c188a934a3a5eac22",
+    "model_sha256sums": "ba0bf88586c9959c4cc4ee0d7d300408d621b146c9ab7e4e9ad1499a44d0cbf6",
+    "dspark_sha256": "6ba6ac1b331c540691a209e7fc97dec2a24e295acb1e755c84c7d24a4373927a",
+    "frozen_profile_sha256": "8db93e483b34b15dbf63a0826601f1db2107a8cfea73774e7d21d8559e0a9568",
+    "pack_files": {
+      "ds4.txt": "87e04d460f8f9ab82a14cb3793fe0c48f85348d81da5f2e93d200bc5dbc2d6f4",
+      "tensors.txt": "f91733dc81ff262a0e6f65c0c5c3b86aa1390cfcd144bba75858357d62a50284",
+      "engram.bin": "08d55d6433f389b14aa115f4ea4eb31d6a2d63df1ae40821f03facf4c2d49142",
+      "tokenizer/chat_template.jinja": "4d61d22c90ea0cdf15c7e298f7215f23eeffd20f8eed8fb517fda5fb64693d99"
+    }
+  }
+}

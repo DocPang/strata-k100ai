@@ -1,0 +1,41 @@
+{
+  "name": "Qwen3.8-Flash-Next K100AI",
+  "model_name": "qwen3.8-flash-next",
+  "arch": "qwen4exp",
+  "backend": "hip",
+  "exe": "/data/strata-dsv41-k100ai/build-gfx928-qwen-v029-896743023/strata",
+  "cwd": "/data/strata-dsv41-k100ai",
+  "gpu": 0,
+  "gpu_order": "as_given",
+  "tokenizer": "/data/experiments/strata_iq3xxs_gfx928_20261015/packs/iq3xxs/tokenizer",
+  "engine_ready_s": 900,
+  "engine_silence_s": 600,
+  "args": [
+    "--pack",
+    "/data/experiments/strata_iq3xxs_gfx928_20261015/packs/iq3xxs",
+    "--native",
+    "/data/experimental-models/qwen38-flash-next-gsq-rco-iq3-xxs-20261015/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf",
+    "--ple-gguf",
+    "/data/experimental-models/qwen38-flash-next-gsq-rco-iq3-xxs-20261015/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf",
+    "--ple-io",
+    "mmap",
+    "--mmap-experts",
+    "--expert-cache",
+    "24576",
+    "--expert-profile",
+    "/data/experiments/strata_iq3xxs_gfx928_20261015/strata/data/expert-profile.bin",
+    "--prefill",
+    "20480",
+    "--spec",
+    "2",
+    "--suffix-draft",
+    "0",
+    "--max-context",
+    "8192",
+    "--eos-ids",
+    "248046"
+  ],
+  "env": {
+    "HSA_FORCE_FINE_GRAIN_PCIE": "1"
+  }
+}
