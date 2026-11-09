@@ -6,6 +6,7 @@
 ## v0.3.0
 
 - [安装与启动](INSTALL_V0.3.md)
+- [视觉输入](VISION.md)
 - [源码与二进制来源](PROVENANCE_V0.3.md)
 - [DeepSeek-V4.1-Flash 最终优化报告](DSV41_OPTIMIZATION_FINAL.md)
 - [v0.3.0 Release Notes](RELEASE_NOTES_V0.3.0.md)
