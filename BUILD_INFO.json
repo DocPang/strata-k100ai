@@ -24,8 +24,8 @@
     }
   },
   "deepseek_configs": [
-    "configs/exl3-tp1-prod.json",
-    "configs/exl3-tp4-prod.json",
-    "configs/gguf-tp2-prod.json"
+    "configs/k100ai/exl3-tp1-prod.json",
+    "configs/k100ai/exl3-tp4-prod.json",
+    "configs/k100ai/gguf-tp2-prod.json"
   ]
 }

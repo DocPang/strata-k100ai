@@ -185,6 +185,6 @@ Verify keyboard/direct entry, Light/Dark, reduced motion/transparency, increased
 | 7 Casual research and work user | [Review](07-research.md) | [Debate](07-research-debate.md) | [JSON](07-research-vote.json) |
 | 8 Regular workplace document user | [Review](08-office.md) | [Debate](08-office-debate.md) | [JSON](08-office-vote.json) |
 
-[Common ballot](ballot.md) · [Validated tally](vote-tally.json) · [Implementation being reviewed](../engine-models-onboarding-2026-10-05.md) · [Screenshot evidence](../evidence/instrument-redesign-2026-10-05/)
+[Common ballot](ballot.md) · [Validated tally](vote-tally.json) · [Implementation being reviewed](../engine-models-onboarding-2026-10-05.md) · Screenshot evidence (`../evidence/instrument-redesign-2026-10-05/`)
 
 Only documentation was created during the original review. The subsequent authorized implementation is recorded in [implementation and verification](implementation-verification.md).

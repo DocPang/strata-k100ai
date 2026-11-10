@@ -1,9 +1,8 @@
 # K100AI 优化说明
 
-[返回首页](../../README.md) · [验证记录](VALIDATION.md)
+[返回首页](../../README.md) · [文档索引](README.md) · [验证记录](VALIDATION.md)
 
-
-下表列出 v0.2.3 的运行路径，包括 gfx928 内核适配、布局与参数选择。性能结果见 [验证记录](VALIDATION.md)。
+下表记录 K100AI 的基础优化路径，包括 gfx928 内核适配、布局与参数选择。Qwen 部分沿用 v0.2.3 验证结果；DeepSeek-V4.1 的 v0.3.0 最终结论见 [DEEPSEEK41.md](DEEPSEEK41.md)。
 
 | 范围 | 本版采用的优化 |
 | --- | --- |

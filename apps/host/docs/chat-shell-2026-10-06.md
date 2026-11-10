@@ -28,4 +28,4 @@ Media assets are local and authored by `scripts/assets/make-chat-media.py` (Pill
 - Media: four-second video loaded and played to its end; GIF pause swaps to the still poster and resumes to the GIF. HTTP range request returned 206 with `video/mp4` and the expected byte count.
 - Task mutations were performed only on an isolated host. The main app retains its previous chats and adds the requested showcase.
 
-![Chat, code, approval and integrated image preview](evidence/chat-shell-2026-10-06/chat-showcase.jpg)
+Evidence not included in this K100AI archive: `evidence/chat-shell-2026-10-06/chat-showcase.jpg`

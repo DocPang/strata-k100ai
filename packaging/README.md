@@ -148,7 +148,7 @@ The Terminal bundles a private Python and its dependencies for `windows-x86_64`,
 
 ## Release checks and gaps
 
-- CI covers scripts, Terminal checks, Metal builds and Docker images ([.github/workflows](../.github/workflows)). It does not replace native desktop
+- CI covers scripts, Terminal checks, Metal builds and Docker images (.github/workflows (`../.github/workflows`)). It does not replace native desktop
   packaging, signing or real-GPU acceptance on every target. Some recipes still run by hand.
 - Signing needs the owner's credentials, which are never in this tree. The feed and every engine package are signed with the feed key
   (`feed_tool.py`); the app installers with the Tauri updater key ([UPDATES.md](UPDATES.md)). The Mac app and Terminal archive are signed and

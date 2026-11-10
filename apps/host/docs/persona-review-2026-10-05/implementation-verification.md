@@ -81,15 +81,15 @@ The existing rendered contrast probe was run through CUA's read-only evaluator f
 
 ## Evidence
 
-- [Engine](../evidence/persona-simplification-2026-10-05/01-engine-desktop.png)
-- [Models](../evidence/persona-simplification-2026-10-05/02-models-desktop.png)
-- [Setup review](../evidence/persona-simplification-2026-10-05/05-setup-review.png)
-- [Desktop comparison](../evidence/persona-simplification-2026-10-05/03-comparison-desktop.png) / [mobile comparison](../evidence/persona-simplification-2026-10-05/04-comparison-mobile.png)
-- [Final load failure](../evidence/persona-simplification-2026-10-05/20-setup-load-failure.png) / [successful retry](../evidence/persona-simplification-2026-10-05/07-setup-ready.png)
-- [Unknown hardware](../evidence/persona-simplification-2026-10-05/14-unknown-hardware.png) / [long names](../evidence/persona-simplification-2026-10-05/15-long-model-name-mobile.png)
-- [Dark accessibility preferences](../evidence/persona-simplification-2026-10-05/17-engine-dark-accessibility.png)
-- [Measurements and responsive checks](../evidence/persona-simplification-2026-10-05/verification-data.json)
-- [Evidence directory notes](../evidence/persona-simplification-2026-10-05/README.md)
+- Engine (`../evidence/persona-simplification-2026-10-05/01-engine-desktop.png`)
+- Models (`../evidence/persona-simplification-2026-10-05/02-models-desktop.png`)
+- Setup review (`../evidence/persona-simplification-2026-10-05/05-setup-review.png`)
+- Desktop comparison (`../evidence/persona-simplification-2026-10-05/03-comparison-desktop.png`) / mobile comparison (`../evidence/persona-simplification-2026-10-05/04-comparison-mobile.png`)
+- Final load failure (`../evidence/persona-simplification-2026-10-05/20-setup-load-failure.png`) / successful retry (`../evidence/persona-simplification-2026-10-05/07-setup-ready.png`)
+- Unknown hardware (`../evidence/persona-simplification-2026-10-05/14-unknown-hardware.png`) / long names (`../evidence/persona-simplification-2026-10-05/15-long-model-name-mobile.png`)
+- Dark accessibility preferences (`../evidence/persona-simplification-2026-10-05/17-engine-dark-accessibility.png`)
+- Measurements and responsive checks (`../evidence/persona-simplification-2026-10-05/verification-data.json`)
+- Evidence directory notes (`../evidence/persona-simplification-2026-10-05/README.md`)
 
 ## Practical limits
 

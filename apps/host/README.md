@@ -1,6 +1,6 @@
 # Strata app source
 
-Start with [the complete developer handoff](../handoff.md) and [the runbook](../docs/RUNBOOK.md).
+Start with the complete developer handoff (`../handoff.md`) and the runbook (`../docs/RUNBOOK.md`).
 
 ```sh
 npm ci

@@ -1,4 +1,6 @@
-# DeepSeek-V4.1-Flash K100AI 最终优化报告
+# DeepSeek-V4.1-Flash
+
+[返回首页](../../README.md) · [文档索引](README.md) · [配置目录](../../configs/k100ai/README.md)
 
 本报告冻结 R001-R179 的最终生产结论，对应 `v0.3.0`。实验探索到此结束；
 后续发布只使用本报告列出的三套配置和生产二进制。
@@ -30,9 +32,9 @@ SHA-256 4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6
 
 | 配置 | 设备 | Pack | Prefill chunk | Decode |
 | --- | --- | --- | ---: | --- |
-| `configs/exl3-tp1-prod.json` | HCU0-3，EXL3 TP1 | EXL3 2.9 bpw | 1024 | Native |
-| `configs/exl3-tp4-prod.json` | HCU0-3，EXL3 TP4 | EXL3 2.9 bpw | 3072 | DSpark |
-| `configs/gguf-tp2-prod.json` | HCU0-1，GGUF TP2 | GGUF 2.00 bpw | 512 | DSpark |
+| `configs/k100ai/exl3-tp1-prod.json` | HCU0-3，EXL3 TP1 | EXL3 2.9 bpw | 1024 | Native |
+| `configs/k100ai/exl3-tp4-prod.json` | HCU0-3，EXL3 TP4 | EXL3 2.9 bpw | 3072 | DSpark |
+| `configs/k100ai/gguf-tp2-prod.json` | HCU0-1，GGUF TP2 | GGUF 2.00 bpw | 512 | DSpark |
 
 所有配置只启用 4K、32K 和 Decode 已验证的路径。模型资产、tokenizer、profile
 和日志路径可以在 JSON 中按部署位置修改。配置顶部的中文说明字段是发布元数据，
@@ -145,12 +147,12 @@ STRATA_DS4_MOE_PREFILL_KEEP_TAIL_ROWS=1024
 ## 启动
 
 启动命令与设备映射见
-[`configs/README.md`](../../configs/README.md)。三套配置可任选一套：
+[`configs/k100ai/README.md`](../../configs/k100ai/README.md)。三套配置可任选一套：
 
 ```bash
 python3 -m serve.server \
   --engine strata \
-  --config configs/exl3-tp4-prod.json \
+  --config configs/k100ai/exl3-tp4-prod.json \
   --host 127.0.0.1 \
   --port 18097 \
   --no-api-key
