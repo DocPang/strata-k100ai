@@ -1293,7 +1293,12 @@ bool finish_capture(cudaStream_t cs, bool ok, cudaGraphExec_t& exec, const char*
     cudaGraphDestroy(graph);
     // an explicit upload: the first launch's implicit one blocked behind a device-side spin (verify.cpp); only a warm-up,
     // so a failure (no VRAM left) is cleared and the first launch uploads it
-    if (cudaGraphUpload(exec, cs) != cudaSuccess || cudaStreamSynchronize(cs) != cudaSuccess) (void) cudaGetLastError();
+    // [k100ai] STRATA_MTP_NO_UPLOAD=1 skips it: on gfx928 the upload itself costs ~16 ms per graph here, and on
+    // Hygon's galaxyhip 5.2 (DTK 26.04) a freshly instantiated exec can be half-initialized so the explicit upload
+    // faults in libgalaxyhip; the first launch's implicit upload takes that path once instead. Off by default.
+    static const bool mtp_no_up = std::getenv("STRATA_MTP_NO_UPLOAD") != nullptr;
+    if (!mtp_no_up && (cudaGraphUpload(exec, cs) != cudaSuccess || cudaStreamSynchronize(cs) != cudaSuccess))
+        (void) cudaGetLastError();
     return true;
 }
 }  // namespace
