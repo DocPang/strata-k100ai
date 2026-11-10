@@ -6,7 +6,7 @@ request workflow; a single model, GPU, or context length is enough to contribute
 There are two ways to measure. For results other people can compare with, run the **standard benchmark**: `strata bench run`
 follows the draft protocol in [BENCHMARK_PROTOCOL.md](BENCHMARK_PROTOCOL.md) (fixed prompts, thinking on, the model card's
 sampling, twelve sanity checks, about 2 to 4 minutes after the model has loaded on a fast card, more on a slow one) and writes `results.json` with
-the hardware, versions and every request. For a quick look at your own machine, [`BENCH.bat` / `./bench.sh`](#run-the-benchmark)
+the hardware, versions and every request. For a quick look at your own machine, [`packaging/windows/BENCH.bat` / `./bench/bench.sh`](#run-the-benchmark)
 takes 3 to 10 minutes and writes a report in the format below.
 
 The protocol is still a draft until a pilot has run on two kinds of hardware. The reports listed below were made before
@@ -95,7 +95,7 @@ a result, follow [Submit and review](BENCHMARK_PROTOCOL.md#submit-and-review) in
 
 ## Run the benchmark
 
-The simplest report is one command after setup. Windows: double-click `BENCH.bat`. Linux: `./bench.sh`. Or
+The simplest report is one command after setup. Windows: double-click `packaging/windows/BENCH.bat`. Linux: `./bench/bench.sh`. Or
 `python tools/strata_bench.py` from the Strata folder. Setup also offers it at the end of an interactive install
 (default no). The Terminal's `strata bench run` runs the standard benchmark (next section); its `--suite serving-smoke` and
 other serving suites ([TERMINAL.md](TERMINAL.md)) write JSON evidence for your own comparisons, not a report in this format.

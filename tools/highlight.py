@@ -1,4 +1,4 @@
-"""Syntax highlighting for chat.py's streamed output: fenced code blocks get colored (tags, strings, comments,
+"""Syntax highlighting for tools/chat.py's streamed output: fenced code blocks get colored (tags, strings, comments,
 keywords, numbers), everything else passes through unchanged. Standard library only, no dependency.
 
     from highlight import StreamHighlighter

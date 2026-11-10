@@ -300,7 +300,7 @@ def _monitor_component() -> dict:
         found = None
     if found is None:
         return {**component, "status": "optional_missing",
-                "reason": "install the optional monitor dependency from requirements-monitor.txt"}
+                "reason": "install the optional monitor dependency from packaging/requirements/requirements-monitor.txt"}
     try:
         version = metadata.version("textual")
     except metadata.PackageNotFoundError:

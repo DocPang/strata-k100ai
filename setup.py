@@ -256,7 +256,7 @@ KV_CELL_BYTES = {"q4_0": 576, "k8v4": 816}
 PY_PACKAGES = ["numpy", "jinja2", "regex", "pyyaml", "tqdm", "requests", "pillow", "psutil"]
 REQUIREMENTS = ROOT / "requirements.txt"   # the same packages and their dependencies, pinned (#214)
 BUILD_PACKAGES = ["cmake", "ninja"]
-BUILD_REQUIREMENTS = ROOT / "requirements-build.txt"
+BUILD_REQUIREMENTS = ROOT / "packaging/requirements/requirements-build.txt"
 
 # NVFP4 experts (MODEL-UPDATE Phase 4; the engine path is ported from sergqwer/strata-nvfp4, MIT).  Ready-made Strata
 # packs on Hugging Face by the fork's author: nothing is converted here.  Every file is pinned by its upload's commit,
@@ -3517,7 +3517,7 @@ def requirement_lines(path: Path | None = None) -> list[str]:
     return lines
 
 
-MONITOR_REQUIREMENTS = ROOT / "requirements-monitor.txt"
+MONITOR_REQUIREMENTS = ROOT / "packaging/requirements/requirements-monitor.txt"
 
 
 def runtime_packages() -> list[str]:
@@ -3585,12 +3585,12 @@ def pip_install(packages, what, extra=()):
     ok(f"{what} installed")
 
 
-NVFP4_LOCAL_REQUIREMENTS = ROOT / "requirements-nvfp4-local.txt"
+NVFP4_LOCAL_REQUIREMENTS = ROOT / "packaging/requirements/requirements-nvfp4-local.txt"
 NVFP4_LOCAL_MODULES = ("torch", "transformers", "safetensors")
 
 
 def nvfp4_local_packages() -> list:
-    """The pinned lines of requirements-nvfp4-local.txt (comments and options left out)."""
+    """The pinned lines of packaging/requirements/requirements-nvfp4-local.txt (comments and options left out)."""
     try:
         lines = NVFP4_LOCAL_REQUIREMENTS.read_text(encoding="utf-8").splitlines()
     except OSError:
@@ -3611,7 +3611,7 @@ def ensure_nvfp4_local_packages() -> None:
              "install this model from the source download (SETUP.bat on Windows, ./setup.sh on Linux), or pick another version in the app")
     pkgs = nvfp4_local_packages()
     if not pkgs:
-        fail("requirements-nvfp4-local.txt is missing", "update Strata, or run: python -m pip install torch transformers safetensors")
+        fail("packaging/requirements/requirements-nvfp4-local.txt is missing", "update Strata, or run: python -m pip install torch transformers safetensors")
     say("  Converting NVIDIA's checkpoint needs PyTorch, transformers and safetensors (a few hundred MB, installed once).")
     pip_install(pkgs, "PyTorch, transformers and safetensors (for the FP4-Local conversion)",
                 extra=[] if WIN else ["--extra-index-url", "https://download.pytorch.org/whl/cpu"])   # Linux: the CPU build, not 3 GB of CUDA libraries
@@ -5758,7 +5758,7 @@ def tool_usable(name):
 
 
 def ensure_build_tools():
-    """cmake and ninja for a local compile, installed from requirements-build.txt when missing (#3403: the Mac setup
+    """cmake and ninja for a local compile, installed from packaging/requirements/requirements-build.txt when missing (#3403: the Mac setup
     compiles without cmake_build(), so it calls this too).  Returns (cmake, ninja)."""
     # The ready-made engine path never calls this function. Keep build helpers out of
     # the normal serving environment, and use already installed tools offline.
@@ -5768,7 +5768,7 @@ def ensure_build_tools():
         pip_install(missing, "CMake and Ninja build tools")
     cmake, ninja = find_tool("cmake"), find_tool("ninja")
     if cmake is None or ninja is None:
-        fail("cmake / ninja not found after installing them", "run: .venv python -m pip install -r requirements-build.txt")
+        fail("cmake / ninja not found after installing them", "run: .venv python -m pip install -r packaging/requirements/requirements-build.txt")
     return cmake, ninja
 
 
@@ -8114,7 +8114,7 @@ def install_own_path(a, family, gpu, hip, amd, cuda_tk, multi, port, ram, adopte
     say(f"  API (Anthropic):  http://127.0.0.1:{port}/v1/messages")
     say(f"  Next time:        just run {'START-HERE.bat' if WIN else './setup.sh'} (or {script.name}) - it starts right away")
     if vision != "none":
-        say("  Images:           send them in the chat page, in chat.py (/image <path>) or over the API")
+        say("  Images:           send them in the chat page, in tools/chat.py (/image <path>) or over the API")
     if par is None and not par_said:                   # the opt-in, said once (nothing changes)
         for line in own_path_parallel_note(None, fam, model, vram_gb, ctx):
             say("  " + line)
@@ -10470,7 +10470,7 @@ def main() -> int:
             + ("" if a.api_key else " - no API key set: anyone on your network can use it"))
     say(f"  Next time:        just run {'START-HERE.bat' if WIN else './setup.sh'} (or {script.name}) - it starts right away")
     if vision != "none":
-        say("  Images:           send them in the chat page, in chat.py (/image <path>) or over the API")
+        say("  Images:           send them in the chat page, in tools/chat.py (/image <path>) or over the API")
     if cfg.get("images"):
         say(f"  Image generation: POST http://127.0.0.1:{port}/v1/images/generations (OpenAI's images API)")
     if a.parallel is None:                             # #465: the opt-in, said once (nothing changes)
@@ -10485,7 +10485,7 @@ def main() -> int:
     # offered only when someone answers (--yes asks nothing), default no; the benchmark starts its own server and stops it
     if not a.yes and sys.stdin.isatty() and ask(
             "Run a quick benchmark now? It measures this install for about 10 minutes and writes a report you can share "
-            f"(later: {'BENCH.bat' if WIN else './bench.sh'})", ["y", "n"], "n", a.yes) == "y":
+            f"(later: {'packaging/windows/BENCH.bat' if WIN else './bench/bench.sh'})", ["y", "n"], "n", a.yes) == "y":
         subprocess.call([sys.executable, str(ROOT / "tools" / "strata_bench.py"), "--config", str(cfg_path), "--port", str(port)])
     return start(cfg_path, port)
 

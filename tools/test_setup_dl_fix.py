@@ -112,7 +112,7 @@ class Fp4LocalPackages(unittest.TestCase):
             with self.assertRaises(SystemExit) as cm:
                 P.require_packages()
         self.assertIn("transformers", str(cm.exception))
-        self.assertIn("requirements-nvfp4-local.txt", str(cm.exception))
+        self.assertIn("packaging/requirements/requirements-nvfp4-local.txt", str(cm.exception))
         self.assertNotIn("torch,", str(cm.exception))
 
 

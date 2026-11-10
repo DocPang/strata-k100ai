@@ -12,7 +12,7 @@ Report their duration separately if measured.
 
 `strata bench run` implements this protocol from Strata 0.2.1. It sends the frozen fixtures in
 `bench/prompts/standard-v1` (corpus SHA-256 `e75eff8b9feea04f745520b392c4c17d97aefc1ba185e222aa6740efa8f68407`)
-and writes the result format below. `BENCH.bat`, `./bench.sh`, and `tools/strata_bench.py` do not implement it.
+and writes the result format below. `packaging/windows/BENCH.bat`, `./bench/bench.sh`, and `tools/strata_bench.py` do not implement it.
 They stay the quick speed check described in the [community guide](COMMUNITY_BENCHMARKS.md). Do not rename their
 output or add a protocol ID to make it appear standard. The draft becomes final only after the measured pilot in the
 [activation checklist](#activation-checklist). The approved manifest described here does not exist yet.
@@ -504,7 +504,7 @@ actual lengths/cache counts, and concurrency; there is no universal combined sco
 
 ## Activation checklist
 
-`tools/strata_bench.py` (behind `BENCH.bat` and `./bench.sh`) hardcodes temperature `0`, turns thinking off by default,
+`tools/strata_bench.py` (behind `packaging/windows/BENCH.bat` and `./bench/bench.sh`) hardcodes temperature `0`, turns thinking off by default,
 has no twelve-case sanity suite, reads changing repository files into its agent workload, and can fall back from token
 counts to stream-chunk counts. `--think` alone does not fix those differences. `strata bench run` does not share
 them: it is the protocol's runner.

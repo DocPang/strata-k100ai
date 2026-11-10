@@ -95,7 +95,7 @@ SESSIONS = [
       ("grep", "strata_tokenizer", "Je cherche qui l'utilise."),
       ("read_file", "serve/frontend.py", "Le frontend l'appelle ; je le lis pour voir les usages réels."),
       ("read_file", "serve/chat_template.jinja", "Je regarde aussi le modèle de conversation."),
-      ("read_file", "chat.py", "Et le client en ligne de commande.")]),
+      ("read_file", "tools/chat.py", "Et le client en ligne de commande.")]),
 ]
 
 

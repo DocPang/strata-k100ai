@@ -55,7 +55,7 @@ You need the CUDA 13.0 toolkit (`/usr/local/cuda`; DGX OS has it), cmake, ninja 
 
 ```sh
 python3 -m venv .venv-build
-.venv-build/bin/pip install -r requirements.txt -r requirements-build.txt
+.venv-build/bin/pip install -r requirements.txt -r packaging/requirements/requirements-build.txt
 PATH="$PWD/.venv-build/bin:/usr/local/cuda/bin:$PATH" PYTHON="$PWD/.venv-build/bin/python" JOBS=16 sh spark/build_engine.sh
 cp -r out-spark/engine ./engine
 ```

@@ -31,7 +31,7 @@ COPY . .
 ARG CUDA_ARCHITECTURES="75;80;86;89;120"
 ARG BUILD_VISION=1
 ARG ENGINE_VERSION=
-RUN python3 -m venv /venv && /venv/bin/pip install --no-cache-dir -r requirements.txt -r requirements-build.txt
+RUN python3 -m venv /venv && /venv/bin/pip install --no-cache-dir -r requirements.txt -r packaging/requirements/requirements-build.txt
 # llama.cpp at the pinned commit (ggml for the engine, mtmd for pictures), exactly as setup.py fetches it
 RUN /venv/bin/python -c "import setup; print(setup.get_llama_cpp())"
 RUN set -e; \

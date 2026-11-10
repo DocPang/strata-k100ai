@@ -88,7 +88,7 @@ Every speed number below is a median of interleaved pairs against the previous d
 - **R9700:** about half of the fresh engines with MTP read prompts 10-23% slower than the others (4K: about 1,350 instead of 1,700 tok/s). Not seen on NVIDIA; the cause is not found.
 - **Docker images are not published yet;** build them yourself (`docs/DOCKER.md`).
 - **`strata code` is not available** in the Terminal; use `strata connect` for coding apps (the app has its own agent).
-- The standard benchmark protocol is a draft (`docs/BENCHMARK_PROTOCOL.md`); `strata bench run` and `BENCH.bat` do not implement it.
+- The standard benchmark protocol is a draft (`docs/BENCHMARK_PROTOCOL.md`); `strata bench run` and `packaging/windows/BENCH.bat` do not implement it.
 
 Thanks to Laurent Zuijdwijk (the Gyro kernels for CPU and the trellis types), ATIVX928 and NoxestNoz (Volta work) and everyone who tested the builds and sent reports.
 

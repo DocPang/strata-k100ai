@@ -1,4 +1,4 @@
-"""`bench.sh` (tools/strata_bench.py) has its own GPU probe, so the ROCm 7+ fix in strata_cli/bench_facts.py did not
+"""`bench/bench.sh` (tools/strata_bench.py) has its own GPU probe, so the ROCm 7+ fix in strata_cli/bench_facts.py did not
 reach it: with no `rocm-smi` on the box it wrote the server's vendor stub as the card ("AMD Radeon",
 `...-community-unknown-...`) and `GPU driver: not read`. The strings below are the real answers of `amd-smi static
 --asic --json`, `static --driver --json` and `list --json` on one AI PRO R9700 (gfx1201) plus a Ryzen iGPU, with ROCm

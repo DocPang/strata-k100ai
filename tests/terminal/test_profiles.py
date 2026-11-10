@@ -307,7 +307,7 @@ class OperatorProfileTests(unittest.TestCase):
         self.assertTrue(any(i["component"] == "native" for i in result["report"]["issues"]))
 
     def test_monitor_inventory_checks_the_optional_pinned_version(self):
-        pinned = (Path(__file__).resolve().parents[2] / "requirements-monitor.txt").read_text()
+        pinned = (Path(__file__).resolve().parents[2] / "packaging/requirements/requirements-monitor.txt").read_text()
         self.assertIn(f"textual=={doctor.MONITOR_TEXTUAL_VERSION}", pinned)
         with mock.patch.object(doctor.util, "find_spec", return_value=None):
             missing = doctor._monitor_component()

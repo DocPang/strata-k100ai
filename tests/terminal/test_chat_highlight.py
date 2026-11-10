@@ -1,4 +1,4 @@
-"""highlight.py: fenced code blocks in chat.py's streamed output get syntax highlighting (tags, strings, comments,
+"""tools/highlight.py: fenced code blocks in tools/chat.py's streamed output get syntax highlighting (tags, strings, comments,
 keywords, numbers), prose passes through unchanged, and a fence split across streamed chunks still opens.
 
     python -m pytest tests/terminal/test_chat_highlight.py      (no GPU, no downloads)
@@ -8,6 +8,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 
 from highlight import StreamHighlighter  # noqa: E402
 

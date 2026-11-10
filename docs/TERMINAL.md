@@ -162,7 +162,7 @@ strata bench compare ./bench-baseline ./bench-monitored --output json
 The basic CLI and status command use Python's standard library. The interactive monitor is an optional component:
 
 ```sh
-python -m pip install -r requirements-monitor.txt
+python -m pip install -r packaging/requirements/requirements-monitor.txt
 strata monitor --url http://127.0.0.1:8095
 ```
 
