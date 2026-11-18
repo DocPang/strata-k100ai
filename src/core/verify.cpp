@@ -2613,6 +2613,12 @@ void Verifier::refresh_ar() {
     }
 }
 
+// [k100ai] "set to 1" semantics for the upload-skip switches: unset or "0" leaves the default path
+static bool env_switch_on(const char* name) {
+    const char* const v = std::getenv(name);
+    return v != nullptr && *v != '\0' && std::string(v) != "0";
+}
+
 bool Verifier::capture(int T, std::string& err) {
     cudaGraphExec_t& exec_t = ar_off_ ? exec_nr_[sel_long_][T] : exec_[sel_long_][T];
     if (exec_t != nullptr) return true;
@@ -2754,8 +2760,9 @@ bool Verifier::capture(int T, std::string& err) {
     // [k100ai] STRATA_VERIFY_NO_UPLOAD=1 skips the explicit upload: on Hygon's galaxyhip 5.2 (DTK 26.04, gfx928) a
     // freshly instantiated exec can be half-initialized inside, and the explicit upload then faults in libgalaxyhip
     // (SIGSEGV at NULL+0x201 before the first request's first token); the first launch's implicit upload takes that
-    // path once instead. Off by default: the CUDA and supported-ROCm paths are unchanged.
-    if (std::getenv("STRATA_VERIFY_NO_UPLOAD") != nullptr) {
+    // path once instead. "set to 1" semantics (env_switch_on below): unset or "0" leaves the default path.
+    // Off by default: the CUDA and supported-ROCm paths are unchanged.
+    if (env_switch_on("STRATA_VERIFY_NO_UPLOAD")) {
         std::fprintf(stderr, "strata verify: captured the %d-token window (upload skipped)\n", T);
         return true;
     }
@@ -3800,7 +3807,7 @@ bool Verifier::capture_batch(const int* rows, int S, int hbase, std::string& err
     const bool made = instantiate_evicting(ex, graph, bkey(rows, S, hbase), "verify: batch instantiate: ", err);
     cudaGraphDestroy(graph);
     if (!made) return false;
-    if (std::getenv("STRATA_VERIFY_NO_UPLOAD") == nullptr &&
+    if (!env_switch_on("STRATA_VERIFY_NO_UPLOAD") &&
         (cudaGraphUpload(ex, cs_) != cudaSuccess || cudaStreamSynchronize(cs_) != cudaSuccess))
         (void) cudaGetLastError();   // only a warm-up: the first launch uploads it (see capture)
     std::string list;
