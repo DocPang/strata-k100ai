@@ -9,6 +9,7 @@ bench/micro/*.bin
 bench/micro/*.dll
 bench/micro/*.txt
 *.log
+!data/k100ai/qwen-iq3s-r112-evidence/**/*.log
 build*/
 pack/
 logs/
