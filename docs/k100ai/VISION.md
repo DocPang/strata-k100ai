@@ -34,9 +34,18 @@ mv third_party/llama.cpp-3cf0325* third_party/llama.cpp
 视觉编码器的读者准备的。）
 
 **只有 HIP 路径**需要先按 [issue #3](https://github.com/DocPang/strata-k100ai/issues/3)
-的配方给 llama.cpp 打四处 DTK 5.2 适配（版本门 6.1→5.0、`hipStreamPerThread` 兜底、
-cooperative_groups 桩、softmax.cu 守卫，共约 10 行）。这四个锚点在上面的固定 commit
-上原样成立——`ggml/src/ggml-hip/CMakeLists.txt:54`、
+的配方给 llama.cpp 打 DTK 5.2 适配，共 **6 处编译期改动**——原配方 4 处（版本门
+6.1→5.0、`hipStreamPerThread` 兜底、cooperative_groups 桩、softmax.cu 守卫）加社区
+实测补充的 2 处（见
+[#3 的评论](https://github.com/DocPang/strata-k100ai/issues/3)）：
+
+- `ggml/src/ggml-cuda/topk-moe.cu` 的 `__ballot_sync` shim——DTK 的 galaxyhip 没有
+  CUDA 9+ 的该内建，调用点 warp 本就收敛，`#define __ballot_sync(mask, pred) __ballot(pred)` 即可；
+- DTK 版本守卫覆盖——`hipconfig` 报 6.3 而运行时库是 5.2（cmake 读到 5.2），导致
+  `HIP_VERSION >= 60300000` 类守卫走进只有 6.3 才提供的路径而编译失败；定义
+  `GGML_DTK_GALAXYHIP` 后将这些守卫强制按旧版处理。
+
+原配方四个锚点在上面的固定 commit 上原样成立——`ggml/src/ggml-hip/CMakeLists.txt:54`、
 `ggml/src/ggml-cuda/vendors/hip.h:122`、`ggml/src/ggml-cuda/softmax.cu:6`——
 打补丁前请照配方做锚点唯一校验。CPU 路径无需任何补丁。
 
@@ -56,12 +65,18 @@ ninja -C build-vision strata-vision
 ## 3. HIP 编码器（GPU，gfx928）
 
 ```sh
+# hsa.h 藏在隐藏目录 /opt/dtk/.hyhal/include/hsa，且 -D 变量传不进 try_compile
+# 子工程，容器内先补一条软链（一次即可）：
+ln -sfn /opt/dtk/.hyhal/include/hsa /opt/dtk/hip/include/hsa
+
 cmake -S tools/vision -B build-vision-hip -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DLLAMA_DIR=third_party/llama.cpp \
   -DSTRATA_VISION_HIP=ON \
   -DSTRATA_VISION_HIP_ARCHS=gfx928 \
   -DGGML_HIP_NO_VMM=ON \
+  -DHSA_HEADER=/opt/dtk/.hyhal/include \
+  -DCMAKE_PREFIX_PATH=/opt/dtk/.hyhal \
   -DCMAKE_C_COMPILER=/opt/dtk/llvm/bin/clang \
   -DCMAKE_CXX_COMPILER=/opt/dtk/llvm/bin/clang++ \
   -DCMAKE_HIP_FLAGS="--gpu-max-threads-per-block=1024"
@@ -116,6 +131,16 @@ CPU 读取器的默认 max tokens 为 300）：
 引擎以 `--vision` 启动；`/health` 返回 `"images": true` 即视觉通道就绪。
 视觉编码器显存预算约 1 GiB（mmproj 权重 + 中间激活），全驻留部署时计入
 显存账本。
+
+**运行期四个必要条件**（不满足时全部表现为**静默失败**——能跑、只是变慢或回退
+CPU，无告警；社区实测补充，见 [#3 评论](https://github.com/DocPang/strata-k100ai/issues/3)）：
+
+| # | 条件 | 不满足时的表现 |
+|---|---|---|
+| 1 | 容器挂载 `-v /opt/hyhal:/opt/hyhal:ro` | `no ROCm-capable device is detected` |
+| 2 | 视觉进程用干净的 `LD_LIBRARY_PATH`（`/opt/dtk/lib:/opt/dtk/hip/lib:/opt/hyhal/lib:/opt/hyhal/lib64`） | 直接继承引擎环境（含 `/opt/dtk/llvm/lib`）时 `open hsa lib:libhsa-runtime64.so error`，服务端回退 CPU |
+| 3 | `LD_PRELOAD=/opt/dtk/llvm/lib/libomp.so` | `error while loading shared libraries: libomp.so` |
+| 4 | serve 配置 `vision` 块写 `"gpu": true`（并给 `cpu_exe` 回退） | 只给 `exe` 时静默走 CPU，日志仅一行 `strata-vision: on the CPU, 16 threads` |
 
 ## 5. 端到端验证
 
