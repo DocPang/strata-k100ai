@@ -1274,6 +1274,13 @@ bool MtpDrafter::record_rest(int step_row, cudaStream_t cs, std::string& err) {
 }
 
 namespace {
+
+// [k100ai] "set to 1" semantics: unset or "0" leaves the default path; any other value enables
+static bool env_switch_on(const char* name) {
+    const char* const v = std::getenv(name);
+    return v != nullptr && *v != '\0' && std::string(v) != "0";
+}
+
 bool finish_capture(cudaStream_t cs, bool ok, cudaGraphExec_t& exec, const char* what, std::string& err) {
     cudaGraph_t graph = nullptr;
     const cudaError_t ce = cudaStreamEndCapture(cs, &graph);
@@ -1288,12 +1295,36 @@ bool finish_capture(cudaStream_t cs, bool ok, cudaGraphExec_t& exec, const char*
         err = std::string("mtp: ") + what + " capture: " + cudaGetErrorString(ie);   // the status that failed
         return false;
     }
+    // [k100ai] fail closed when instantiate reports success but wrote no exec — the same galaxyhip
+    // behavior the verify path guards against (see instantiate_evicting there); static-review
+    // hardening of the MTP path, the fault itself was observed on the verify path only.
+#if defined(STRATA_USE_HIP) || defined(STRATA_HIP_GFX906)
+    if (got == nullptr) {
+        (void) cudaGetLastError();
+        char glog[1024] = {};
+        hipGraphNode_t enode = nullptr;
+        const cudaError_t re =
+            (cudaError_t) hipGraphInstantiate((hipGraphExec_t*) &got, (hipGraph_t) graph, &enode, glog, sizeof(glog));
+        std::fprintf(stderr, "mtp: %s: instantiate reported success but wrote no exec; retry ie=%s node=%p log=%.512s\n",
+                     what, cudaGetErrorString(re), (void*) enode, glog);
+        if (re != cudaSuccess || got == nullptr) {
+            cudaGraphDestroy(graph);
+            err = std::string("mtp: ") + what + ": instantiate reported success but wrote no exec";
+            return false;
+        }
+    }
+#endif
     exec = got;
     mtp_list_nodes(graph, what);
     cudaGraphDestroy(graph);
     // an explicit upload: the first launch's implicit one blocked behind a device-side spin (verify.cpp); only a warm-up,
     // so a failure (no VRAM left) is cleared and the first launch uploads it
-    if (cudaGraphUpload(exec, cs) != cudaSuccess || cudaStreamSynchronize(cs) != cudaSuccess) (void) cudaGetLastError();
+    // [k100ai] STRATA_MTP_NO_UPLOAD=1 skips it: on gfx928 the upload itself costs ~16 ms per graph here, and on
+    // Hygon's galaxyhip 5.2 (DTK 26.04) a freshly instantiated exec can be half-initialized so the explicit upload
+    // faults in libgalaxyhip; the first launch's implicit upload takes that path once instead. Off by default.
+    static const bool mtp_no_up = env_switch_on("STRATA_MTP_NO_UPLOAD");
+    if (!mtp_no_up && (cudaGraphUpload(exec, cs) != cudaSuccess || cudaStreamSynchronize(cs) != cudaSuccess))
+        (void) cudaGetLastError();
     return true;
 }
 }  // namespace
