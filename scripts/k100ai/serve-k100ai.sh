@@ -17,29 +17,17 @@ case "$model" in
   qwen|qwen-iq3s)
     devices=(--device=/dev/dri/renderD128)
     visible=0
-    engine_env=(
-      -e STRATA_K100AI_EXACT_MMAC=1
-      -e STRATA_K100AI_EXACT_GATE_FORMATS=IQ3_XXS,IQ3_S,IQ4_XS
-      -e STRATA_K100AI_EXACT_DOWN_FORMATS=Q2_0
-    )
-    name=${name:-strata-k100ai-serve-$model}
-    qwen_variant=IQ3_XXS
-    qwen_pack=iq3xxs
-    qwen_engine=bin/strata-0.1.47
-    template="$root/configs/k100ai/qwen-server.template.json"
-    qwen_assets="$assets/qwen3.8-flash-next-iq3-xxs"
-    if [[ "$model" == qwen-iq3s ]]; then
-      engine_env=()
-      qwen_variant=IQ3_S
-      qwen_pack=iq3s
-      qwen_engine=bin/strata-qwen-iq3s-r112
-      template="$root/configs/k100ai/qwen-iq3s-r112.template.json"
-      qwen_assets="$assets/qwen3.8-flash-next-iq3-s"
-      export K100AI_QWEN_MTP_VOCAB=${K100AI_QWEN_MTP_VOCAB:-"$qwen_assets/mtp/draft_vocab_zh60k.bin"}
-      if [[ -z "$config" && ! -f "$K100AI_QWEN_MTP_VOCAB" ]]; then
-        echo "missing Qwen IQ3_S draft vocabulary: $K100AI_QWEN_MTP_VOCAB" >&2
-        exit 2
-      fi
+    engine_env=()
+    name=${name:-strata-k100ai-serve-qwen}
+    qwen_variant=IQ3_S
+    qwen_pack=iq3s
+    qwen_engine=bin/strata-qwen-iq3s-r112
+    template="$root/configs/k100ai/qwen-iq3s-r112.template.json"
+    qwen_assets="$assets/qwen3.8-flash-next-iq3-s"
+    export K100AI_QWEN_MTP_VOCAB=${K100AI_QWEN_MTP_VOCAB:-"$root/data/k100ai-qwen-iq3s-draft-vocab-zh60k.bin"}
+    if [[ -z "$config" && ! -f "$K100AI_QWEN_MTP_VOCAB" ]]; then
+      echo "missing Qwen IQ3_S draft vocabulary: $K100AI_QWEN_MTP_VOCAB" >&2
+      exit 2
     fi
     export K100AI_QWEN_PACK=${K100AI_QWEN_PACK:-"$qwen_assets/pack/$qwen_pack"}
     export K100AI_QWEN_NATIVE=${K100AI_QWEN_NATIVE:-"$qwen_assets/model/$qwen_variant/Qwen3.8-Flash-Next-GSQ-RCO-$qwen_variant-00001-of-00002.gguf"}
@@ -69,7 +57,7 @@ case "$model" in
         exit 2
       fi
     done
-    if [[ "$model" == qwen || -z "$config" ]]; then
+    if [[ -z "$config" ]]; then
       for mtp_file in experts.bin dense.bin dense.txt draft_vocab.bin; do
         if [[ ! -f "$K100AI_QWEN_MTP_RT/$mtp_file" ]]; then
           echo "missing Qwen MTP runtime file: $K100AI_QWEN_MTP_RT/$mtp_file" >&2
@@ -79,6 +67,55 @@ case "$model" in
       done
     fi
     log=${log:-"$run_dir/qwen-server.log"}
+    ;;
+  qwen-iq3xxs)
+    devices=(--device=/dev/dri/renderD128)
+    visible=0
+    engine_env=(
+      -e STRATA_K100AI_EXACT_MMAC=1
+      -e STRATA_K100AI_EXACT_GATE_FORMATS=IQ3_XXS,IQ3_S,IQ4_XS
+      -e STRATA_K100AI_EXACT_DOWN_FORMATS=Q2_0
+    )
+    name=${name:-strata-k100ai-serve-qwen-iq3xxs}
+    qwen_variant=IQ3_XXS
+    qwen_pack=iq3xxs
+    qwen_engine=bin/strata-0.1.47
+    template="$root/configs/k100ai/qwen-server.template.json"
+    qwen_assets="$assets/qwen3.8-flash-next-iq3-xxs"
+    export K100AI_QWEN_PACK=${K100AI_QWEN_PACK:-"$qwen_assets/pack/$qwen_pack"}
+    export K100AI_QWEN_NATIVE=${K100AI_QWEN_NATIVE:-"$qwen_assets/model/$qwen_variant/Qwen3.8-Flash-Next-GSQ-RCO-$qwen_variant-00001-of-00002.gguf"}
+    export K100AI_QWEN_PLE=${K100AI_QWEN_PLE:-"$qwen_assets/model/$qwen_variant/Qwen3.8-Flash-Next-GSQ-RCO-$qwen_variant-00002-of-00002.gguf"}
+    export K100AI_QWEN_TOKENIZER=${K100AI_QWEN_TOKENIZER:-$K100AI_QWEN_PACK/tokenizer}
+    export K100AI_QWEN_MTP_RT=${K100AI_QWEN_MTP_RT:-"$qwen_assets/mtp/rt"}
+    export K100AI_QWEN_ENGINE=${K100AI_QWEN_ENGINE:-$qwen_engine}
+    if [[ "$K100AI_QWEN_ENGINE" = /* ]]; then
+      qwen_engine_path=$K100AI_QWEN_ENGINE
+    else
+      qwen_engine_path="$root/$K100AI_QWEN_ENGINE"
+    fi
+    if [[ ! -x "$qwen_engine_path" ]]; then
+      echo "missing Qwen engine executable: $qwen_engine_path" >&2
+      exit 2
+    fi
+    for asset in \
+      "$K100AI_QWEN_PACK/experts.bin" \
+      "$K100AI_QWEN_PACK/dense.bin" \
+      "$K100AI_QWEN_PACK/index.txt" \
+      "$K100AI_QWEN_NATIVE" \
+      "$K100AI_QWEN_PLE" \
+      "$K100AI_QWEN_TOKENIZER/tokenizer.json"; do
+      if [[ ! -f "$asset" ]]; then
+        echo "missing Qwen external asset: $asset" >&2
+        exit 2
+      fi
+    done
+    for mtp_file in experts.bin dense.bin dense.txt draft_vocab.bin; do
+      if [[ ! -f "$K100AI_QWEN_MTP_RT/$mtp_file" ]]; then
+        echo "missing Qwen MTP runtime file: $K100AI_QWEN_MTP_RT/$mtp_file" >&2
+        exit 2
+      fi
+    done
+    log=${log:-"$run_dir/qwen-iq3xxs-server.log"}
     ;;
   dsv41)
     devices=(
@@ -107,7 +144,7 @@ case "$model" in
     log=${log:-"$run_dir/dsv41-server.log"}
     ;;
   *)
-    echo "usage: $0 qwen|qwen-iq3s|dsv41" >&2
+    echo "usage: $0 qwen|qwen-iq3s|qwen-iq3xxs|dsv41" >&2
     exit 2
     ;;
 esac

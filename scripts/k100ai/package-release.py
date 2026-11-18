@@ -14,6 +14,8 @@ from pathlib import Path
 
 PROFILE_FILES = (
     "data/expert-profile.bin",
+    "data/k100ai-qwen-iq3s-draft-vocab-zh60k.bin",
+    "data/k100ai-qwen-iq3s-rocblas.txt",
     "data/dsv41/profile-2.00.bin",
     "data/dsv41/profile-2.00.bin.sha256",
 )
@@ -23,6 +25,7 @@ SCRIPT_FILES = (
     "render-config.py",
     "setup-runtime.sh",
     "validate-api.sh",
+    "fetch-qwen-iq3s.sh",
 )
 DOC_FILES = (
     "README.md",
@@ -33,6 +36,7 @@ DOC_FILES = (
     "DEEPSEEK41.md",
     "OPTIMIZATION.md",
     "REPRODUCIBILITY.md",
+    "QWEN31.md",
 )
 CONFIG_FILES = (
     "exl3-tp1-prod.json",
@@ -40,6 +44,7 @@ CONFIG_FILES = (
     "gguf-tp2-prod.json",
     "qwen-server.json",
     "qwen-server.template.json",
+    "qwen-iq3s-r112.template.json",
     "dsv41-server.json",
     "dsv41-server.template.json",
     "release-inputs.json",
@@ -137,6 +142,7 @@ def main() -> int:
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--qwen-bin", type=Path, required=True)
     parser.add_argument("--qwen-current-bin", type=Path)
+    parser.add_argument("--qwen-iq3s-bin", type=Path)
     parser.add_argument("--qwen-fast-source-commit", required=True)
     parser.add_argument("--dsv41-bin", type=Path, required=True)
     parser.add_argument("--ds4-test-bin", type=Path, required=True)
@@ -155,6 +161,8 @@ def main() -> int:
     required_binaries = [args.qwen_bin, args.dsv41_bin, args.ds4_test_bin]
     if args.qwen_current_bin is not None:
         required_binaries.append(args.qwen_current_bin)
+    if args.qwen_iq3s_bin is not None:
+        required_binaries.append(args.qwen_iq3s_bin)
     for binary in required_binaries:
         if not binary.is_file() or not os.access(binary, os.X_OK):
             raise SystemExit(f"missing executable: {binary}")
@@ -164,6 +172,8 @@ def main() -> int:
     shutil.copy2(args.qwen_bin, root / "bin/strata")
     if args.qwen_current_bin is not None:
         shutil.copy2(args.qwen_current_bin, root / "bin/strata-0.1.55")
+    if args.qwen_iq3s_bin is not None:
+        shutil.copy2(args.qwen_iq3s_bin, root / "bin/strata-qwen-iq3s-r112")
     shutil.copy2(args.dsv41_bin, root / "bin/strata-dsv41")
     shutil.copy2(args.ds4_test_bin, root / "bin/ds4_gguf_test")
     for binary in (root / "bin").iterdir():
@@ -234,6 +244,15 @@ def main() -> int:
                 "engine_source_commit": args.qwen_fast_source_commit,
                 "numeric_profile": "drift-accepted-fast",
             },
+            **({
+                "production": {
+                    "binary": "bin/strata-qwen-iq3s-r112",
+                    "engine_version": "0.1.47",
+                    "revision": "R112",
+                    "numeric_profile": "IQ3_S-exact-prefill",
+                    "config": "configs/k100ai/qwen-iq3s-r112.template.json",
+                }
+            } if args.qwen_iq3s_bin is not None else {}),
             "current": {
                 "binary": "bin/strata-0.1.55",
                 "engine_version": "0.1.55",

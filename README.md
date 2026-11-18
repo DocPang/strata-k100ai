@@ -52,15 +52,18 @@ DeepSeek-V4.1-Flash 提供三套冻结配置，分别面向四卡低首 token �
 <details>
 <summary><img src="docs/media/models/qwen.svg" width="22" alt="" align="middle"> &nbsp;<b>Qwen3.8-Flash-Next</b></summary>
 
-Qwen3.8-Flash-Next 在单张 K100AI 上运行，发布包保留默认快速引擎和对照引擎。
+Qwen3.8-Flash-Next 在单张 K100AI 64 GiB 上运行。v0.3.1 的生产入口是
+IQ3_S 精确引擎，旧 IQ3_XXS 快速档和 0.1.55 对照档继续保留用于兼容测试。
 
 | 引擎 | 二进制 | 用途 |
 | --- | --- | --- |
-| **IQ3_S 精确档** | `bin/strata-qwen-iq3s-r112` | 单卡生产，完整路由与目标模型验证 MTP |
-| **0.1.47** | `bin/strata-0.1.47` | 默认快速档，启用 gfx928 prompt MMAC 与 MTP |
-| 0.1.55 | `bin/strata-0.1.55` | 对照档，便于精度和性能比较 |
+| **IQ3_S 精确档** | `bin/strata-qwen-iq3s-r112` | v0.3.1 默认生产引擎，完整路由与目标模型验证 MTP |
+| 0.1.47 快速档 | `bin/strata-0.1.47` | 旧 IQ3_XXS 兼容，允许数值漂移 |
+| 0.1.55 对照档 | `bin/strata-0.1.55` | 旧 canonical / A-B 对照 |
 
-IQ3_S 精确档不使用 Top-k 截断或 prompt-lookup 后缀投机。0.1.47 快速档允许数值漂移，不保证与对照档逐位一致。运行参数和资产准备见 [K100AI 运行指南](docs/k100ai/RUNTIME.md)。
+IQ3_S 精确档固定完整路由 top-10、65,536-token KV 驻留、目标模型验证的
+MTP，关闭 prompt-lookup 后缀投机。旧 0.1.47 快速档不保证与对照档逐位
+一致。完整参数和成绩见 [Qwen v0.3.1 指南](docs/k100ai/QWEN31.md)。
 
 </details>
 
@@ -102,19 +105,44 @@ bash scripts/k100ai/preflight.sh
 
 ### 启动 Qwen3.8-Flash-Next
 
+安装运行时和 Qwen 外置资产：
+
+```bash
+bash scripts/k100ai/setup-runtime.sh
+
+K100AI_ASSETS_DIR=/data/k100ai-assets \
+  bash scripts/k100ai/fetch-qwen-iq3s.sh \
+  /data/k100ai-assets/qwen3.8-flash-next-iq3-s
+```
+
+启动 v0.3.1 默认生产引擎：
+
 ```bash
 K100AI_ASSETS_DIR=/data/k100ai-assets \
 PORT=18096 \
   bash scripts/k100ai/serve-k100ai.sh qwen
 ```
 
-如需切换到 0.1.55 对照引擎：
+旧 IQ3_XXS 快速档通过独立入口启动：
+
+```bash
+K100AI_ASSETS_DIR=/data/k100ai-assets \
+PORT=18096 \
+  bash scripts/k100ai/serve-k100ai.sh qwen-iq3xxs
+```
+
+旧 0.1.55 对照引擎：
 
 ```bash
 K100AI_QWEN_ENGINE=bin/strata-0.1.55 \
+K100AI_QWEN_PACK=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/pack/iq3xxs \
+K100AI_QWEN_NATIVE=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/model/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf \
+K100AI_QWEN_PLE=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/model/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf \
+K100AI_QWEN_TOKENIZER=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/pack/iq3xxs/tokenizer \
+K100AI_QWEN_MTP_RT=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/mtp/rt \
 K100AI_ASSETS_DIR=/data/k100ai-assets \
 PORT=18096 \
-  bash scripts/k100ai/serve-k100ai.sh qwen
+  bash scripts/k100ai/serve-k100ai.sh qwen-iq3xxs
 ```
 
 ### 启动 DeepSeek-V4.1-Flash
@@ -128,6 +156,21 @@ bash scripts/k100ai/start-dsv41.sh configs/k100ai/exl3-tp4-prod.json
 同一时间只启动一套模型服务。切换配置前，请停止当前服务并重新执行设备占用检查。
 
 ### 发送第一条请求
+
+Qwen：
+
+```bash
+curl --fail http://127.0.0.1:18096/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "qwen3.8-flash-next",
+    "messages": [{"role": "user", "content": "你好"}],
+    "max_tokens": 64,
+    "temperature": 0
+  }'
+```
+
+DeepSeek：
 
 ```bash
 curl --fail http://127.0.0.1:18097/v1/chat/completions \
@@ -144,32 +187,54 @@ Qwen 使用端口 `18096` 和模型名 `qwen3.8-flash-next`。服务同时提供
 
 ## 性能
 
-### 输入处理
+### Qwen3.8-Flash-Next IQ3_S
 
-输入速度单位为 **tok/s**，数值越高越好。Qwen 使用引擎 prefill 计时。DeepSeek 的 4K/32K 数字按标称输入长度除以已记录的 API 首 token 时间换算，是**端到端等效吞吐约数**；原始记录未保存精确 prompt token 数和引擎内部 prefill 用时，不能与 Qwen 直接比较。
+测试条件为单张 K100AI 64 GiB、IQ3_S、INT8 KV、24,576 expert slots、
+完整路由 top-10、prefill chunk 20,480。Decode 使用 32,768-token prompt
+和 256-token 输出，temperature 0、无 prompt cache。MTP 使用
+`spec 3`、`min-p 0.5`、`window 4096` 和 Q4 draft head。
 
-| 模型 / 配置 | 测试输入 | 输入速度 | 计时口径 |
-| --- | ---: | ---: | --- |
-| Qwen 0.1.47 | 8,190 tokens | **1,846.2 tok/s** | 引擎 prefill |
-| Qwen 0.1.47 | 40,057 tokens | **2,086.1 tok/s** | 引擎 prefill |
-| DeepSeek EXL3 TP1 | 标称 4K | 约 1,374 tok/s | 端到端约数 |
-| DeepSeek EXL3 TP1 | 标称 32K | 约 1,825 tok/s | 端到端约数 |
-| DeepSeek EXL3 TP4 | 标称 4K | 约 1,013 tok/s | 端到端约数 |
-| DeepSeek EXL3 TP4 | 标称 32K | 约 1,121 tok/s | 端到端约数 |
-| DeepSeek GGUF TP2 | 标称 4K | 约 505 tok/s | 端到端约数 |
-| DeepSeek GGUF TP2 | 标称 32K | 约 625 tok/s | 端到端约数 |
+#### Prefill 详细成绩
 
-### 输出处理
+8K 和 32K 各使用 8 个内容不同、长度固定的 prompt。计时来自引擎
+`prompt ... read in ... ms`，不是端到端 TTFT 换算。
 
-输出速度仅列投机解码开启时的实测值。DeepSeek 使用 DSpark，Qwen 使用 MTP。
+| Prompt | 第 1 次 | 第 2 次 | 第 3 次 | 第 4 次 | 第 5 次 | 第 6 次 | 第 7 次 | 第 8 次 |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 8,192 tok/s | 2,665.1 | 2,718.1 | 2,719.3 | 2,716.2 | 2,714.9 | 2,713.3 | 2,715.6 | 2,716.4 |
+| 32,768 tok/s | 2,848.0 | 2,863.9 | 2,859.2 | 2,856.9 | 2,850.0 | 2,853.3 | 2,846.4 | 2,847.5 |
 
-| 模型 / 配置 | 投机算法 | 输出速度 | 说明 |
-| --- | --- | ---: | --- |
-| DeepSeek EXL3 TP4 | DSpark | **43.9 tok/s** | 生产安装后的 smoke |
-| DeepSeek GGUF TP2 | DSpark | **42.05 tok/s** | 四组样本中位数 |
-| Qwen 0.1.47 | MTP `spec=6` | **79.37 tok/s** | 8,191-token 输入，64-token 输出 |
+8K 中位 **2,715.9 tok/s**，耗时 3.013–3.074 s。32K 中位
+**2,851.65 tok/s**，耗时 11.442–11.512 s。v0.3.1 发布时另行复测的
+32K Native 为 2,856.4–2,869.4 tok/s，MTP 为 2,837.3–2,851.3 tok/s。
 
-DeepSeek TP1 的发布配置关闭 DSpark，现有记录只有原生解码 18.7 tok/s，因此不列入投机解码成绩表。DSpark 输出速度会随内容和 draft 命中率波动。Qwen 验收见[验证记录](docs/k100ai/VALIDATION.md#qwen-精度和快速档验收)，DeepSeek 原始计时和 PPL 见 [DeepSeek-V4.1 指南](docs/k100ai/DEEPSEEK41.md)。
+#### Decode 详细成绩
+
+| 轮次 | Prompt Prefill | Native Decode | MTP Decode | MTP Draft 接受 |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 11,471.7 ms / 2,856.4 tok/s | **45.7 tok/s** | **70.8 tok/s** | 132 / 188 |
+| 2 | 11,420.0 ms / 2,869.4 tok/s | **45.8 tok/s** | **68.4 tok/s** | 128 / 193 |
+| 3 | 11,440.8 ms / 2,864.1 tok/s | **45.8 tok/s** | **71.7 tok/s** | 133 / 180 |
+| 4 | 11,443.9 ms / 2,863.4 tok/s | **45.9 tok/s** | **69.2 tok/s** | 128 / 185 |
+
+Native 中位 **45.8 tok/s**，MTP 中位 **70.0 tok/s**，对应约 **1.53×**
+输出加速。四组 Native / MTP 的 256-token 输出 SHA-256 逐轮相同，
+input exact、output exact 和 retrieval 均为 8/8 通过。
+
+### DeepSeek-V4.1-Flash
+
+DeepSeek 数字按标称输入长度除以记录的 API 首 token 时间换算，是端到端
+等效吞吐约数，不能与上面 Qwen 引擎 Prefill 直接比较。
+
+| 配置 | 4K 输入约数 | 32K 输入约数 | 投机 Decode |
+| --- | ---: | ---: | ---: |
+| EXL3 TP1 | 1,374 tok/s | 1,825 tok/s | Native 18.7 tok/s |
+| EXL3 TP4 | 1,013 tok/s | 1,121 tok/s | DSpark 43.9 tok/s |
+| GGUF TP2 | 505 tok/s | 625 tok/s | DSpark 中位 42.05 tok/s |
+
+Qwen 的完整运行参数、每轮耗时和输出哈希见
+[Qwen v0.3.1 指南](docs/k100ai/QWEN31.md)。DeepSeek 原始计时和 PPL 见
+[DeepSeek-V4.1 指南](docs/k100ai/DEEPSEEK41.md)。
 
 ## 配置
 
@@ -180,7 +245,8 @@ DeepSeek TP1 的发布配置关闭 DSpark，现有记录只有原生解码 18.7 
 | 四卡，优先 4K 首 token 延迟 | [EXL3 TP1](configs/k100ai/exl3-tp1-prod.json) |
 | 四卡，优先持续输出速度 | [EXL3 TP4](configs/k100ai/exl3-tp4-prod.json) |
 | 两张卡，或已有 GGUF 2.00 bpw 资产 | [GGUF TP2](configs/k100ai/gguf-tp2-prod.json) |
-| 单卡 Qwen，优先输入吞吐 | `scripts/k100ai/serve-k100ai.sh qwen` |
+| 单卡 Qwen，生产、完整路由和无近似 Prefill 算法 | `scripts/k100ai/serve-k100ai.sh qwen` |
+| 单卡 Qwen，复现旧 IQ3_XXS 快速档 | `scripts/k100ai/serve-k100ai.sh qwen-iq3xxs` |
 
 配置字段、资产路径和生产参数说明见 [配置指南](configs/k100ai/README.md)。
 
@@ -204,6 +270,7 @@ DeepSeek TP1 的发布配置关闭 DSpark，现有记录只有原生解码 18.7 
 | [K100AI 文档索引](docs/k100ai/README.md) | 安装、运行、验证、来源与版本记录 |
 | [安装指南](docs/k100ai/INSTALL.md) | 模型资产、运行环境和启动 |
 | [运行指南](docs/k100ai/RUNTIME.md) | 引擎切换、运行参数和 API |
+| [Qwen v0.3.1 指南](docs/k100ai/QWEN31.md) | IQ3_S 安装、算法边界、完整成绩和复现 |
 | [DeepSeek-V4.1](docs/k100ai/DEEPSEEK41.md) | 三套配置、R001–R179 和原始计时 |
 | [验证记录](docs/k100ai/VALIDATION.md) | 性能、精度、算子和 API 测试 |
 | [来源与校验](docs/k100ai/PROVENANCE.md) | 二进制、源码与运行资产 |
@@ -221,7 +288,9 @@ DeepSeek TP1 的发布配置关闭 DSpark，现有记录只有原生解码 18.7 
 
 - 当前发布环境为 **K100AI/gfx928 + DTK 2604**，其他架构需要单独构建和验证。
 - DeepSeek 仅验证 EXL3 TP1、EXL3 TP4 和 GGUF TP2 三套拓扑。
-- Qwen 256K、DeepSeek 1M 是配置上限，完整窗口尚未完成质量评测。
+- Qwen v0.3.1 生产模板验证到 32K 输入并配置 65,536-token KV。旧引擎的
+  262K 上限属于历史兼容路径，完整窗口尚未完成质量评测。
+- DeepSeek 1M 是配置上限，完整窗口尚未完成质量评测。
 - TP1、TP4 的 32K 首 token 延迟没有达到既定目标。
 - 模型、量化 pack、MTP、Engram 和 DSpark 分别适用其上游许可证。
 

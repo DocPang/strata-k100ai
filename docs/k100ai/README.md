@@ -10,14 +10,14 @@
 | --- | --- |
 | [安装指南](INSTALL.md) | 运行环境、模型资产、下载校验和启动 |
 | [运行指南](RUNTIME.md) | 引擎切换、模型参数、API 验收和运行边界 |
-| [配置目录](../../configs/k100ai/README.md) | 三套 DeepSeek 配置与 Qwen 模板 |
+| [配置目录](../../configs/k100ai/README.md) | 三套 DeepSeek 配置与 Qwen IQ3_S / 旧兼容模板 |
 
 ## 模型
 
 | 模型 | 文档 |
 | --- | --- |
 | DeepSeek-V4.1-Flash | [三套生产配置、性能与 R001–R179](DEEPSEEK41.md) |
-| Qwen3.8-Flash-Next | [运行参数与引擎说明](RUNTIME.md) |
+| Qwen3.8-Flash-Next | [IQ3_S 安装、算法、完整成绩与来源](QWEN31.md) |
 
 ## 验证与复现
 

@@ -12,6 +12,7 @@ image=${BASE_IMAGE:-harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d3
 ggml=${STRATA_GGML_DIR:-}
 jobs=${JOBS:-64}
 qwen_fast_bin=${QWEN_FAST_BIN:-}
+qwen_iq3s_bin=${QWEN_IQ3S_BIN:-}
 qwen_fast_source_commit=${QWEN_FAST_SOURCE_COMMIT:-2150b1acdb48c386a9afcd64e63e2369b5a5e108}
 engine_source_commit=${ENGINE_SOURCE_COMMIT:-$(git -C "$src" log -1 --format=%H -- CMakeLists.txt src 2>/dev/null || cat "$src/BUILD_ID" 2>/dev/null || printf 'unknown')}
 package_source_commit=${PACKAGE_SOURCE_COMMIT:-$(git -C "$src" rev-parse HEAD 2>/dev/null || cat "$src/BUILD_ID" 2>/dev/null || printf 'unknown')}
@@ -21,7 +22,13 @@ test_expected=0d6c8455d76815b810a38c5529bc868087e71641008e0c86843ecd8b34dd815c
 
 test -n "$ggml" || { echo "set STRATA_GGML_DIR to the fixed llama.cpp source snapshot" >&2; exit 2; }
 test -n "$qwen_fast_bin" || { echo "set QWEN_FAST_BIN to the verified 0.1.47 engine" >&2; exit 2; }
-for path in "$src/CMakeLists.txt" "$ggml" "$src/scripts/k100ai/package-release.py" "$qwen_fast_bin"; do
+test -n "$qwen_iq3s_bin" || { echo "set QWEN_IQ3S_BIN to the verified R112 IQ3_S engine" >&2; exit 2; }
+for path in \
+  "$src/CMakeLists.txt" \
+  "$ggml" \
+  "$src/scripts/k100ai/package-release.py" \
+  "$qwen_fast_bin" \
+  "$qwen_iq3s_bin"; do
   test -e "$path" || { echo "missing build input: $path" >&2; exit 2; }
 done
 test ! -e "$out" || { echo "output already exists: $out" >&2; exit 2; }
@@ -96,6 +103,7 @@ python3 "$src/scripts/k100ai/package-release.py" \
   --source "$src" \
   --qwen-bin "$qwen_fast_bin" \
   --qwen-current-bin "$out/qwen/strata" \
+  --qwen-iq3s-bin "$qwen_iq3s_bin" \
   --qwen-fast-source-commit "$qwen_fast_source_commit" \
   --dsv41-bin "$out/dsv41/strata-dsv41" \
   --ds4-test-bin "$out/dsv41/ds4_gguf_test" \

@@ -4,9 +4,9 @@
 
 适用版本：**v0.3.1**。本版同时提供：
 
-- Qwen3.8-Flash-Next IQ3_S 精确引擎
-- Qwen3.8-Flash-Next 0.1.47 默认引擎
-- Qwen3.8-Flash-Next 0.1.55 对照引擎
+- Qwen3.8-Flash-Next IQ3_S 默认生产引擎
+- Qwen3.8-Flash-Next IQ3_XXS 0.1.47 旧快速兼容引擎
+- Qwen3.8-Flash-Next 0.1.55 旧对照引擎
 - DeepSeek-V4.1-Flash `strata-dsv41`
 
 模型权重、tokenizer 和 MTP runtime 不随发布包提供。
@@ -51,38 +51,43 @@ harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59c
 
 ## Qwen3.8-Flash-Next
 
-IQ3_S 精确档：
+v0.3.1 默认生产引擎为 IQ3_S。模型、pack 和 MTP runtime 需要准备，合计
+约 140 GB 磁盘。建议先确认 `setup-runtime.sh` 已完成，再运行恢复下载
+和校验脚本：
 
 ```bash
 K100AI_ASSETS_DIR=/data/k100ai-assets \
-PORT=18096 \
-  bash scripts/k100ai/serve-k100ai.sh qwen-iq3s
+  bash scripts/k100ai/fetch-qwen-iq3s.sh \
+  /data/k100ai-assets/qwen3.8-flash-next-iq3-s
 ```
 
-默认资产目录：
+脚本固定模型 revision `6ac9406afe74db316b11a3865a3382c7bedbcf34`，
+检查两个 GGUF、pack 和 MTP runtime 的 SHA-256。转换在固定 DTK 2604
+容器中完成。发布包自带 238 KB 的
+`data/k100ai-qwen-iq3s-draft-vocab-zh60k.bin`，不需要单独下载。
+
+默认资产结构：
 
 ```text
-$K100AI_ASSETS_DIR/qwen3.8-flash-next-iq3-xxs
+$K100AI_ASSETS_DIR/qwen3.8-flash-next-iq3-s/
+  model/IQ3_S/*.gguf
+  pack/iq3s/{experts.bin,dense.bin,index.txt,native_experts.txt,tokenizer}
+  mtp/rt/{experts.bin,dense.bin,dense.txt,draft_vocab.bin}
 ```
 
-启动 0.1.47：
+启动 v0.3.1 默认生产引擎：
 
 ```bash
+printf '%s  %s\n' \
+  102b4b412068a68588883c13a28103600d8b078785da9dcbbda34c440e9a5074 \
+  bin/strata-qwen-iq3s-r112 | sha256sum -c -
+
 K100AI_ASSETS_DIR=/data/k100ai-assets \
 PORT=18096 \
   bash scripts/k100ai/serve-k100ai.sh qwen
 ```
 
-启动 0.1.55：
-
-```bash
-K100AI_QWEN_ENGINE=bin/strata-0.1.55 \
-K100AI_ASSETS_DIR=/data/k100ai-assets \
-PORT=18096 \
-  bash scripts/k100ai/serve-k100ai.sh qwen
-```
-
-可单独覆盖：
+`qwen-iq3s` 是同一入口的显式别名。可覆盖以下路径：
 
 ```text
 K100AI_QWEN_PACK
@@ -90,9 +95,34 @@ K100AI_QWEN_NATIVE
 K100AI_QWEN_PLE
 K100AI_QWEN_TOKENIZER
 K100AI_QWEN_MTP_RT
+K100AI_QWEN_MTP_VOCAB
 ```
 
-Qwen 的完整运行参数见[运行指南](RUNTIME.md)。v0.2.3 的历史资产准备步骤保留在
+旧 IQ3_XXS 快速档使用单独入口：
+
+```bash
+K100AI_ASSETS_DIR=/data/k100ai-assets \
+PORT=18096 \
+  bash scripts/k100ai/serve-k100ai.sh qwen-iq3xxs
+```
+
+旧 0.1.55 对照档需要显式指定引擎，并继续使用 IQ3_XXS 资产：
+
+```bash
+K100AI_QWEN_ENGINE=bin/strata-0.1.55 \
+K100AI_QWEN_PACK=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/pack/iq3xxs \
+K100AI_QWEN_NATIVE=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/model/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf \
+K100AI_QWEN_PLE=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/model/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf \
+K100AI_QWEN_TOKENIZER=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/pack/iq3xxs/tokenizer \
+K100AI_QWEN_MTP_RT=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/mtp/rt \
+K100AI_ASSETS_DIR=/data/k100ai-assets \
+PORT=18096 \
+  bash scripts/k100ai/serve-k100ai.sh qwen-iq3xxs
+```
+
+IQ3_S 的版本、完整成绩和资产哈希见 [Qwen v0.3.1 指南](QWEN31.md)。
+旧 IQ3_XXS 资产仍可使用
+`scripts/k100ai/fetch-qwen-iq3xxs.sh`。v0.2.3 的历史安装步骤保留在
 [历史安装说明](archive/v0.2.3/INSTALL.md)。
 
 ## DeepSeek-V4.1-Flash
@@ -146,11 +176,21 @@ curl --fail http://127.0.0.1:18097/v1/chat/completions \
   -d '{"model":"deepseek-v4.1-flash","messages":[{"role":"user","content":"你好"}],"max_tokens":32,"temperature":0}'
 ```
 
-运行固定 API 验收：
+Qwen v0.3.1 API 验收：
+
+```bash
+BASE_URL=http://127.0.0.1:18096 \
+MODEL=qwen3.8-flash-next \
+EXPECT_DRAFT_METRICS=1 \
+OUT=api-qwen-v031 \
+  bash scripts/k100ai/validate-api.sh
+```
+
+DeepSeek API 验收：
 
 ```bash
 BASE_URL=http://127.0.0.1:18097 \
 MODEL=deepseek-v4.1-flash \
-OUT=api-v030 \
+OUT=api-dsv41-v031 \
   bash scripts/k100ai/validate-api.sh
 ```

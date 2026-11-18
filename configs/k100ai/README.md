@@ -21,25 +21,35 @@ SHA-256 4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6
 
 ## Qwen 配置
 
-`qwen-iq3s-r112.template.json` 对应新增的 IQ3_S 精确引擎：
+`qwen-iq3s-r112.template.json` 是 v0.3.1 默认生产模板，对应
+`bin/strata-qwen-iq3s-r112`。准备 IQ3_S 资产后直接启动：
 
 ```bash
 K100AI_ASSETS_DIR=/data/k100ai-assets \
+  bash scripts/k100ai/fetch-qwen-iq3s.sh \
+  /data/k100ai-assets/qwen3.8-flash-next-iq3-s
+
+K100AI_ASSETS_DIR=/data/k100ai-assets \
 PORT=18096 \
-  bash scripts/k100ai/serve-k100ai.sh qwen-iq3s
+  bash scripts/k100ai/serve-k100ai.sh qwen
 ```
 
 模板固定 `--max-context 65536`、`--kv-resident 65536`、
 `--no-publish-kernel`、`--suffix-draft 0` 和
 `STRATA_PREFILL_TOPK=10`。它保留完整路由并关闭 prompt-lookup 后缀投机。
+资产和逐轮成绩见 [Qwen v0.3.1 指南](../../docs/k100ai/QWEN31.md)。
 
-`qwen-server.template.json` 是可提交的模板，`qwen-server.json` 是生成后的本机配置。启动器通过 `scripts/k100ai/render-config.py` 渲染模板：
+`qwen-server.template.json` 只用于旧 IQ3_XXS 0.1.47 / 0.1.55
+兼容路径。启动器通过 `scripts/k100ai/render-config.py` 渲染模板：
 
 ```bash
 K100AI_ASSETS_DIR=/data/k100ai-assets \
 PORT=18096 \
-  bash scripts/k100ai/serve-k100ai.sh qwen
+  bash scripts/k100ai/serve-k100ai.sh qwen-iq3xxs
 ```
+
+IQ3_S 生产配置在单张 K100AI、32K 输入和 256 输出下 Native Decode
+45.7–45.9 tok/s，MTP 68.4–71.7 tok/s，Prefill 2,846.4–2,869.4 tok/s。
 
 ## 启动前
 

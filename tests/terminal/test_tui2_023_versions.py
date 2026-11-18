@@ -42,9 +42,14 @@ class VersionBump(unittest.TestCase):
         self.assertEqual((locked["version"], locked["packages"][""]["version"]), ("0.2.9", "0.2.9"))
 
     def test_the_documents_that_state_the_current_version_agree(self):
-        self.assertIn("Product version is **v0.3.0**", (ROOT / "AGENTS.md").read_text(encoding="utf-8"))
-        self.assertIn("K100AI 版本 **v0.3.0**", (ROOT / "README.md").read_text(encoding="utf-8"))
-        self.assertEqual(json.loads((ROOT / "BUILD_INFO.json").read_text(encoding="utf-8"))["version"], "0.3.0")
+        self.assertIn("Product version is **v0.3.1**", (ROOT / "AGENTS.md").read_text(encoding="utf-8"))
+        self.assertIn("K100AI 版本 **v0.3.1**", (ROOT / "README.md").read_text(encoding="utf-8"))
+        build = json.loads((ROOT / "BUILD_INFO.json").read_text(encoding="utf-8"))
+        self.assertEqual(build["version"], "0.3.1")
+        qwen = build["models"]["qwen3.8-flash-next"]
+        self.assertEqual(qwen["default"]["model"], "IQ3_S")
+        self.assertEqual(qwen["default"]["binary"], "bin/strata-qwen-iq3s-r112")
+        self.assertEqual(qwen["fast_legacy"]["launcher"], "scripts/k100ai/serve-k100ai.sh qwen-iq3xxs")
 
     def test_version_prints_the_product_and_the_build(self):
         done = subprocess.run([sys.executable, str(ROOT / "strata.py"), "--version"], capture_output=True, text=True, cwd=str(ROOT),

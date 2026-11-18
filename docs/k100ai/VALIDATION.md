@@ -2,7 +2,11 @@
 
 [返回首页](../../README.md) · [文档索引](README.md) · [来源与校验](PROVENANCE.md)
 
-本页保留 Qwen 在 v0.2.3 的完整验收数据，并汇总 v0.3.0 的验证边界。v0.3.1 新增 Qwen3.8-Flash-Next IQ3_S 精确引擎，其 32K 测试、确定性与速度见 [v0.3.1 发布说明](release-notes/v0.3.1.md)。v0.3.0 的 DeepSeek 三套生产配置、PPL、32K 输入和 DSpark 结果见 [DeepSeek-V4.1 指南](DEEPSEEK41.md)。
+本页以 v0.3.1 Qwen3.8-Flash-Next IQ3_S 为当前生产路径。旧 IQ3_XXS
+快速档、0.1.55 对照档和 v0.2.3 API 记录保留在历史章节，不能与当前
+IQ3_S 成绩混用。详细安装、参数和逐轮数据见
+[Qwen v0.3.1 指南](QWEN31.md)。DeepSeek 三套生产配置仍对应 R179，
+见 [DeepSeek-V4.1 指南](DEEPSEEK41.md)。
 
 所有 GPU 测试只使用 HCU0–3。每个 case 前执行 preflight，结束后确认没有测试容器或设备 lease。
 
@@ -12,12 +16,17 @@ v0.3.1 发布包包含四个 Qwen/DeepSeek 生产二进制，运行环境均为 
 
 | 目标 | 大小 | SHA-256 |
 | --- | ---: | --- |
-| Qwen 默认快速档 `strata-0.1.47` | 45,674,152 B | `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9` |
-| Qwen 当前对照档 `strata-0.1.55` | 49,496,856 B | `25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e` |
+| **Qwen v0.3.1 生产档 `strata-qwen-iq3s-r112`** | 53,884,424 B | `102b4b412068a68588883c13a28103600d8b078785da9dcbbda34c440e9a5074` |
+| Qwen 旧快速兼容档 `strata-0.1.47` | 45,674,152 B | `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9` |
+| Qwen 旧对照档 `strata-0.1.55` | 49,496,856 B | `25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e` |
 | DeepSeek `strata-dsv41` | 23,941,864 B | `4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6` |
-| Qwen IQ3_S 精确档 `strata-qwen-iq3s-r112` | 53,884,424 B | `102b4b412068a68588883c13a28103600d8b078785da9dcbbda34c440e9a5074` |
 
-IQ3_S 精确档在单张 K100AI、32K 输入和 256 输出下实测：
+## Qwen v0.3.1 IQ3_S 验证
+
+测试使用单张 K100AI 64 GiB、IQ3_S、INT8 KV、65,536-token KV 驻留、
+24,576 expert slots、完整路由 top-10 和 prefill chunk 20,480。
+Decode 输入为 32,768 tokens，输出 256 tokens，temperature 0，不使用
+prompt cache。
 
 | 路径 | Decode 四次 | 中位 | 质量门禁 |
 | --- | ---: | ---: | --- |
@@ -25,12 +34,22 @@ IQ3_S 精确档在单张 K100AI、32K 输入和 256 输出下实测：
 | MTP | 68.4 / 69.2 / 70.8 / 71.7 tok/s | 70.0 tok/s | 4 / 4 全通过 |
 
 Native / MTP 的输出 SHA-256 在四个配对上完全相同。8K / 32K Prefill
-范围分别为 `2,665.1–2,719.3` 与 `2,846.4–2,869.4 tok/s`。原始请求与
-日志见发布包 `data/k100ai/qwen-iq3s-r112-evidence/`。
+范围分别为 `2,665.1–2,719.3` 与 `2,846.4–2,869.4 tok/s`。
+
+| Prefill | 八次 tok/s | 中位 |
+| --- | ---: | ---: |
+| 8,192 tokens | 2,665.1 / 2,718.1 / 2,719.3 / 2,716.2 / 2,714.9 / 2,713.3 / 2,715.6 / 2,716.4 | 2,715.9 |
+| 32,768 tokens | 2,848.0 / 2,863.9 / 2,859.2 / 2,856.9 / 2,850.0 / 2,853.3 / 2,846.4 / 2,847.5 | 2,851.65 |
+
+MTP draft 接受数为 `132/188`、`128/193`、`133/180`、`128/185`。
+四轮 input exact、output exact 和 retrieval 全部为 true。原始请求、
+配置和引擎日志见
+`data/k100ai/qwen-iq3s-r112-evidence/`。完整逐轮表见
+[Qwen v0.3.1 指南](QWEN31.md#详细成绩)。
 
 v0.2.3 的算子测试还包括 `ds4_gguf_test`，覆盖 BF16、MXFP4、Q8_0、Q2_K、Q3_K、Q4_K、IQ4_XS、IQ3_S、IQ2_XXS 和 IQ2_S 的 expert、CPU lane、SwiGLU、combine 与 KV packed rows。该项属于历史构建记录。
 
-## Qwen 精度和快速档验收
+## 历史 Qwen 0.2.3 快速档与对照档
 
 0.1.55 对照档保留 `8544d2fa` 的 gfx928 int8 expert MMAC 精确集合：
 
@@ -73,7 +92,7 @@ prefill 8,034.2 ms，TTFT 9,932.8 ms。draft layer 明确打印
 4,095-token 运行日志保留在构建主机，未打进发布归档；归档检查要求模型
 权重、外置 MTP runtime 和研究构建路径均为零。
 
-默认 `bin/strata` 快速档采用 K100AI 原生 gfx928 prompt MMAC、fused
+历史 `bin/strata` 快速档采用 K100AI 原生 gfx928 prompt MMAC、fused
 gate/up、Q2_0 down、HC upmix 和 FP16 prompt GEMM。验收门槛是：first-logit
 top-1 保持、余弦相似度高于 0.98、短输出语义及 greedy 前缀保持。实测：
 
@@ -88,7 +107,7 @@ top-1 保持、余弦相似度高于 0.98、短输出语义及 greedy 前缀保�
 98153`。该漂移高于纯 FP16 档，所以快速档不冒充 bitwise 或 canonical
 profile。
 
-## Qwen 性能
+### 历史 Qwen 0.1.47 / 0.1.55 Prefill
 
 相同 pack、profile、expert cache、设备、KV int8、prefill chunk 和
 `--no-prefill-borrow` 的配对测试：
@@ -104,8 +123,8 @@ profile。
 5%；关闭 exact MMAC 反而降到 1,042.0 tok/s，启用 HC upmix 也只到
 1,266.2 tok/s。阶段日志确认 0.1.55 主要慢在 prompt attention、gate/up
 和 down；不是 KV、专家借用或测量口径。当前实现没有达到旧版
-1.8x–2.1x 的路径，因此默认包使用经验证的 0.1.47 快速档，而不是声称
-0.1.55 已修复。
+1.8x–2.1x 的路径。v0.2.3 因此选择旧 0.1.47 快速档。v0.3.1 的生产
+入口已经改为 IQ3_S，不沿用该历史默认。
 
 ## 历史记录：DeepSeek 四卡、DSpark 和长输入（v0.2.3）
 
@@ -262,9 +281,9 @@ runtime 路径；本次 v0.2.3 没有连接 HCU，未重跑 GPU/API 验证，因
 
 - 原生 NVIDIA/CUDA 编译未完成。当前 DTK/HIP 构建不能作为 nvcc 编译
   证据；发布包只声明并验证 gfx928 + DTK 2604。
-- Qwen 配置上限为 262,144 tokens。本轮快速档在 8,191 和 40,058 tokens
-  重测，没有单独重跑 20K；更早的 0.1.47 服务记录到 100,058 tokens。没有
-  重新灌满完整 262,144-token 窗口，也不声称整个窗口的语义质量。
+- Qwen v0.3.1 生产模板配置 65,536-token KV，已在 8,192 和 32,768-token
+  prompt 上实测，没有灌满完整 65,536-token 上下文，也不声称整个窗口的
+  语义质量。旧 0.1.47 的 262,144-token 上限只属于历史兼容路径。
 - 40K 数值对照使用快速 0.1.47 与本轮 0.1.55 F16，并非 canonical 0.1.55
   first-logits oracle；证据是同 top-1、各完整性统计和相同的 8-token 输出
   前缀。
@@ -274,6 +293,6 @@ runtime 路径；本次 v0.2.3 没有连接 HCU，未重跑 GPU/API 验证，因
 - `--vision off`，本版本不宣称图片输入。
 - `IQ2_XXS`、`IQ2_XS` gate exact MMAC 和双 down-format 组合仍是诊断
   路径，不属于生产支持。
-- Qwen 默认快速档的 HC upmix、prompt MMAC 和 fused expert 输出不
-  bitwise；它按本文的 top-1、余弦和输出前缀门槛验收。0.1.55 对照档保留
-  在 `bin/strata-0.1.55`。
+- 旧 Qwen 快速档的 HC upmix、prompt MMAC 和 fused expert 输出不
+  bitwise；它按历史 top-1、余弦和输出前缀门槛验收。v0.3.1 IQ3_S 的
+  Native / MTP 输出哈希逐轮一致，但 IQ3_S 权重仍不等同于 BF16/FP16。

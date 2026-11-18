@@ -13,6 +13,10 @@
   prompt-lookup 后缀投机，不使用 Top-k 截断或其他近似 Prefill 算法。
 - 四个原生与四个 MTP 请求均通过 input exact、output exact 和 retrieval
   门禁。
+- `scripts/k100ai/serve-k100ai.sh qwen` 改为默认启动 IQ3_S，
+  `qwen-iq3xxs` 保留旧 IQ3_XXS 快速档。
+- 新增 `fetch-qwen-iq3s.sh`，自动恢复下载、校验并构造 IQ3_S pack 与
+  MTP runtime。238 KB 的 zh60k draft vocabulary 随发布包提供。
 
 发布、口径和来源见
 [`docs/k100ai/release-notes/v0.3.1.md`](docs/k100ai/release-notes/v0.3.1.md)。

@@ -8,13 +8,15 @@
 
 | 文件 | 大小 | SHA-256 |
 | --- | ---: | --- |
+| `bin/strata-qwen-iq3s-r112` | 53,884,424 B | `102b4b412068a68588883c13a28103600d8b078785da9dcbbda34c440e9a5074` |
 | `bin/strata-0.1.47` | 45,674,152 B | `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9` |
 | `bin/strata-0.1.55` | 49,496,856 B | `25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e` |
 | `bin/strata-dsv41` | 23,941,864 B | `4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6` |
-| `bin/strata-qwen-iq3s-r112` | 53,884,424 B | `102b4b412068a68588883c13a28103600d8b078785da9dcbbda34c440e9a5074` |
 
-Qwen 两个二进制沿用 v0.2.3 已验证版本。DeepSeek 二进制在 R178 完成增量构建
-与 clean rebuild 同哈希验证，随后通过 R179 四卡 A/B 和生产 postinstall。
+v0.3.1 的 Qwen 生产二进制是 `strata-qwen-iq3s-r112`。0.1.47 和
+0.1.55 两个旧二进制沿用 v0.2.3 已验证版本，只用于兼容入口和 A-B。
+DeepSeek 二进制在 R178 完成增量构建与 clean rebuild 同哈希验证，随后
+通过 R179 四卡 A/B 和生产 postinstall。
 
 ## DeepSeek 源码
 
@@ -38,8 +40,8 @@ DeepSeek 发布源码取自：
 
 ## Qwen 来源
 
-Qwen 源码、配置、测试和打包脚本来自 v0.2.3 发布树。两个二进制保留原始
-SHA-256，便于确认它们与 v0.2.3 验证结果对应。
+两个旧 Qwen 二进制的源码、配置、测试和打包脚本来自 v0.2.3 发布树，
+保留原始 SHA-256。
 
 v0.3.1 的 IQ3_S 引擎来源为 K100AI Qwen 研究树 HEAD
 `ca83b39d212c35bb03eba1960578f273294f3e68`。R112 只替换 IQ3_S/IQ4_NL
@@ -53,6 +55,29 @@ v0.3.1 的 IQ3_S 引擎来源为 K100AI Qwen 研究树 HEAD
 
 完整快照、构建命令和精确性说明随 Release
 `strata-qwen-iq3s-r112-source.tar.gz` 提供。
+
+## Qwen IQ3_S 运行资产
+
+| 资产 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| IQ3_S 模型分片 1 | 54,817,524,224 B | `4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3` |
+| IQ3_S 模型分片 2 | 28,800,138,432 B | `316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113` |
+| `pack/iq3s/experts.bin` | 50,292,326,400 B | `ed9d0a872b4d9fb992a05f3f5114107b0689767f0d95e2fb7e2ffe091000e67c` |
+| `pack/iq3s/dense.bin` | 1,538,035,200 B | `d2af3d8331e5c7a1985d1d589747230f9d56719a6d33c7cddc9ee6b81cde6b13` |
+| `pack/iq3s/index.txt` | 93,685 B | `b2a014878c3b61d6a6f915e194055a5e68ede34f9465dd1cb13249d902f008ac` |
+| `pack/iq3s/native_experts.txt` | 3,304 B | `d9ac2dfa3ee63c55c9c6a6db26f72da0cec0ee41733f007e5cbbbba71617aa5d` |
+| `mtp/rt/experts.bin` | 707,788,800 B | `09398406be61f1f54c93861f449e48b8df0bfccbc9ec9b2b7636775a6ea9244f` |
+| `mtp/rt/dense.bin` | 116,099,072 B | `c724dc0b0822ada5d2977bf5bde821605feabaa64ea2e0045b67ca656329070a` |
+| `mtp/rt/dense.txt` | 1,851 B | `991456cf4eb266eb8a888c349e548d11bc640f5dbd9149439aa9786af0f732fd` |
+| `mtp/rt/draft_vocab.bin` | 425,196 B | `b1e1d3a7a9e4bf862dcd5923ce661fb59bbd07907e594df5cf86a62ac235cb91` |
+| 发布包 `data/k100ai-qwen-iq3s-draft-vocab-zh60k.bin` | 238,428 B | `e93f8cd23075d98ccdb4bf10d10c69613a25ec449afc062d0c9dbd33dfb96122` |
+| `data/k100ai-qwen-iq3s-rocblas.txt` | 1,593 B | `2552ded20306907e3ed82df5a4dd6b977916ea3652895097389014b846f85490` |
+
+模型来自 [ISTA-DASLab Qwen3.8-Flash-Next GSQ-RCO GGUF](https://www.modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF)，
+revision 为 `6ac9406afe74db316b11a3865a3382c7bedbcf34`。
+`scripts/k100ai/fetch-qwen-iq3s.sh` 会下载、恢复并校验这些外置资产。
+简体中文 60K draft vocabulary 固定自
+[Strata-rdna3 `7df6538d`](https://github.com/nicejunjie/Strata-rdna3/blob/7df6538d6c886093df39d74b36ed0a3396bf9467/rdna3/draft_vocab_zh60k.bin)。
 
 ## 构建环境
 

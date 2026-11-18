@@ -12,9 +12,9 @@ documents. Historical v0.2.3 material is under
 
 - **DeepSeek-V4.1-Flash**: `bin/strata-dsv41`, with EXL3 TP1, EXL3 TP4 and
   GGUF TP2 production configurations.
-- **Qwen3.8-Flash-Next**: `bin/strata-0.1.47` is the default fast engine,
-  `bin/strata-0.1.55` is the exact comparison engine and
-  `bin/strata-qwen-iq3s-r112` is the IQ3_S production engine.
+- **Qwen3.8-Flash-Next**: `bin/strata-qwen-iq3s-r112` is the production
+  engine. `bin/strata-0.1.47` is the legacy drift-accepted fast engine and
+  `bin/strata-0.1.55` is the legacy comparison engine.
 
 The release contains engines and runtime code. Model weights, tokenizers, MTP
 runtime files and DeepSeek expert profiles are external assets.
@@ -72,7 +72,9 @@ python3 -m json.tool configs/k100ai/gguf-tp2-prod.json >/dev/null
 git diff --check
 ```
 
-Use [docs/k100ai/VALIDATION.md](docs/k100ai/VALIDATION.md) for Qwen evidence and
+Use [docs/k100ai/QWEN31.md](docs/k100ai/QWEN31.md) for the current Qwen
+installation, algorithm and score scope. Use
+[docs/k100ai/VALIDATION.md](docs/k100ai/VALIDATION.md) for verification evidence and
 [docs/k100ai/DEEPSEEK41.md](docs/k100ai/DEEPSEEK41.md) for DeepSeek production
 results. Do not mix v0.2.3 measurements with v0.3.0 configuration claims without
 marking the historical scope.

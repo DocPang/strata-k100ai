@@ -8,8 +8,9 @@
 
 | 模型 | 服务名 | 最少设备 | 二进制 |
 | --- | --- | ---: | --- |
-| Qwen3.8-Flash-Next IQ3_S 精确档 | `qwen3.8-flash-next` | 1× K100AI 64 GiB | `bin/strata-qwen-iq3s-r112` |
-| Qwen3.8-Flash-Next | `qwen3.8-flash-next` | 1× K100AI 64 GiB | `bin/strata-0.1.47` / `bin/strata-0.1.55` |
+| Qwen3.8-Flash-Next IQ3_S 生产档 | `qwen3.8-flash-next` | 1× K100AI 64 GiB | `bin/strata-qwen-iq3s-r112` |
+| Qwen3.8-Flash-Next IQ3_XXS 快速兼容档 | `qwen3.8-flash-next` | 1× K100AI 64 GiB | `bin/strata-0.1.47` |
+| Qwen3.8-Flash-Next 0.1.55 对照档 | `qwen3.8-flash-next` | 1× K100AI 64 GiB | `bin/strata-0.1.55` |
 | DeepSeek-V4.1-Flash | `deepseek-v4.1-flash` | 2× 或 4× K100AI 64 GiB | `bin/strata-dsv41` |
 
 模型权重、tokenizer、MTP runtime 和 DeepSeek expert profile 不随发布包提供。
@@ -34,24 +35,9 @@ bash scripts/k100ai/preflight.sh
 
 ## Qwen3.8-Flash-Next
 
-IQ3_S 精确档使用完整路由 top-10、QSA 精确 top-k 和目标模型验证的 MTP，
-关闭 prompt-lookup 后缀投机，不启用 Top-k 截断或其他近似 Prefill 算法：
-
-```bash
-K100AI_ASSETS_DIR=/data/k100ai-assets \
-PORT=18096 \
-  bash scripts/k100ai/serve-k100ai.sh qwen-iq3s
-```
-
-默认资产目录为
-`$K100AI_ASSETS_DIR/qwen3.8-flash-next-iq3-s`。`K100AI_QWEN_MTP_VOCAB`
-默认指向该目录的 `mtp/draft_vocab_zh60k.bin`。
-
-Qwen 默认使用 0.1.47 快速档。默认资产目录：
-
-```text
-$K100AI_ASSETS_DIR/qwen3.8-flash-next-iq3-xxs
-```
+v0.3.1 的 `qwen` 入口默认启动 IQ3_S 生产引擎。它使用完整路由 top-10、
+QSA 精确 top-k 和目标模型验证的 MTP，关闭 prompt-lookup 后缀投机，
+不启用 Top-k 截断或其他近似 Prefill 算法：
 
 ```bash
 K100AI_ASSETS_DIR=/data/k100ai-assets \
@@ -59,13 +45,57 @@ PORT=18096 \
   bash scripts/k100ai/serve-k100ai.sh qwen
 ```
 
-切换到 0.1.55 对照档：
+默认资产目录为
+`$K100AI_ASSETS_DIR/qwen3.8-flash-next-iq3-s`。`K100AI_QWEN_MTP_VOCAB`
+默认指向发布包内
+`data/k100ai-qwen-iq3s-draft-vocab-zh60k.bin`。
+
+生产模板参数：
+
+```text
+--expert-cache 24576
+--vram-reserve-mib 2048
+--prefill 20480
+--spec 3
+--spec-min-p 0.5
+--max-context 65536
+--kv int8
+--kv-resident 65536
+--mtp-window 4096
+--mtp-q4 all
+--no-publish-kernel
+--suffix-draft 0
+STRATA_PREFILL_TOPK=10
+```
+
+`qwen-iq3s` 是同一引擎的显式别名。
+
+安装和资产准备见[安装指南](INSTALL.md#qwen38-flash-next)，完整成绩见
+[Qwen v0.3.1 指南](QWEN31.md)。
+
+### 旧 IQ3_XXS 快速档
+
+旧快速档使用 `qwen-iq3xxs` 入口，资产目录为
+`$K100AI_ASSETS_DIR/qwen3.8-flash-next-iq3-xxs`：
+
+```bash
+K100AI_ASSETS_DIR=/data/k100ai-assets \
+PORT=18096 \
+  bash scripts/k100ai/serve-k100ai.sh qwen-iq3xxs
+```
+
+它使用 IQ3_XXS、INT8 KV、24,576 expert slots、`--spec 6` 和 MTP。
+该路径允许数值漂移，不保证逐位一致，不属于 v0.3.1 IQ3_S 精确路径。
+
+### 旧 0.1.55 对照档
+
+显式切换引擎并继续使用 IQ3_XXS 资产：
 
 ```bash
 K100AI_QWEN_ENGINE=bin/strata-0.1.55 \
 K100AI_ASSETS_DIR=/data/k100ai-assets \
 PORT=18096 \
-  bash scripts/k100ai/serve-k100ai.sh qwen
+  bash scripts/k100ai/serve-k100ai.sh qwen-iq3xxs
 ```
 
 可单独覆盖以下资产路径：
@@ -76,9 +106,11 @@ K100AI_QWEN_NATIVE
 K100AI_QWEN_PLE
 K100AI_QWEN_TOKENIZER
 K100AI_QWEN_MTP_RT
+K100AI_QWEN_MTP_VOCAB
 ```
 
-默认快速档采用 IQ3_XXS、INT8 KV、24,576 expert slots、`--spec 6` 和 MTP。它启用 gfx928 prompt MMAC、fused expert 和 HC upmix，允许数值漂移，不保证逐位一致。精确结果和对照数据见[验证记录](VALIDATION.md#qwen-精度和快速档验收)。
+旧快速档与 0.1.55 的历史精度和对照数据见
+[验证记录的历史章节](VALIDATION.md#历史-qwen-023-快速档与对照档)。
 
 ## DeepSeek-V4.1-Flash
 
@@ -160,4 +192,6 @@ OUT=api-dsv41 \
 - 只验证 K100AI/gfx928、Linux x86_64 和 DTK 2604。
 - 不自动停止其他服务或研究容器；切换模型前先停止当前服务。
 - DeepSeek DSpark 的输出速度会随内容、draft 命中率和负载波动。
+- Qwen v0.3.1 生产模板实测到 32K 输入，配置 65,536-token KV。完整
+  65,536-token 语义质量尚未验证。
 - 完整 1M context 尚未完成质量评测。

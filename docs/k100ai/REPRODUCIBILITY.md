@@ -2,7 +2,9 @@
 
 [返回首页](../../README.md) · [文档索引](README.md) · [来源与校验](PROVENANCE.md)
 
-本页说明如何从 v0.3.0 发布包验证二进制、准备模型输入、启动服务并重复质量与 API 验收。固定构建环境为 **K100AI/gfx928、Linux x86_64、DTK 2604**。
+本页说明如何从 v0.3.1 发布包验证二进制、准备模型输入、启动服务并重复
+质量与 API 验收。固定构建环境为 **K100AI/gfx928、Linux x86_64、
+DTK 2604**。
 
 ## 发布输入
 
@@ -10,11 +12,15 @@
 | --- | --- |
 | 运行镜像 | [安装指南](INSTALL.md#安装) |
 | DeepSeek 三套配置 | `configs/k100ai/*-prod.json` |
-| Qwen 模板 | `configs/k100ai/qwen-server.template.json` |
+| Qwen v0.3.1 生产模板 | `configs/k100ai/qwen-iq3s-r112.template.json` |
+| Qwen 旧引擎模板 | `configs/k100ai/qwen-server.template.json` |
 | 模型与资产来源 | [已固定的 revision 和 SHA-256](PROVENANCE.md) |
+| Qwen v0.3.1 完整方法 | [Qwen v0.3.1 指南](QWEN31.md) |
 | DeepSeek 最终参数 | [DeepSeek-V4.1 指南](DEEPSEEK41.md#启用参数) |
 
-模型权重、tokenizer、MTP runtime 和 expert profile 不进入发布归档。下载后按发布包内的 `BUILD.json`、源码树中的 `BUILD_INFO.json` 和 `configs/k100ai/release-inputs.json` 核对 revision、文件大小与 SHA-256。
+模型权重、tokenizer 和 MTP runtime 不进入发布归档。expert profile 与
+IQ3_S draft vocabulary 随发布包提供。下载后按 `BUILD_INFO.json` 和
+`configs/k100ai/release-inputs.json` 核对 revision、文件大小与 SHA-256。
 
 ## 校验发布包
 
@@ -22,15 +28,20 @@
 sha256sum -c SHA256SUMS
 ```
 
-校验三个生产二进制：
+校验四个生产二进制：
 
 ```bash
-sha256sum bin/strata-0.1.47 bin/strata-0.1.55 bin/strata-dsv41
+sha256sum \
+  bin/strata-qwen-iq3s-r112 \
+  bin/strata-0.1.47 \
+  bin/strata-0.1.55 \
+  bin/strata-dsv41
 ```
 
 预期值：
 
 ```text
+102b4b412068a68588883c13a28103600d8b078785da9dcbbda34c440e9a5074  bin/strata-qwen-iq3s-r112
 bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9  bin/strata-0.1.47
 25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e  bin/strata-0.1.55
 4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6  bin/strata-dsv41
@@ -40,7 +51,16 @@ DeepSeek 二进制的生产来源、源码对账和 clean build 记录见 [PROVE
 
 ## 启动与 API 验收
 
-先准备模型资产，再按 [安装指南](INSTALL.md) 启动 Qwen 或 DeepSeek。每次 GPU 工作前执行：
+先准备 Qwen IQ3_S 或 DeepSeek 模型资产，再按 [安装指南](INSTALL.md)
+启动服务。Qwen 资产恢复脚本为：
+
+```bash
+K100AI_ASSETS_DIR=/data/k100ai-assets \
+  bash scripts/k100ai/fetch-qwen-iq3s.sh \
+  /data/k100ai-assets/qwen3.8-flash-next-iq3-s
+```
+
+每次 GPU 工作前执行：
 
 ```bash
 bash scripts/k100ai/preflight.sh
@@ -50,7 +70,10 @@ API 验收命令见[运行指南](RUNTIME.md#api-验收)。固定四项测试覆
 
 ## 性能与质量
 
-- Qwen 快速档使用 top-1、余弦相似度和 greedy 前缀验收，不要求逐位一致。
+- Qwen v0.3.1 IQ3_S 使用 input exact、output exact、retrieval、
+  Native / MTP 输出哈希和确定性 draft 验证。
+- 旧 Qwen 快速档使用 top-1、余弦相似度和 greedy 前缀验收，不要求逐位
+  一致。
 - DeepSeek 三套生产配置要求 PPL 相对基线不超过 `+2%`，并执行固定 API 测试。
 - 原始时间、配置和限制分别记录在 [DEEPSEEK41.md](DEEPSEEK41.md) 与 [VALIDATION.md](VALIDATION.md)。
 
