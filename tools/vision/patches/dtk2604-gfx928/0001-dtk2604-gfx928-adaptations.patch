@@ -1,0 +1,81 @@
+--- a/ggml/src/ggml-hip/CMakeLists.txt
++++ b/ggml/src/ggml-hip/CMakeLists.txt
+@@ -51,7 +51,7 @@
+     find_package(rccl REQUIRED)
+ endif()
+ 
+-if (${hip_VERSION} VERSION_LESS 6.1)
++if (${hip_VERSION} VERSION_LESS 5.0)   # [k100ai] DTK 5.2: no real 6.1 API deps, all have fallbacks
+     message(FATAL_ERROR "At least ROCM/HIP V6.1 is required")
+ endif()
+ 
+--- a/ggml/src/ggml-cuda/vendors/hip.h
++++ b/ggml/src/ggml-cuda/vendors/hip.h
+@@ -119,7 +119,12 @@
+ #define cudaStreamDestroy hipStreamDestroy
+ #define cudaStreamFireAndForget hipStreamFireAndForget
+ #define cudaStreamNonBlocking hipStreamNonBlocking
++// [k100ai] DTK 5.2 galaxyhip lacks hipStreamPerThread; use default stream (0)
++#if !defined(HIP_VERSION) || HIP_VERSION < 50500000
++#define cudaStreamPerThread ((hipStream_t)0)
++#else
+ #define cudaStreamPerThread hipStreamPerThread
++#endif
+ #define cudaStreamSynchronize hipStreamSynchronize
+ #define cudaStreamWaitEvent hipStreamWaitEvent
+ #define cudaGraphExec_t hipGraphExec_t
+@@ -200,6 +205,10 @@
+ #define CDNA3
+ #endif // defined(__gfx942__)
+ 
++#if defined(__gfx928__)
++#define HYGON_GFX928
++#endif // defined(__gfx928__)
++
+ #if defined(__gfx90a__)
+ #define CDNA2
+ #endif // defined(__gfx90a__)
+@@ -303,3 +312,21 @@
+     }
+     return c;
+ }
++
++// [k100ai] DTK 5.2 cooperative_groups asm bug on gfx928 → disable coop kernels
++#define GGML_HIP_NO_COOP 1
++
++// [k100ai] Minimal cooperative_groups stubs for DTK 5.2 (asm bug in real header on gfx928).
++// These compile but are never called: supports_cooperative_launch is false at runtime.
++#if defined(GGML_HIP_NO_COOP)
++namespace cooperative_groups {
++    struct grid_group {
++        __device__ void sync() const {
++            // grid sync requires cooperative launch; this stub is never reached
++        }
++        __device__ unsigned long long size() const { return 1; }
++        __device__ unsigned long long thread_rank() const { return 0; }
++    };
++    __device__ inline grid_group this_grid() { return grid_group(); }
++}
++#endif
+--- a/ggml/src/ggml-cuda/softmax.cu
++++ b/ggml/src/ggml-cuda/softmax.cu
+@@ -2,12 +2,16 @@
+ #include "ggml.h"
+ #include "softmax.cuh"
+ 
+-#ifdef GGML_USE_HIP
+-#include <hip/hip_cooperative_groups.h>
++// [k100ai] DTK 5.2's cooperative_groups has an asm constraint bug on gfx928;
++// the cooperative kernel path falls back to the standard variant at runtime.
++#if defined(GGML_USE_HIP)
++  #if !defined(GGML_HIP_NO_COOP)
++  #include <hip/hip_cooperative_groups.h>
++  #endif
+ #else
+ #include <cooperative_groups.h>
+ #include <cooperative_groups/reduce.h>
+-#endif // GGML_USE_HIP
++#endif
+ 
+ #include <cstdint>
+ #include <utility>
