@@ -33,6 +33,7 @@
 | 版本 | 发行记录 |
 | --- | --- |
 | [全部版本记录](release-notes/README.md) | 按版本查看功能和发布资产 |
+| v0.3.1 | [Qwen3.8-Flash-Next IQ3_S 精确引擎](release-notes/v0.3.1.md) |
 | v0.3.0 | [DeepSeek-V4.1 与 Qwen3.8-Flash-Next](release-notes/v0.3.0.md) |
 
 ## 历史资料

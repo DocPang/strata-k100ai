@@ -2,8 +2,9 @@
 
 [返回首页](../../README.md) · [文档索引](README.md) · [运行指南](RUNTIME.md)
 
-适用版本：**v0.3.0**。本版同时提供：
+适用版本：**v0.3.1**。本版同时提供：
 
+- Qwen3.8-Flash-Next IQ3_S 精确引擎
 - Qwen3.8-Flash-Next 0.1.47 默认引擎
 - Qwen3.8-Flash-Next 0.1.55 对照引擎
 - DeepSeek-V4.1-Flash `strata-dsv41`
@@ -31,12 +32,12 @@
 ## 安装
 
 ```bash
-BASE=https://github.com/DocPang/strata-k100ai/releases/download/v0.3.0
-curl -fLO "$BASE/strata-k100ai-v0.3.0.tar.gz"
-curl -fLO "$BASE/strata-k100ai-v0.3.0.tar.gz.sha256"
-sha256sum -c strata-k100ai-v0.3.0.tar.gz.sha256
-tar -xzf strata-k100ai-v0.3.0.tar.gz
-cd strata-k100ai-v0.3.0
+BASE=https://github.com/DocPang/strata-k100ai/releases/download/v0.3.1
+curl -fLO "$BASE/strata-k100ai-v0.3.1.tar.gz"
+curl -fLO "$BASE/strata-k100ai-v0.3.1.tar.gz.sha256"
+sha256sum -c strata-k100ai-v0.3.1.tar.gz.sha256
+tar -xzf strata-k100ai-v0.3.1.tar.gz
+cd strata-k100ai-v0.3.1
 sha256sum -c SHA256SUMS
 bash scripts/k100ai/setup-runtime.sh
 bash scripts/k100ai/preflight.sh
@@ -49,6 +50,14 @@ harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59c
 ```
 
 ## Qwen3.8-Flash-Next
+
+IQ3_S 精确档：
+
+```bash
+K100AI_ASSETS_DIR=/data/k100ai-assets \
+PORT=18096 \
+  bash scripts/k100ai/serve-k100ai.sh qwen-iq3s
+```
 
 默认资产目录：
 

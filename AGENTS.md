@@ -1,7 +1,7 @@
 # AGENTS.md
 
 This repository is the `strata-k100ai` product branch for **Hygon K100AI / gfx928** on
-**Linux x86_64 with DTK 2604**. Product version is **v0.3.0**.
+**Linux x86_64 with DTK 2604**. Product version is **v0.3.1**.
 
 Read [docs/k100ai/README.md](docs/k100ai/README.md) first. It is the index for the
 current installation, runtime, model, validation, provenance and reproduction
@@ -12,8 +12,9 @@ documents. Historical v0.2.3 material is under
 
 - **DeepSeek-V4.1-Flash**: `bin/strata-dsv41`, with EXL3 TP1, EXL3 TP4 and
   GGUF TP2 production configurations.
-- **Qwen3.8-Flash-Next**: `bin/strata-0.1.47` is the default fast engine and
-  `bin/strata-0.1.55` is the exact comparison engine.
+- **Qwen3.8-Flash-Next**: `bin/strata-0.1.47` is the default fast engine,
+  `bin/strata-0.1.55` is the exact comparison engine and
+  `bin/strata-qwen-iq3s-r112` is the IQ3_S production engine.
 
 The release contains engines and runtime code. Model weights, tokenizers, MTP
 runtime files and DeepSeek expert profiles are external assets.

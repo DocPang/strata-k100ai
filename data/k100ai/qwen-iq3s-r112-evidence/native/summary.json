@@ -1,0 +1,138 @@
+{
+  "prefill_median": 2863.75,
+  "decode_median": 45.8,
+  "rows": [
+    {
+      "content": "The three secret codes found in the records, in order of appearance, are:\n\n1.  **ALPHA-7391** (Found in Record 0)\n2.  **BRAVO-2846** (Found in Record 767)\n3.  **CHARLIE-6158** (Found in Record 1534)\n\n***\n\n# Comprehensive Inventory Auditing Guide for Warehouse Cedar\n\n## Introduction: The Imperative of Precision in Modern Warehousing\n\nIn the contemporary logistics landscape, inventory management is no longer merely a back-office administrative task; it is the central nervous system of supply chain operations. For facilities like Warehouse Cedar, which operates under a strict protocol of daily inventory checks, the accuracy of data is paramount. The records provided indicate a highly standardized environment where every unit is tracked with blue crates and green labels, suggesting a visual management system designed for rapid identification and error reduction. However, standardization alone does not guarantee accuracy. Discrepancies, shrinkage, misplacement, and data entry errors can accumulate silently, leading to significant financial losses and operational bottlenecks.\n\nThis guide provides a detailed, step-by-step framework for conducting rigorous inventory audits. It is designed to complement",
+      "usage": {
+        "prompt_tokens": 32768,
+        "completion_tokens": 256,
+        "total_tokens": 33024,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 32768,
+        "prompt_ms": 11471.7,
+        "prompt_per_token_ms": 0.35,
+        "prompt_per_second": 2856.4,
+        "predicted_n": 256,
+        "predicted_ms": 5600.4,
+        "predicted_per_token_ms": 21.877,
+        "predicted_per_second": 45.7,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "ttft_s": 11.537841610610485,
+      "wall_s": 17.113390490412712,
+      "arm": "baseline",
+      "repeat": 0,
+      "target": 32768,
+      "input_exact": true,
+      "output_exact": true,
+      "retrieval": true,
+      "output_sha256": "93c693fb9293847b6ae181863bca9be71a8421db3c7f0f974f495464f5f04de2"
+    },
+    {
+      "content": "The three secret codes found in the records are:\n\n1.  **ALPHA-7391** (Found in Record 0)\n2.  **BRAVO-2846** (Found in Record 767)\n3.  **CHARLIE-6158** (Found in Record 1534)\n\n***\n\n# Comprehensive Inventory Auditing Guide for Warehouse Cedar\n\n## Introduction: The Imperative of Precision in Modern Warehousing\n\nIn the contemporary logistics landscape, inventory management is no longer merely a back-office administrative task; it is the central nervous system of supply chain operations. For facilities like Warehouse Cedar, which operates under a standardized protocol of daily checks, blue crate storage, and green label identification, the margin for error is virtually non-existent. A discrepancy of even a single unit can cascade into stockouts, overstocking, financial misreporting, and customer dissatisfaction. This guide provides a detailed, step-by-step framework for conducting rigorous inventory audits, ensuring that the physical reality of the warehouse matches the digital records with absolute precision.\n\nThe presence of specific \"secret codes\" within the data logs, such as ALPHA-7391, BRAVO-2846, and CHAR",
+      "usage": {
+        "prompt_tokens": 32768,
+        "completion_tokens": 256,
+        "total_tokens": 33024,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 32768,
+        "prompt_ms": 11420.0,
+        "prompt_per_token_ms": 0.349,
+        "prompt_per_second": 2869.4,
+        "predicted_n": 256,
+        "predicted_ms": 5585.7,
+        "predicted_per_token_ms": 21.819,
+        "predicted_per_second": 45.8,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "ttft_s": 11.486269413493574,
+      "wall_s": 17.047213764861226,
+      "arm": "baseline",
+      "repeat": 1,
+      "target": 32768,
+      "input_exact": true,
+      "output_exact": true,
+      "retrieval": true,
+      "output_sha256": "831981ddc871d8469176a00848809c42c397935c3e4924d12533d505b7dbb268"
+    },
+    {
+      "content": "The three secret codes found in the records, in order of appearance, are:\n\n1.  **ALPHA-7391** (Found in Record 0)\n2.  **BRAVO-2846** (Found in Record 767)\n3.  **CHARLIE-6158** (Found in Record 1534)\n\n***\n\n# Comprehensive Inventory Auditing Guide for Warehouse Cedar\n\n## Introduction: The Imperative of Precision in Modern Warehousing\n\nIn the contemporary logistics landscape, inventory management is no longer merely a back-office administrative task; it is the central nervous system of supply chain operations. For facilities such as \"Warehouse Cedar,\" which operates under a standardized protocol of daily checks, blue crate storage, and green label identification, the margin for error is effectively zero. The sheer volume of data—exemplified by the thousands of records processed in this benchmark—demonstrates that manual oversight is insufficient. A robust, detailed, and scientifically rigorous inventory auditing guide is essential to maintain accuracy, prevent shrinkage, optimize cash flow, and ensure customer satisfaction.\n\nThis guide provides a comprehensive framework for conducting inventory audits at Warehouse Cedar. It moves beyond simple counting to encompass strategic planning,",
+      "usage": {
+        "prompt_tokens": 32768,
+        "completion_tokens": 256,
+        "total_tokens": 33024,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 32768,
+        "prompt_ms": 11440.8,
+        "prompt_per_token_ms": 0.349,
+        "prompt_per_second": 2864.1,
+        "predicted_n": 256,
+        "predicted_ms": 5586.9,
+        "predicted_per_token_ms": 21.824,
+        "predicted_per_second": 45.8,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "ttft_s": 11.505769446492195,
+      "wall_s": 17.06771505717188,
+      "arm": "baseline",
+      "repeat": 2,
+      "target": 32768,
+      "input_exact": true,
+      "output_exact": true,
+      "retrieval": true,
+      "output_sha256": "76849a298e423649b13f5cfefb62c4afbf0a12b80ba34d62c25ddd07f89bd490"
+    },
+    {
+      "content": "The three secret codes found in the records, in order of appearance, are:\n\n1.  **ALPHA-7391** (Found in Record 0)\n2.  **BRAVO-2846** (Found in Record 767)\n3.  **CHARLIE-6158** (Found in Record 1534)\n\n***\n\n# Comprehensive Inventory Auditing Guide for Warehouse Cedar\n\n## Introduction: The Imperative of Precision in Modern Warehousing\n\nIn the contemporary logistics landscape, inventory management is no longer merely a back-office administrative task; it is the central nervous system of supply chain operations. For facilities like Warehouse Cedar, which operates under a standardized protocol of daily checks, blue crate storage, and green label identification, the margin for error is effectively zero. A discrepancy in inventory data does not just result in a financial loss; it cascades into delayed shipments, customer dissatisfaction, increased labor costs, and potential safety hazards.\n\nThis guide provides a detailed, step-by-step framework for conducting rigorous inventory audits. It is designed to complement the existing daily checks mentioned in the operational records, transforming routine observations into a robust system of quality control and data integrity. By adhering to these protocols,",
+      "usage": {
+        "prompt_tokens": 32768,
+        "completion_tokens": 256,
+        "total_tokens": 33024,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 32768,
+        "prompt_ms": 11443.9,
+        "prompt_per_token_ms": 0.349,
+        "prompt_per_second": 2863.4,
+        "predicted_n": 256,
+        "predicted_ms": 5580.0,
+        "predicted_per_token_ms": 21.797,
+        "predicted_per_second": 45.9,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "ttft_s": 11.509221769869328,
+      "wall_s": 17.06452013272792,
+      "arm": "baseline",
+      "repeat": 3,
+      "target": 32768,
+      "input_exact": true,
+      "output_exact": true,
+      "retrieval": true,
+      "output_sha256": "c49911d19a98f43a8da58464a70221647fcacdbbc588285288c80e3d15c6bfd0"
+    }
+  ]
+}

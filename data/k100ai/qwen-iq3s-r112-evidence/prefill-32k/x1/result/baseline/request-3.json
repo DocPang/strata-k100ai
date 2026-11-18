@@ -1,0 +1,33 @@
+{
+  "content": "The three secret codes found in the records, in order of appearance, are:\n\n1.  **ALPHA-7391** (Found in Record 0)\n2.  **BRAVO-2846** (Found in Record 767)\n3.  **CHARLIE-6158** (Found in Record 1534)\n\n***\n\n# Comprehensive Inventory Auditing Guide for Warehouse Cedar\n\n## Introduction: The Imperative of Precision in Modern Warehousing\n\nIn the contemporary logistics landscape, inventory management is no longer merely a back-office administrative task; it is the central nervous system of supply chain operations. For facilities like Warehouse Cedar, which operates under a standardized protocol of daily checks, blue crate storage, and green label identification, the margin for error is effectively zero. A discrepancy in inventory data does not just result in a financial loss; it cascades into delayed shipments, customer dissatisfaction, increased labor costs, and potential safety hazards.\n\nThis guide provides a detailed, step-by-step framework for conducting rigorous inventory audits. It is designed to complement the existing daily checks mentioned in the operational records, transforming routine observations into a robust system of quality control and data integrity. By adhering to these protocols,",
+  "usage": {
+    "prompt_tokens": 32768,
+    "completion_tokens": 256,
+    "total_tokens": 33024,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    }
+  },
+  "timings": {
+    "cache_n": 0,
+    "prompt_n": 32768,
+    "prompt_ms": 11469.9,
+    "prompt_per_token_ms": 0.35,
+    "prompt_per_second": 2856.9,
+    "predicted_n": 256,
+    "predicted_ms": 3703.5,
+    "predicted_per_token_ms": 14.467,
+    "predicted_per_second": 69.1,
+    "draft_n": 187,
+    "draft_n_accepted": 128
+  },
+  "ttft_s": 11.539155513979495,
+  "wall_s": 15.217774098739028,
+  "arm": "baseline",
+  "repeat": 3,
+  "target": 32768,
+  "input_exact": true,
+  "output_exact": true,
+  "retrieval": true,
+  "output_sha256": "c49911d19a98f43a8da58464a70221647fcacdbbc588285288c80e3d15c6bfd0"
+}

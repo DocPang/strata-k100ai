@@ -1,0 +1,33 @@
+{
+  "content": "The three secret codes found in the records, in order of appearance, are:\n\n1.  **ALPHA-7391** (Found in Record 0)\n2.  **BRAVO-2846** (Found in Record 767)\n3.  **CHARLIE-6158** (Found in Record 1534)\n\n***\n\n# Comprehensive Inventory Auditing Guide for Warehouse Cedar\n\n## Introduction: The Imperative of Precision in Modern Warehousing\n\nIn the contemporary logistics landscape, inventory management is no longer merely a back-office administrative task; it is the central nervous system of supply chain operations. For facilities like Warehouse Cedar, which operates under a standardized protocol of daily checks, blue crates, and green labels, the margin for error is effectively zero. The sheer volume of data—exemplified by the thousands of records processed in this benchmark—demonstrates that manual oversight is insufficient. A robust, detailed, and scientifically rigorous inventory auditing guide is essential to maintain accuracy, prevent shrinkage, optimize cash flow, and ensure customer satisfaction.\n\nThis guide provides a comprehensive framework for conducting inventory audits at Warehouse Cedar. It moves beyond basic counting techniques to encompass strategic planning, technological integration,",
+  "usage": {
+    "prompt_tokens": 32768,
+    "completion_tokens": 256,
+    "total_tokens": 33024,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    }
+  },
+  "timings": {
+    "cache_n": 0,
+    "prompt_n": 32768,
+    "prompt_ms": 11484.1,
+    "prompt_per_token_ms": 0.35,
+    "prompt_per_second": 2853.3,
+    "predicted_n": 256,
+    "predicted_ms": 3549.5,
+    "predicted_per_token_ms": 13.865,
+    "predicted_per_second": 72.1,
+    "draft_n": 178,
+    "draft_n_accepted": 133
+  },
+  "ttft_s": 11.55272779520601,
+  "wall_s": 15.07718975096941,
+  "arm": "baseline",
+  "repeat": 5,
+  "target": 32768,
+  "input_exact": true,
+  "output_exact": true,
+  "retrieval": true,
+  "output_sha256": "7dd7e99cf5ba936e61ed69a7091f1848a004ca0e1b346d0d5570d8b8f17e9c31"
+}

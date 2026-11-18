@@ -9,6 +9,7 @@ bench/prompts/** -text
 bin/strata text eol=lf
 bin/strata-0.1.47 binary
 bin/strata-0.1.55 binary
+bin/strata-qwen-iq3s-r112 binary
 bin/strata-dsv41 binary
 
 # copies of real packs' native_experts.txt, parsed byte for byte by tests/core/expert_layout_test.cpp

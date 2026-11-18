@@ -1,0 +1,33 @@
+{
+  "content": "The three secret codes found in the records, in order, are:\n\n1.  **ALPHA-7391** (Found in Record 0)\n2.  **BRAVO-2846** (Found in Record 195)\n3.  **CHARLIE-6158** (Found in Record 390)\n\n***\n\n# Comprehensive Inventory Auditing Guide for Warehouse Cedar\n\n## Introduction: The Imperative of Precision in Modern Warehousing\n\nIn the contemporary logistics landscape, inventory management is no longer merely a back-office administrative task; it is the central nervous system of supply chain operations. For facilities such as Warehouse Cedar, which operates under a standardized protocol involving blue crates and green labels with daily inventory checks, the margin for error is effectively zero. The consistency observed in the provided records—where every single entry from Record 0 to Record 390 mirrors the same operational status—suggests a highly controlled environment. However, the presence of embedded \"secret codes\" within these repetitive records highlights a critical vulnerability: the potential for data integrity issues, unauthorized access, or hidden anomalies within seemingly uniform datasets.\n\nThis guide provides a detailed, step-by-step framework for conducting rigorous inventory audits. It",
+  "usage": {
+    "prompt_tokens": 8192,
+    "completion_tokens": 256,
+    "total_tokens": 8448,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    }
+  },
+  "timings": {
+    "cache_n": 0,
+    "prompt_n": 8192,
+    "prompt_ms": 3015.8,
+    "prompt_per_token_ms": 0.368,
+    "prompt_per_second": 2716.4,
+    "predicted_n": 256,
+    "predicted_ms": 3617.8,
+    "predicted_per_token_ms": 14.132,
+    "predicted_per_second": 70.8,
+    "draft_n": 184,
+    "draft_n_accepted": 133
+  },
+  "ttft_s": 3.0563168339431286,
+  "wall_s": 6.650060875341296,
+  "arm": "baseline",
+  "repeat": 7,
+  "target": 8192,
+  "input_exact": true,
+  "output_exact": true,
+  "retrieval": true,
+  "output_sha256": "76071d0ba88e152b67945c32423777b241ed1f4a970986167fd761ce8ac085c9"
+}

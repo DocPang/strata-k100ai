@@ -2,7 +2,7 @@
 
 [返回首页](../../README.md) · [文档索引](README.md) · [安装指南](INSTALL.md)
 
-适用版本：**v0.3.0**。
+适用版本：**v0.3.1**。
 
 ## 生产二进制
 
@@ -11,6 +11,7 @@
 | `bin/strata-0.1.47` | 45,674,152 B | `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9` |
 | `bin/strata-0.1.55` | 49,496,856 B | `25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e` |
 | `bin/strata-dsv41` | 23,941,864 B | `4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6` |
+| `bin/strata-qwen-iq3s-r112` | 53,884,424 B | `102b4b412068a68588883c13a28103600d8b078785da9dcbbda34c440e9a5074` |
 
 Qwen 两个二进制沿用 v0.2.3 已验证版本。DeepSeek 二进制在 R178 完成增量构建
 与 clean rebuild 同哈希验证，随后通过 R179 四卡 A/B 和生产 postinstall。
@@ -39,6 +40,19 @@ DeepSeek 发布源码取自：
 
 Qwen 源码、配置、测试和打包脚本来自 v0.2.3 发布树。两个二进制保留原始
 SHA-256，便于确认它们与 v0.2.3 验证结果对应。
+
+v0.3.1 的 IQ3_S 引擎来源为 K100AI Qwen 研究树 HEAD
+`ca83b39d212c35bb03eba1960578f273294f3e68`。R112 只替换 IQ3_S/IQ4_NL
+专家的 mode 8 派发，基础对象与锚定 R54 构建固定。关键源码 SHA-256：
+
+| 文件 | SHA-256 |
+| --- | --- |
+| `src/kernels/cuda/iq_kernels.cu` | `031918c19e542a1687888eb769d677a3c760f4c7e69a291032448ad8dffc6ee1` |
+| `src/kernels/cuda/qsa_select.cu` | `7a9156c96ce24b69e0131304362b55d3ba7642d083a0bac93225bebfbec8f542` |
+| `src/prefill/prefill.cpp` | `2188db7c673085069fec066ecf7b90f9d67aa2c2163f6f642c11c6ab5471701b` |
+
+完整快照、构建命令和精确性说明随 Release
+`strata-qwen-iq3s-r112-source.tar.gz` 提供。
 
 ## 构建环境
 

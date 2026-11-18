@@ -2,7 +2,7 @@
 
 [返回首页](../../README.md) · [安装指南](../../docs/k100ai/INSTALL.md) · [运行指南](../../docs/k100ai/RUNTIME.md)
 
-本目录收纳 v0.3.0 的 DeepSeek-V4.1-Flash 生产配置，以及 Qwen3.8-Flash-Next 的运行模板。三套 DeepSeek 配置共用同一个生产二进制：
+本目录收纳 v0.3.1 的 DeepSeek-V4.1-Flash 生产配置，以及 Qwen3.8-Flash-Next 的运行模板。三套 DeepSeek 配置共用同一个生产二进制：
 
 ```text
 strata-dsv41
@@ -20,6 +20,18 @@ SHA-256 4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6
 配置中的 `description_zh`、`notes_zh`、`measured_zh`、`quality_zh`、`binary_sha256` 和 `provenance_zh` 是发布元数据。服务端只消费运行参数，不会把未知元数据传给引擎。
 
 ## Qwen 配置
+
+`qwen-iq3s-r112.template.json` 对应新增的 IQ3_S 精确引擎：
+
+```bash
+K100AI_ASSETS_DIR=/data/k100ai-assets \
+PORT=18096 \
+  bash scripts/k100ai/serve-k100ai.sh qwen-iq3s
+```
+
+模板固定 `--max-context 65536`、`--kv-resident 65536`、
+`--no-publish-kernel`、`--suffix-draft 0` 和
+`STRATA_PREFILL_TOPK=10`。它保留完整路由并关闭 prompt-lookup 后缀投机。
 
 `qwen-server.template.json` 是可提交的模板，`qwen-server.json` 是生成后的本机配置。启动器通过 `scripts/k100ai/render-config.py` 渲染模板：
 

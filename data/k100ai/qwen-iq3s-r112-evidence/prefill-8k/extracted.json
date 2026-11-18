@@ -1,0 +1,42 @@
+[
+  {
+    "prompt_n": 8192,
+    "prefill_tps": 2665.1,
+    "decode_tps": 68.9
+  },
+  {
+    "prompt_n": 8192,
+    "prefill_tps": 2718.1,
+    "decode_tps": 69.5
+  },
+  {
+    "prompt_n": 8192,
+    "prefill_tps": 2719.3,
+    "decode_tps": 72.4
+  },
+  {
+    "prompt_n": 8192,
+    "prefill_tps": 2716.2,
+    "decode_tps": 71.0
+  },
+  {
+    "prompt_n": 8192,
+    "prefill_tps": 2714.9,
+    "decode_tps": 71.9
+  },
+  {
+    "prompt_n": 8192,
+    "prefill_tps": 2713.3,
+    "decode_tps": 73.1
+  },
+  {
+    "prompt_n": 8192,
+    "prefill_tps": 2715.6,
+    "decode_tps": 67.1
+  },
+  {
+    "prompt_n": 8192,
+    "prefill_tps": 2716.4,
+    "decode_tps": 70.8
+  }
+]

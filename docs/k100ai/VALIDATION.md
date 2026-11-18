@@ -2,19 +2,31 @@
 
 [返回首页](../../README.md) · [文档索引](README.md) · [来源与校验](PROVENANCE.md)
 
-本页保留 Qwen 在 v0.2.3 的完整验收数据，并汇总 v0.3.0 的验证边界。v0.3.0 的 DeepSeek 三套生产配置、PPL、32K 输入和 DSpark 结果见 [DeepSeek-V4.1 指南](DEEPSEEK41.md)。Qwen 的两个二进制未改变，因此继续使用相同验收记录。
+本页保留 Qwen 在 v0.2.3 的完整验收数据，并汇总 v0.3.0 的验证边界。v0.3.1 新增 Qwen3.8-Flash-Next IQ3_S 精确引擎，其 32K 测试、确定性与速度见 [v0.3.1 发布说明](release-notes/v0.3.1.md)。v0.3.0 的 DeepSeek 三套生产配置、PPL、32K 输入和 DSpark 结果见 [DeepSeek-V4.1 指南](DEEPSEEK41.md)。
 
 所有 GPU 测试只使用 HCU0–3。每个 case 前执行 preflight，结束后确认没有测试容器或设备 lease。
 
 ## 构建和算子测试
 
-v0.3.0 发布包包含三个生产二进制，运行环境均为 DTK 2604：
+v0.3.1 发布包包含四个 Qwen/DeepSeek 生产二进制，运行环境均为 DTK 2604：
 
 | 目标 | 大小 | SHA-256 |
 | --- | ---: | --- |
 | Qwen 默认快速档 `strata-0.1.47` | 45,674,152 B | `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9` |
 | Qwen 当前对照档 `strata-0.1.55` | 49,496,856 B | `25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e` |
 | DeepSeek `strata-dsv41` | 23,941,864 B | `4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6` |
+| Qwen IQ3_S 精确档 `strata-qwen-iq3s-r112` | 53,884,424 B | `102b4b412068a68588883c13a28103600d8b078785da9dcbbda34c440e9a5074` |
+
+IQ3_S 精确档在单张 K100AI、32K 输入和 256 输出下实测：
+
+| 路径 | Decode 四次 | 中位 | 质量门禁 |
+| --- | ---: | ---: | --- |
+| Native | 45.7 / 45.8 / 45.8 / 45.9 tok/s | 45.8 tok/s | 4 / 4 全通过 |
+| MTP | 68.4 / 69.2 / 70.8 / 71.7 tok/s | 70.0 tok/s | 4 / 4 全通过 |
+
+Native / MTP 的输出 SHA-256 在四个配对上完全相同。8K / 32K Prefill
+范围分别为 `2,665.1–2,719.3` 与 `2,846.4–2,869.4 tok/s`。原始请求与
+日志见发布包 `data/k100ai/qwen-iq3s-r112-evidence/`。
 
 v0.2.3 的算子测试还包括 `ds4_gguf_test`，覆盖 BF16、MXFP4、Q8_0、Q2_K、Q3_K、Q4_K、IQ4_XS、IQ3_S、IQ2_XXS 和 IQ2_S 的 expert、CPU lane、SwiGLU、combine 与 KV packed rows。该项属于历史构建记录。
 

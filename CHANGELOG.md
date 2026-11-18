@@ -1,5 +1,22 @@
 # 更新记录
 
+## v0.3.1 — Qwen3.8-Flash-Next IQ3_S 精确引擎
+
+本小版本新增 Qwen3.8-Flash-Next IQ3_S 单卡生产引擎
+`bin/strata-qwen-iq3s-r112`，并把已验证的精确路径和运行参数固化为发布
+模板。DeepSeek-V4.1-Flash 的三套生产配置与二进制保持与 v0.3.0 一致。
+
+- 32K 输入、256 输出：原生 Decode `45.7–45.9 tok/s`。
+- 同一请求的 MTP：Decode `68.4–71.7 tok/s`，四次中位 `70.0 tok/s`。
+- Prefill：8K `2,665–2,719 tok/s`，32K `2,846–2,869 tok/s`。
+- 默认完整路由 top-10、QSA 精确选择、目标模型验证 MTP，关闭
+  prompt-lookup 后缀投机，不使用 Top-k 截断或其他近似 Prefill 算法。
+- 四个原生与四个 MTP 请求均通过 input exact、output exact 和 retrieval
+  门禁。
+
+发布、口径和来源见
+[`docs/k100ai/release-notes/v0.3.1.md`](docs/k100ai/release-notes/v0.3.1.md)。
+
 ## v0.3.0 — DeepSeek-V4.1 与 Qwen3.8-Flash-Next
 
 本版保留完整 K100AI 项目以及 Qwen3.8-Flash-Next 的两套生产引擎，并固化

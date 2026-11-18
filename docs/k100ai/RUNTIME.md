@@ -2,12 +2,13 @@
 
 [返回首页](../../README.md) · [文档索引](README.md) · [安装指南](INSTALL.md) · [配置目录](../../configs/k100ai/README.md)
 
-适用版本：**v0.3.0**。同一时间只运行一套模型服务。
+适用版本：**v0.3.1**。同一时间只运行一套模型服务。
 
 ## 支持的模型
 
 | 模型 | 服务名 | 最少设备 | 二进制 |
 | --- | --- | ---: | --- |
+| Qwen3.8-Flash-Next IQ3_S 精确档 | `qwen3.8-flash-next` | 1× K100AI 64 GiB | `bin/strata-qwen-iq3s-r112` |
 | Qwen3.8-Flash-Next | `qwen3.8-flash-next` | 1× K100AI 64 GiB | `bin/strata-0.1.47` / `bin/strata-0.1.55` |
 | DeepSeek-V4.1-Flash | `deepseek-v4.1-flash` | 2× 或 4× K100AI 64 GiB | `bin/strata-dsv41` |
 
@@ -32,6 +33,19 @@ bash scripts/k100ai/preflight.sh
 ```
 
 ## Qwen3.8-Flash-Next
+
+IQ3_S 精确档使用完整路由 top-10、QSA 精确 top-k 和目标模型验证的 MTP，
+关闭 prompt-lookup 后缀投机，不启用 Top-k 截断或其他近似 Prefill 算法：
+
+```bash
+K100AI_ASSETS_DIR=/data/k100ai-assets \
+PORT=18096 \
+  bash scripts/k100ai/serve-k100ai.sh qwen-iq3s
+```
+
+默认资产目录为
+`$K100AI_ASSETS_DIR/qwen3.8-flash-next-iq3-s`。`K100AI_QWEN_MTP_VOCAB`
+默认指向该目录的 `mtp/draft_vocab_zh60k.bin`。
 
 Qwen 默认使用 0.1.47 快速档。默认资产目录：
 

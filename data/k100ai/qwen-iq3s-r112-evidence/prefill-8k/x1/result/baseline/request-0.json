@@ -1,0 +1,33 @@
+{
+  "content": "The three secret codes found in the records are:\n1. ALPHA-7391\n2. BRAVO-2846\n3. CHARLIE-6158\n\n***\n\n# Comprehensive Inventory Auditing Guide for Warehouse Cedar\n\n## Introduction: The Critical Role of Inventory Integrity\n\nIn the modern supply chain ecosystem, inventory is not merely a collection of goods sitting on shelves; it is a dynamic asset that represents capital, operational efficiency, and customer satisfaction. For Warehouse Cedar, which operates under a standardized protocol involving blue crates and green labels with daily inventory checks, the integrity of this system is paramount. This guide provides a detailed, step-by-step framework for conducting rigorous inventory audits. It is designed to ensure that the physical stock matches the digital records, to identify discrepancies early, and to maintain the high standards implied by the \"daily check\" protocol mentioned in the operational records.\n\nAn effective audit is not just about counting items; it is about validating processes, ensuring data accuracy, and identifying systemic weaknesses. Whether you are an internal auditor, a warehouse manager, or a third-party consultant, this guide will serve as your definitive manual for maintaining inventory excellence at Warehouse Cedar.\n\n## Phase 1: Pre-Audit Preparation and Planning\n\nBefore any",
+  "usage": {
+    "prompt_tokens": 8192,
+    "completion_tokens": 256,
+    "total_tokens": 8448,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    }
+  },
+  "timings": {
+    "cache_n": 0,
+    "prompt_n": 8192,
+    "prompt_ms": 3073.8,
+    "prompt_per_token_ms": 0.375,
+    "prompt_per_second": 2665.1,
+    "predicted_n": 256,
+    "predicted_ms": 3717.1,
+    "predicted_per_token_ms": 14.52,
+    "predicted_per_second": 68.9,
+    "draft_n": 181,
+    "draft_n_accepted": 126
+  },
+  "ttft_s": 3.114015754312277,
+  "wall_s": 6.806723738089204,
+  "arm": "baseline",
+  "repeat": 0,
+  "target": 8192,
+  "input_exact": true,
+  "output_exact": true,
+  "retrieval": true,
+  "output_sha256": "8ac21688e86d57d28bd90ea2e0dea6cb4fc4652958a016b111608448dba3e8ef"
+}

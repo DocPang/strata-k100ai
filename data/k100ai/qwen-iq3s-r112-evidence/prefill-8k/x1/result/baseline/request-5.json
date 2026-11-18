@@ -1,0 +1,33 @@
+{
+  "content": "The three secret codes found in the records, in order of appearance, are:\n\n1.  **ALPHA-7391** (Found in Record 0)\n2.  **BRAVO-2846** (Found in Record 195)\n3.  **CHARLIE-6158** (Found in Record 390)\n\n***\n\n# Comprehensive Inventory Auditing Guide for Warehouse Cedar\n\n## Introduction: The Imperative of Precision in Modern Warehousing\n\nIn the contemporary logistics landscape, inventory management is no longer merely a back-office administrative task; it is the central nervous system of supply chain operations. For facilities such as \"Warehouse Cedar,\" which operates under a standardized protocol involving blue crates and green labels with daily inventory checks, the margin for error is effectively zero. The data provided in the benchmark trial highlights a critical reality: while the operational baseline is consistent (blue crates, green labels, daily checks), the presence of unique identifiers—such as the secret codes ALPHA-7391, BRAVO-2846, and CHARLIE-6158—embedded within specific records suggests that standardization must be paired with rigorous, granular auditing procedures.\n\nThis guide provides",
+  "usage": {
+    "prompt_tokens": 8192,
+    "completion_tokens": 256,
+    "total_tokens": 8448,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    }
+  },
+  "timings": {
+    "cache_n": 0,
+    "prompt_n": 8192,
+    "prompt_ms": 3019.2,
+    "prompt_per_token_ms": 0.369,
+    "prompt_per_second": 2713.3,
+    "predicted_n": 256,
+    "predicted_ms": 3500.0,
+    "predicted_per_token_ms": 13.672,
+    "predicted_per_second": 73.1,
+    "draft_n": 177,
+    "draft_n_accepted": 137
+  },
+  "ttft_s": 3.059686659835279,
+  "wall_s": 6.535335570573807,
+  "arm": "baseline",
+  "repeat": 5,
+  "target": 8192,
+  "input_exact": true,
+  "output_exact": true,
+  "retrieval": true,
+  "output_sha256": "5b68f94d127a4ff65e5d5e8740f2c65aa1885ad602997d4e6d091c0cdf1d75ac"
+}

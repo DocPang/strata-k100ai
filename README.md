@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/DocPang/strata-k100ai/releases/tag/v0.3.0"><img src="https://img.shields.io/badge/version-v0.3.0-0ab887" alt="v0.3.0"></a>
+  <a href="https://github.com/DocPang/strata-k100ai/releases/tag/v0.3.1"><img src="https://img.shields.io/badge/version-v0.3.1-0ab887" alt="v0.3.1"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/DocPang/strata-k100ai" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/platform-K100AI%20%2F%20gfx928-5b67ff" alt="K100AI / gfx928">
   <img src="https://img.shields.io/badge/DTK-2604-3d6bff" alt="DTK 2604">
@@ -26,7 +26,9 @@
 
 **免费、开源，在你的 K100AI 集群上运行。** 提供 OpenAI 与 Anthropic 兼容 API，可直接连接现有客户端和编程工具。
 
-K100AI 版本 **v0.3.0** · **Linux x86_64 / gfx928 / DTK 2604** · [发布说明](docs/k100ai/release-notes/v0.3.0.md)
+K100AI 版本 **v0.3.1** · **Linux x86_64 / gfx928 / DTK 2604** · [发布说明](docs/k100ai/release-notes/v0.3.1.md)
+
+**v0.3.1 新增** Qwen3.8-Flash-Next IQ3_S 精确引擎：32K 原生 Decode 45.7–45.9 tok/s，MTP 68.4–71.7 tok/s，Prefill 2,846–2,869 tok/s。
 
 ## 模型
 
@@ -54,10 +56,11 @@ Qwen3.8-Flash-Next 在单张 K100AI 上运行，发布包保留默认快速引�
 
 | 引擎 | 二进制 | 用途 |
 | --- | --- | --- |
+| **IQ3_S 精确档** | `bin/strata-qwen-iq3s-r112` | 单卡生产，完整路由与目标模型验证 MTP |
 | **0.1.47** | `bin/strata-0.1.47` | 默认快速档，启用 gfx928 prompt MMAC 与 MTP |
 | 0.1.55 | `bin/strata-0.1.55` | 对照档，便于精度和性能比较 |
 
-快速档允许数值漂移，不保证与对照档逐位一致。运行参数和资产准备见 [K100AI 运行指南](docs/k100ai/RUNTIME.md)。
+IQ3_S 精确档不使用 Top-k 截断或 prompt-lookup 后缀投机。0.1.47 快速档允许数值漂移，不保证与对照档逐位一致。运行参数和资产准备见 [K100AI 运行指南](docs/k100ai/RUNTIME.md)。
 
 </details>
 
@@ -65,24 +68,24 @@ Qwen3.8-Flash-Next 在单张 K100AI 上运行，发布包保留默认快速引�
 
 ### 下载发布包
 
-**[下载 Strata for K100AI v0.3.0 →](https://github.com/DocPang/strata-k100ai/releases/tag/v0.3.0)**
+**[下载 Strata for K100AI v0.3.1 →](https://github.com/DocPang/strata-k100ai/releases/tag/v0.3.1)**
 
 ```bash
-BASE=https://github.com/DocPang/strata-k100ai/releases/download/v0.3.0
+BASE=https://github.com/DocPang/strata-k100ai/releases/download/v0.3.1
 
-curl -fLO "$BASE/strata-k100ai-v0.3.0.tar.gz"
-curl -fLO "$BASE/strata-k100ai-v0.3.0.tar.gz.sha256"
-sha256sum -c strata-k100ai-v0.3.0.tar.gz.sha256
+curl -fLO "$BASE/strata-k100ai-v0.3.1.tar.gz"
+curl -fLO "$BASE/strata-k100ai-v0.3.1.tar.gz.sha256"
+sha256sum -c strata-k100ai-v0.3.1.tar.gz.sha256
 
-tar -xzf strata-k100ai-v0.3.0.tar.gz
-cd strata-k100ai-v0.3.0
+tar -xzf strata-k100ai-v0.3.1.tar.gz
+cd strata-k100ai-v0.3.1
 sha256sum -c SHA256SUMS
 ```
 
 也可以检出对应 tag：
 
 ```bash
-git clone --branch v0.3.0 --depth 1 \
+git clone --branch v0.3.1 --depth 1 \
   https://github.com/DocPang/strata-k100ai.git
 cd strata-k100ai
 sha256sum -c SHA256SUMS
@@ -212,7 +215,7 @@ DeepSeek TP1 的发布配置关闭 DSpark，现有记录只有原生解码 18.7 
 <a id="how-fast-is-it"></a>
 <a id="something-went-wrong"></a>
 
-[报告问题](https://github.com/DocPang/strata-k100ai/issues/new/choose) · [讨论与提问](https://github.com/DocPang/strata-k100ai/issues) · [参与贡献](https://github.com/DocPang/strata-k100ai/blob/release/v0.3.0/CONTRIBUTING.md) · [上游 Strata](https://github.com/Niko1221/Strata)
+[报告问题](https://github.com/DocPang/strata-k100ai/issues/new/choose) · [讨论与提问](https://github.com/DocPang/strata-k100ai/issues) · [参与贡献](https://github.com/DocPang/strata-k100ai/blob/release/v0.3.1/CONTRIBUTING.md) · [上游 Strata](https://github.com/Niko1221/Strata)
 
 ## 使用边界
 

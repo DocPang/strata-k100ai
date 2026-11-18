@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "strata-k100ai",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "platform": "linux-x86_64-gfx928-dtk2604",
   "container_image": "harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68",
   "models": {
@@ -15,6 +15,13 @@
         "binary": "bin/strata-0.1.55",
         "version": "0.1.55",
         "sha256": "25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e"
+      },
+      "iq3s": {
+        "binary": "bin/strata-qwen-iq3s-r112",
+        "version": "0.1.47",
+        "revision": "R112",
+        "sha256": "102b4b412068a68588883c13a28103600d8b078785da9dcbbda34c440e9a5074",
+        "config": "configs/k100ai/qwen-iq3s-r112.template.json"
       }
     },
     "deepseek-v4.1-flash": {
