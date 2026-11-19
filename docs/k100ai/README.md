@@ -11,6 +11,7 @@
 | [安装指南](INSTALL.md) | 运行环境、模型资产、下载校验和启动 |
 | [运行指南](RUNTIME.md) | 引擎切换、模型参数、API 验收和运行边界 |
 | [配置目录](../../configs/k100ai/README.md) | 三套 DeepSeek 配置与 Qwen 模板 |
+| [视觉输入](VISION.md) | strata-vision 的 CPU/HIP（gfx928）构建、serve 配置与端到端验证 |
 
 ## 模型
 
