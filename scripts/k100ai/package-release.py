@@ -24,7 +24,26 @@ SCRIPT_FILES = (
     "setup-runtime.sh",
     "validate-api.sh",
 )
-DOC_FILES = ("README.md", "VALIDATION.md", "PROVENANCE.md")
+DOC_FILES = (
+    "README.md",
+    "INSTALL.md",
+    "RUNTIME.md",
+    "PROVENANCE.md",
+    "VALIDATION.md",
+    "DEEPSEEK41.md",
+    "OPTIMIZATION.md",
+    "REPRODUCIBILITY.md",
+)
+CONFIG_FILES = (
+    "exl3-tp1-prod.json",
+    "exl3-tp4-prod.json",
+    "gguf-tp2-prod.json",
+    "qwen-server.json",
+    "qwen-server.template.json",
+    "dsv41-server.json",
+    "dsv41-server.template.json",
+    "release-inputs.json",
+)
 SOURCE_SKIP_NAMES = {
     ".git",
     ".venv",
@@ -169,8 +188,12 @@ def main() -> int:
         shutil.copy2(source, root / "tools" / source.name)
 
     (root / "configs/k100ai").mkdir(parents=True)
-    for name in ("qwen-server.template.json", "dsv41-server.template.json"):
-        shutil.copy2(src / "configs/k100ai" / name, root / "configs/k100ai" / name)
+    shutil.copy2(src / "configs/README.md", root / "configs/README.md")
+    shutil.copy2(src / "configs/k100ai/README.md", root / "configs/k100ai/README.md")
+    for name in CONFIG_FILES:
+        source = src / "configs/k100ai" / name
+        if source.is_file():
+            shutil.copy2(source, root / "configs/k100ai" / name)
 
     for relative in PROFILE_FILES:
         target = root / relative
@@ -184,13 +207,18 @@ def main() -> int:
         target.chmod(0o755)
 
     (root / "docs/k100ai").mkdir(parents=True)
+    shutil.copy2(src / "README.md", root / "README.md")
     for name in DOC_FILES:
         source = src / "docs/k100ai" / name
         if source.is_file():
             shutil.copy2(source, root / "docs/k100ai" / name)
+    shutil.copytree(src / "docs/k100ai/release-notes", root / "docs/k100ai/release-notes", symlinks=True, ignore=cache_ignore)
+    shutil.copytree(src / "docs/k100ai/archive", root / "docs/k100ai/archive", symlinks=True, ignore=cache_ignore)
     shutil.copytree(src, root / "source", symlinks=True, ignore=source_ignore(src))
     shutil.copy2(src / "requirements.txt", root / "requirements.txt")
     shutil.copy2(src / "LICENSE", root / "LICENSE")
+    shutil.copytree(src / "apps/host/public/brand", root / "apps/host/public/brand", symlinks=True, ignore=cache_ignore)
+    shutil.copytree(src / "docs/media/models", root / "docs/media/models", symlinks=True, ignore=cache_ignore)
 
     build = {
         "engine_version": args.engine_version,

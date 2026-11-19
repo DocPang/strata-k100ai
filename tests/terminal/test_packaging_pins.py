@@ -73,7 +73,7 @@ class WheelLocks(unittest.TestCase):
 
     def test_the_locks_agree_with_requirements_txt(self):
         pins = {}
-        for name in ("requirements.txt", "requirements-monitor.txt"):
+        for name in ("requirements.txt", "packaging/requirements/requirements-monitor.txt"):
             for line in (ROOT / name).read_text(encoding="utf-8").splitlines():
                 m = re.match(r"^([A-Za-z0-9_.-]+)==([^\s;]+)(?:\s*;\s*(.*))?$", line.split(" #")[0].strip())
                 if m:

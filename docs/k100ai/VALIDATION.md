@@ -1,25 +1,22 @@
-# K100AI 双模型验证
+# K100AI 验证记录
 
-发布包采用逐模型二进制分层。Qwen 默认快速档是本机已验证的 K100AI
-0.1.47；DeepSeek 和 Qwen 对照档来自
-`8c413cae0f5e9f88df784642772d78dff7bef428` 的 0.1.55。所有 GPU 测试只用
-HCU0-3；每个 case 前执行 preflight，结束后确认没有测试容器和 lease，三个
-研究容器保持 `exited`。
+[返回首页](../../README.md) · [文档索引](README.md) · [来源与校验](PROVENANCE.md)
+
+本页保留 Qwen 在 v0.2.3 的完整验收数据，并汇总 v0.3.0 的验证边界。v0.3.0 的 DeepSeek 三套生产配置、PPL、32K 输入和 DSpark 结果见 [DeepSeek-V4.1 指南](DEEPSEEK41.md)。Qwen 的两个二进制未改变，因此继续使用相同验收记录。
+
+所有 GPU 测试只使用 HCU0–3。每个 case 前执行 preflight，结束后确认没有测试容器或设备 lease。
 
 ## 构建和算子测试
 
-包内有四个 gfx928 二进制，运行环境均为同一 DTK 2604 镜像：
+v0.3.0 发布包包含三个生产二进制，运行环境均为 DTK 2604：
 
 | 目标 | 大小 | SHA-256 |
 | --- | ---: | --- |
-| Qwen 默认快速档 `strata`（0.1.47） | 45,674,152 B | `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9` |
+| Qwen 默认快速档 `strata-0.1.47` | 45,674,152 B | `bdbfd934cf605074213c78529ba3f01236381ef2252ad562ade6369d6f4056f9` |
 | Qwen 当前对照档 `strata-0.1.55` | 49,496,856 B | `25d4ea83b883443d0a8bc68686c72f613cd0923a2897c2f7e9063939025e904e` |
-| DeepSeek `strata-dsv41` | 22,812,816 B | `1b0610416b3cce179983f3e439c2d4dc173122c9dc432b485450107b9116d811` |
-| DeepSeek `ds4_gguf_test` | 19,044,176 B | `6159e5e04a602f0362f23501194d63cce0bc47c2089f0b3be4dd088d486f9ee6` |
+| DeepSeek `strata-dsv41` | 23,941,864 B | `4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6` |
 
-最终包内 `ds4_gguf_test` 输出 `ALL OK (0 failed)`。覆盖 BF16、MXFP4、
-Q8_0、Q2_K、Q3_K、Q4_K、IQ4_XS、IQ3_S、IQ2_XXS、IQ2_S 的
-token/window expert、CPU lane、SwiGLU、combine 和 KV packed rows。
+v0.2.3 的算子测试还包括 `ds4_gguf_test`，覆盖 BF16、MXFP4、Q8_0、Q2_K、Q3_K、Q4_K、IQ4_XS、IQ3_S、IQ2_XXS 和 IQ2_S 的 expert、CPU lane、SwiGLU、combine 与 KV packed rows。该项属于历史构建记录。
 
 ## Qwen 精度和快速档验收
 
@@ -98,7 +95,7 @@ profile。
 1.8x–2.1x 的路径，因此默认包使用经验证的 0.1.47 快速档，而不是声称
 0.1.55 已修复。
 
-## DeepSeek 四卡、DSpark 和长输入
+## 历史记录：DeepSeek 四卡、DSpark 和长输入（v0.2.3）
 
 最终包的 `strata-dsv41` 在 HCU0-3 上完整放置四张卡，CPU lane 为 0。
 

@@ -70,6 +70,8 @@ the model. The section above is about the engine's HTTP server. This is what the
   with a separate key (Tauri's minisign key) that the app and the Terminal both check. The private keys are kept offline by the owner.
   See [packaging/UPDATES.md](packaging/UPDATES.md).
 
+<a id="how-far-to-trust-curl--sh-and-irm--iex"></a>
+
 ### How far to trust `curl | sh` and `irm | iex`
 
 The Terminal installs with one line:

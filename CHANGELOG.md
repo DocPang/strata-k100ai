@@ -12,10 +12,11 @@ Qwen3.8-Flash-Next：
 
 DeepSeek-V4.1-Flash：
 
-- EXL3 四卡 TP1：4K `2.98 s`、32K `17.95 s`、Native Decode `18.7 tok/s`。
-- EXL3 四卡 TP4：4K `4.04 s`、32K `29.22 s`、DSpark Decode `43.9 tok/s`。
-- GGUF 双卡 TP2：4K `8.11 s`、32K `52.42 s`、DSpark Decode 中位数
-  `42.05 tok/s`。
+- EXL3 四卡 TP1：4K 输入约 `1,374 tok/s`、32K 输入约 `1,825 tok/s`。
+- EXL3 四卡 TP4：4K 输入约 `1,013 tok/s`、32K 输入约 `1,121 tok/s`，
+  DSpark Decode `43.9 tok/s`。
+- GGUF 双卡 TP2：4K 输入约 `505 tok/s`、32K 输入约 `625 tok/s`，
+  DSpark Decode 中位数 `42.05 tok/s`。
 
 DeepSeek 三套配置均通过 `+2%` PPL 门限和固定四项 API 测试。R179 四卡
 32K 实测改善分别为 `3.63%`、`3.20%`，没有达到外部给定的 `14.5 s` /

@@ -2,7 +2,7 @@
 
 K100AI 发布版本 **v0.3.0**。DeepSeek-V4.1-Flash 的 R001-R179
 最终优化结果、三套生产配置、PPL/API 和启动说明见
-[DSV41_OPTIMIZATION_FINAL.md](DSV41_OPTIMIZATION_FINAL.md)。完整下载和资产准备步骤见[手动安装](INSTALL.md)。支持：
+[DeepSeek-V4.1 指南](../../DEEPSEEK41.md)。完整下载和资产准备步骤见[历史安装说明](INSTALL.md)。支持：
 
 - DeepSeek-V4.1-Flash，服务模型名 `deepseek-v4.1-flash`
 - Qwen3.8-Flash-Next，服务模型名 `qwen3.8-flash-next`
@@ -71,7 +71,7 @@ K100AI 发布版本 **v0.3.0**。DeepSeek-V4.1-Flash 的 R001-R179
 | `validation-evidence.tar.gz` | 59,981 B | `702c54ebd44d40de2dc40b0dda6ab2ab7d02712761511f28a829a5c585c9c764` |
 
 配套源码归档、资产下载和从零构建步骤见
-[REPRODUCIBILITY.md](REPRODUCIBILITY.md)。源码归档包含主源码树、
+[REPRODUCIBILITY.md](../../REPRODUCIBILITY.md)。源码归档包含主源码树、
 Qwen 0.1.47 快速源码树和固定 llama.cpp 快照；运行包和源码归档都采用
 固定顺序、零时间戳的 tar/gzip 元数据生成。
 
@@ -201,7 +201,7 @@ DeepSeek 使用 `--experts 6`、`--vision off`、`--tp 4`、
 placement profile。
 
 完整正确性、性能、API、机器可复现证据和限制见
-[VALIDATION.md](VALIDATION.md)。构建与模型 provenance 见
+[VALIDATION.md](../../VALIDATION.md)。构建与模型 provenance 见
 [PROVENANCE.md](PROVENANCE.md)。
 
 模型和 pack 可由发布内脚本重新生成：

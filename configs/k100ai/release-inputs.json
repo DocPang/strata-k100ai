@@ -17,9 +17,9 @@
     "source_root": "/data/dsv41-opt-v022-20261104/src",
     "ds4_model_sha256": "fa4644560c1fd3bd7e1aa259791b817a001a9d7ee48b1206ecd5cb228b0a548a",
     "production_configs": [
-      "configs/exl3-tp1-prod.json",
-      "configs/exl3-tp4-prod.json",
-      "configs/gguf-tp2-prod.json"
+      "configs/k100ai/exl3-tp1-prod.json",
+      "configs/k100ai/exl3-tp4-prod.json",
+      "configs/k100ai/gguf-tp2-prod.json"
     ]
   },
   "qwen": {

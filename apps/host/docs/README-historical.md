@@ -3,7 +3,7 @@
 Local AI, with one model by default and multiple native instances in Expert mode.
 The React UI connects to the official Strata installer and engine, checks the
 hardware, prepares supported models, serves compatible APIs and shows measured
-engine activity. See [native integration handover](docs/native-engine-handover.md).
+engine activity. See native integration handover (`docs/native-engine-handover.md`).
 
 This is the web-first iteration of the app. It is built to become a standalone
 desktop app later — the browser shell and the engine host are already separate

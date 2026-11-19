@@ -174,11 +174,11 @@ Shared field-error style is visible in dark mode; opaque overlays and dark scrim
 | Check | Result | Evidence |
 |---|---|---|
 | Baseline unit suite | 34 passed | Existing suite before changes |
-| Final unit suite | 39 passed; 0 failed, skipped or cancelled | [tests.log](tests.log) |
-| Production build | Passed | [build.log](build.log) |
-| TypeScript, UI audit, WCAG contrast, reading measure, dark-surface luminance | Passed | [check-final.log](check-final.log) |
-| Motion/reduced motion | Passed | [motion.log](motion.log) |
-| Quantified motion budget | **Not measured**: harness self-check could not detect its deliberately expensive control effect | [motion-budget.log](motion-budget.log) |
+| Final unit suite | 39 passed; 0 failed, skipped or cancelled | tests.log (`tests.log`) |
+| Production build | Passed | build.log (`build.log`) |
+| TypeScript, UI audit, WCAG contrast, reading measure, dark-surface luminance | Passed | check-final.log (`check-final.log`) |
+| Motion/reduced motion | Passed | motion.log (`motion.log`) |
+| Quantified motion budget | **Not measured**: harness self-check could not detect its deliberately expensive control effect | motion-budget.log (`motion-budget.log`) |
 
 The package command `node --test tests/` is not accepted as a directory entry point by the installed Node version. Used `node --test tests/*.test.mjs` instead. Existing tests were retained. Fixture IDs and stale UI selectors were updated to the new single-model catalog and current accessible control labels; five logic tests were added (identity, memory, model fit, usage, JSON diagnostics).
 
@@ -199,4 +199,4 @@ The screenshot set is a **targeted regression review**, not a replacement captur
 
 ## Evidence and follow-up
 
-See [the screenshot gallery](../docs/evidence/audit-fixes-2026-10-07/index.html) and [its coverage notes](../docs/evidence/audit-fixes-2026-10-07/README.md). Optional low-priority work remains listed in the supplied task files and finding ledger. Examples include richer raw-config syntax highlighting, advanced storage actions, and minor copy/spacing polish.
+See the screenshot gallery (`../docs/evidence/audit-fixes-2026-10-07/index.html`) and its coverage notes (`../docs/evidence/audit-fixes-2026-10-07/README.md`). Optional low-priority work remains listed in the supplied task files and finding ledger. Examples include richer raw-config syntax highlighting, advanced storage actions, and minor copy/spacing polish.

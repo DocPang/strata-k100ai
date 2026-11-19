@@ -100,7 +100,7 @@ PAYLOAD = (
     "strata_cli",
     "serve",
     "requirements.txt",
-    "requirements-monitor.txt",
+    "packaging/requirements/requirements-monitor.txt",
     "docs/MANAGEMENT_PROTOCOL.md",
     "docs/TERMINAL_LAUNCH.md",         # the README below points at it (`strata launch`); it used to be missing from the archive
     "data/gguf_fingerprints.json",     # `strata models import --plan` names a known file set from this table

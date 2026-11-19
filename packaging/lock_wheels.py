@@ -4,7 +4,7 @@
 The terminal archive installs its Python packages from `packaging/locks/runtime-<target>-cp312.txt` with
 `pip install --require-hashes --no-deps --only-binary=:all:`: every package, direct or not, is named with an exact
 version and the SHA-256 of the wheel(s) accepted for it, so a build can only ever install the files this lock lists.
-The lock is made here, from `requirements.txt` + `requirements-monitor.txt` (the direct, version-pinned runtime
+The lock is made here, from `requirements.txt` + `packaging/requirements/requirements-monitor.txt` (the direct, version-pinned runtime
 packages) by letting pip resolve and download the wheels for the target's tags and hashing what it fetched.
 
     python packaging/lock_wheels.py --target windows-x86_64          # writes packaging/locks/...
@@ -26,7 +26,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCKS = ROOT / "packaging" / "locks"
-INPUTS = ("requirements.txt", "requirements-monitor.txt")
+INPUTS = ("requirements.txt", "packaging/requirements/requirements-monitor.txt")
 
 #: pip's tags for each target, and the environment markers evaluate under for it.
 TARGETS = {
@@ -107,7 +107,7 @@ def build_lock(target: str) -> str:
     drop = _dropped_for_target(target)
     out = [
         "# Hash-pinned runtime packages for the " + target + " terminal archive (CPython 3.12, " + ABI + ").",
-        "# Made by packaging/lock_wheels.py from requirements.txt + requirements-monitor.txt; installed at BUILD time with",
+        "# Made by packaging/lock_wheels.py from requirements.txt + packaging/requirements/requirements-monitor.txt; installed at BUILD time with",
         "#   pip install --require-hashes --no-deps --only-binary=:all: -r <this file>",
         "# and never on the user's PC. To change a package: edit requirements.txt, run lock_wheels.py, review the diff.",
     ]

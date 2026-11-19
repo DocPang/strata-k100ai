@@ -1,5 +1,5 @@
 # Hash-pinned runtime packages for the linux-aarch64 terminal archive (CPython 3.12, cp312).
-# Made by packaging/lock_wheels.py from requirements.txt + requirements-monitor.txt; installed at BUILD time with
+# Made by packaging/lock_wheels.py from requirements.txt + packaging/requirements/requirements-monitor.txt; installed at BUILD time with
 #   pip install --require-hashes --no-deps --only-binary=:all: -r <this file>
 # and never on the user's PC. To change a package: edit requirements.txt, run lock_wheels.py, review the diff.
 certifi==2026.10.19 \

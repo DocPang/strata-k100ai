@@ -42,11 +42,9 @@ class VersionBump(unittest.TestCase):
         self.assertEqual((locked["version"], locked["packages"][""]["version"]), ("0.2.9", "0.2.9"))
 
     def test_the_documents_that_state_the_current_version_agree(self):
-        self.assertIn("Version 0.2.9, engine 0.1.55.", (ROOT / "AGENTS.md").read_text(encoding="utf-8"))
-        for name in ("README.md", "README.de.md", "README.es.md", "README.fr.md", "README.ja.md", "README.pl.md", "README.pt-BR.md", "README.zh-CN.md"):
-            text = (ROOT / name).read_text(encoding="utf-8")
-            self.assertRegex(text, r"Strata-0[.]2[.][0-9]+-", name)       # (the restyled READMEs state the app version through the download buttons; their owner moves them to the release)
-            self.assertNotIn("Strata-0.2.2-", text, name)
+        self.assertIn("Product version is **v0.3.0**", (ROOT / "AGENTS.md").read_text(encoding="utf-8"))
+        self.assertIn("K100AI 版本 **v0.3.0**", (ROOT / "README.md").read_text(encoding="utf-8"))
+        self.assertEqual(json.loads((ROOT / "BUILD_INFO.json").read_text(encoding="utf-8"))["version"], "0.3.0")
 
     def test_version_prints_the_product_and_the_build(self):
         done = subprocess.run([sys.executable, str(ROOT / "strata.py"), "--version"], capture_output=True, text=True, cwd=str(ROOT),

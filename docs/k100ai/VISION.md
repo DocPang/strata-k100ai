@@ -1,6 +1,6 @@
 # K100AI 视觉输入（strata-vision）
 
-[返回首页](../../README.md) · [安装与启动](INSTALL_V0.3.md) · [来源记录](PROVENANCE_V0.3.md)
+[返回首页](../../README.md) · [安装指南](INSTALL.md) · [来源与校验](PROVENANCE.md)
 
 v0.3.0 发布包未包含视觉编码器二进制。本文记录在 DTK 26.04（gfx928）上从干净检出启用
 图片输入的完整步骤与实测结果：CPU 编码器（零源码改动）与 HIP 编码器（GPU 加速

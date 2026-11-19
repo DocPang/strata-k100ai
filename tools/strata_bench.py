@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One command that measures this Strata install the way it is used, and writes a report you can share.
 
-    BENCH.bat                      (Windows)        ./bench.sh        (Linux)        python tools/strata_bench.py
+    packaging/windows/BENCH.bat    (Windows)        ./bench/bench.sh  (Linux)        python tools/strata_bench.py
 
 It starts the server with your existing settings (the newest strata-*.json of this folder, or --config FILE), or uses
 the one already running (it checks the config's port, or --url http://host:port), and sends a fixed suite through the

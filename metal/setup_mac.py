@@ -129,7 +129,7 @@ def build_engine(llama: Path, jobs: int | None = None) -> Path:
         S.ok(f"Metal engine: {EXE} (built for this source)")
         return EXE
     mcpp = metal_cpp()
-    S.ensure_build_tools()                                # cmake and ninja are in requirements-build.txt, not requirements.txt (#3403)
+    S.ensure_build_tools()                                # cmake and ninja are in packaging/requirements/requirements-build.txt, not requirements.txt (#3403)
     S.say("  Building the Metal engine from source (5-15 minutes the first time) ...")
     BUILD_DIR.mkdir(exist_ok=True)
     log = BUILD_DIR / "build.log"
@@ -421,7 +421,7 @@ def main(argv=None) -> int:
     if free < need:
         S.warn(f"about {need:.0f} GB are needed on the disk ({free:.0f} GB free): kept as you chose; it may run out")
 
-    # ---- 3. Python packages (cmake and ninja come with the build in step 4, from requirements-build.txt)
+    # ---- 3. Python packages (cmake and ninja come with the build in step 4, from packaging/requirements/requirements-build.txt)
     S.step(3, "Python packages")
     S.pip_install(S.requirement_lines() if S.REQUIREMENTS.exists() else S.PY_PACKAGES, "numpy, jinja2, ...")
 

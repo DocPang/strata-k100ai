@@ -40,7 +40,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 # #3227: llama.cpp's converter (conversion/base.py: `from transformers import AutoConfig`) and the MXFP8 / NVFP4 decoding below need
-# these; setup installs them from requirements-nvfp4-local.txt before a prepare, and a run by hand says which one is missing.
+# these; setup installs them from packaging/requirements/requirements-nvfp4-local.txt before a prepare, and a run by hand says which one is missing.
 NEEDED_PACKAGES = ("torch", "transformers", "safetensors")
 MARKS = ("ple-nvfp4.gguf.done", "dense.gguf.done", "pack.done", "draft.done")
 
@@ -49,7 +49,7 @@ def require_packages() -> None:
     import importlib.util
     missing = [m for m in NEEDED_PACKAGES if importlib.util.find_spec(m) is None]
     if missing:
-        req = HERE.parent / "requirements-nvfp4-local.txt"
+        req = HERE.parent / "packaging/requirements/requirements-nvfp4-local.txt"
         sys.exit("tools/nvfp4_local_pack.py needs the Python package%s %s, which %s not installed for %s.\n"
                  "Install %s with:  %s -m pip install -r %s" % ("s" if len(missing) > 1 else "", ", ".join(missing),
                                                                 "are" if len(missing) > 1 else "is", sys.executable,

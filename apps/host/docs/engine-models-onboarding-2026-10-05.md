@@ -92,16 +92,16 @@ Screenshots show development verification states; values labelled Demo must not 
 
 | Evidence | View |
 |---|---|
-| [Engine Light](evidence/instrument-redesign-2026-10-05/01-engine-light.png) | Dials and shared expected experience. |
-| [Engine Dark](evidence/instrument-redesign-2026-10-05/05-engine-dark.png) | Dark reading surfaces and controls. |
-| [Engine mobile](evidence/instrument-redesign-2026-10-05/04-engine-mobile-light.png) | Stacked tuning at 390px. |
-| [Accessibility preferences](evidence/instrument-redesign-2026-10-05/06-engine-accessible.png) | Reduced motion, opaque surfaces, increased contrast. |
-| [Models](evidence/instrument-redesign-2026-10-05/07-models-light.png) | Exact recommendation names, no fitting Agentic candidate and shared winner. |
-| [Variant comparison](evidence/instrument-redesign-2026-10-05/08-variant-comparison.png) | Three exact variants and visible memory constraints. |
-| [Onboarding profile](evidence/instrument-redesign-2026-10-05/09-onboarding-profile.png) | Profile selection and one recommendation. |
-| [Onboarding mobile](evidence/instrument-redesign-2026-10-05/10-onboarding-mobile.png) | Stacked choices and compact step progress. |
-| [Computer](evidence/instrument-redesign-2026-10-05/02-onboarding-computer.png), [Ready](evidence/instrument-redesign-2026-10-05/03-onboarding-ready.png) | Earlier captures from the completed walkthrough, before final spacing refinement. |
-| [Browser checks](evidence/instrument-redesign-2026-10-05/browser-checks.json) | Raw contrast samples, responsive widths and accessibility style observation. |
+| Engine Light (`evidence/instrument-redesign-2026-10-05/01-engine-light.png`) | Dials and shared expected experience. |
+| Engine Dark (`evidence/instrument-redesign-2026-10-05/05-engine-dark.png`) | Dark reading surfaces and controls. |
+| Engine mobile (`evidence/instrument-redesign-2026-10-05/04-engine-mobile-light.png`) | Stacked tuning at 390px. |
+| Accessibility preferences (`evidence/instrument-redesign-2026-10-05/06-engine-accessible.png`) | Reduced motion, opaque surfaces, increased contrast. |
+| Models (`evidence/instrument-redesign-2026-10-05/07-models-light.png`) | Exact recommendation names, no fitting Agentic candidate and shared winner. |
+| Variant comparison (`evidence/instrument-redesign-2026-10-05/08-variant-comparison.png`) | Three exact variants and visible memory constraints. |
+| Onboarding profile (`evidence/instrument-redesign-2026-10-05/09-onboarding-profile.png`) | Profile selection and one recommendation. |
+| Onboarding mobile (`evidence/instrument-redesign-2026-10-05/10-onboarding-mobile.png`) | Stacked choices and compact step progress. |
+| Computer (`evidence/instrument-redesign-2026-10-05/02-onboarding-computer.png`), Ready (`evidence/instrument-redesign-2026-10-05/03-onboarding-ready.png`) | Earlier captures from the completed walkthrough, before final spacing refinement. |
+| Browser checks (`evidence/instrument-redesign-2026-10-05/browser-checks.json`) | Raw contrast samples, responsive widths and accessibility style observation. |
 
 ## Remaining integration and verification
 

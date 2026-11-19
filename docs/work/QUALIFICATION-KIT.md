@@ -48,10 +48,10 @@ python3 --version
 
 # Runtime + test dependencies
 "$ROOT/python311/bin/pip" install -r requirements.txt
-"$ROOT/python311/bin/pip" install -r requirements-monitor.txt   # optional TUI only
+"$ROOT/python311/bin/pip" install -r packaging/requirements/requirements-monitor.txt   # optional TUI only
 
 # Build toolchain for the engine (never needed by an end user of the packaged app)
-"$ROOT/python311/bin/pip" install -r requirements-build.txt
+"$ROOT/python311/bin/pip" install -r packaging/requirements/requirements-build.txt
 ```
 
 Record: `sw_vers`, `uname -m`, `sysctl -n machdep.cpu.brand_string hw.memsize`, `df -h`,
