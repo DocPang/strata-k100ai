@@ -76,6 +76,10 @@ v0.3.1 的 IQ3_S 引擎来源为 K100AI Qwen 研究树 HEAD
 模型来自 [ISTA-DASLab Qwen3.8-Flash-Next GSQ-RCO GGUF](https://www.modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF)，
 revision 为 `6ac9406afe74db316b11a3865a3382c7bedbcf34`。
 `scripts/k100ai/fetch-qwen-iq3s.sh` 会下载、恢复并校验这些外置资产。
+pack 工具使用 llama.cpp `3cf03257f219afbe7334045ff7c6a06ac68c627d`
+的 `gguf-py`。发布包直接携带该目录；缺失时脚本会校验固定 ZIP 的
+SHA-256 `cbe23c594282ead2937abb3f008e51fcec4609d9256652fff42c7cc1c21ea47b`
+后恢复。
 简体中文 60K draft vocabulary 固定自
 [Strata-rdna3 `7df6538d`](https://github.com/nicejunjie/Strata-rdna3/blob/7df6538d6c886093df39d74b36ed0a3396bf9467/rdna3/draft_vocab_zh60k.bin)。
 

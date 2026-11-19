@@ -17,6 +17,8 @@
   `qwen-iq3xxs` 保留旧 IQ3_XXS 快速档。
 - 新增 `fetch-qwen-iq3s.sh`，自动恢复下载、校验并构造 IQ3_S pack 与
   MTP runtime。238 KB 的 zh60k draft vocabulary 随发布包提供。
+- 修正 IQ3_XXS 分片下载目录，并让 IQ3_S / IQ3_XXS 脚本在大文件下载前
+  自动补齐固定 llama.cpp 提交 `3cf0325` 的 `gguf-py`。
 
 发布、口径和来源见
 [`docs/k100ai/release-notes/v0.3.1.md`](docs/k100ai/release-notes/v0.3.1.md)。

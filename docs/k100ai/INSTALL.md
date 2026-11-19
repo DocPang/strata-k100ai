@@ -125,6 +125,10 @@ IQ3_S 的版本、完整成绩和资产哈希见 [Qwen v0.3.1 指南](QWEN31.md)
 `scripts/k100ai/fetch-qwen-iq3xxs.sh`。v0.2.3 的历史安装步骤保留在
 [历史安装说明](archive/v0.2.3/INSTALL.md)。
 
+两个 Qwen 下载脚本会在模型分片下载前检查固定版本的 `gguf-py`。发布包
+已经内置该目录；源码检出或旧包缺少它时，脚本会下载并校验 llama.cpp
+提交 `3cf0325` 后补齐，避免大文件下载完成后才失败。
+
 ## DeepSeek-V4.1-Flash
 
 先修改所选 JSON 中的：

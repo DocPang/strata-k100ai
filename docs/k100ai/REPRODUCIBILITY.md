@@ -60,6 +60,10 @@ K100AI_ASSETS_DIR=/data/k100ai-assets \
   /data/k100ai-assets/qwen3.8-flash-next-iq3-s
 ```
 
+Qwen 下载脚本会在获取大模型分片前准备固定提交 `3cf0325` 的 `gguf-py`。
+发布包应自带该目录；源码检出缺失时由脚本下载并校验固定 ZIP，打包器也
+强制要求 `--ggml-dir`，防止生成缺少该依赖的包。
+
 每次 GPU 工作前执行：
 
 ```bash

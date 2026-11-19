@@ -30,6 +30,12 @@ declare -A hashes=(
   ["$shard2"]=316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113
 )
 
+if [[ ! -d "$root/.python-packages" ]]; then
+  echo "run scripts/k100ai/setup-runtime.sh first" >&2
+  exit 2
+fi
+bash "$script_dir/fetch-llama-gguf-py.sh" "$root"
+
 mkdir -p "$model_dir" "$pack_dir" "$mtp_source" "$mtp_rt"
 
 for file in "$shard1" "$shard2"; do
@@ -73,15 +79,6 @@ run_python=(
   --entrypoint python3
   "$image"
 )
-
-if [[ ! -d "$root/.python-packages" ]]; then
-  echo "run scripts/k100ai/setup-runtime.sh first" >&2
-  exit 2
-fi
-if [[ ! -f "$root/third_party/llama.cpp/gguf-py/gguf/__init__.py" ]]; then
-  echo "missing bundled gguf-py: $root/third_party/llama.cpp/gguf-py" >&2
-  exit 2
-fi
 
 "${run_python[@]}" tools/iq_pack.py \
   --gguf "$model_dir/$shard1" \

@@ -25,7 +25,9 @@ SCRIPT_FILES = (
     "render-config.py",
     "setup-runtime.sh",
     "validate-api.sh",
+    "fetch-llama-gguf-py.sh",
     "fetch-qwen-iq3s.sh",
+    "fetch-qwen-iq3xxs.sh",
 )
 DOC_FILES = (
     "README.md",
@@ -146,7 +148,7 @@ def main() -> int:
     parser.add_argument("--qwen-fast-source-commit", required=True)
     parser.add_argument("--dsv41-bin", type=Path, required=True)
     parser.add_argument("--ds4-test-bin", type=Path, required=True)
-    parser.add_argument("--ggml-dir", type=Path)
+    parser.add_argument("--ggml-dir", type=Path, required=True)
     parser.add_argument("--base-image", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--engine-source-commit", required=True)
@@ -180,14 +182,13 @@ def main() -> int:
         binary.chmod(0o755)
 
     cache_ignore = shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store")
-    if args.ggml_dir is not None:
-        gguf_py = args.ggml_dir / "gguf-py"
-        if not (gguf_py / "gguf").is_dir():
-            raise SystemExit(f"missing gguf-py: {gguf_py}")
-        llama_root = root / "third_party/llama.cpp"
-        llama_root.mkdir(parents=True)
-        shutil.copytree(gguf_py, llama_root / "gguf-py", symlinks=True, ignore=cache_ignore)
-        shutil.copy2(args.ggml_dir / "LICENSE", llama_root / "LICENSE")
+    gguf_py = args.ggml_dir / "gguf-py"
+    if not (gguf_py / "gguf").is_dir():
+        raise SystemExit(f"missing gguf-py: {gguf_py}")
+    llama_root = root / "third_party/llama.cpp"
+    llama_root.mkdir(parents=True)
+    shutil.copytree(gguf_py, llama_root / "gguf-py", symlinks=True, ignore=cache_ignore)
+    shutil.copy2(args.ggml_dir / "LICENSE", llama_root / "LICENSE")
 
     shutil.copytree(src / "serve", root / "serve", symlinks=True, ignore=cache_ignore)
     shutil.copytree(src / "strata_control", root / "strata_control", symlinks=True, ignore=cache_ignore)

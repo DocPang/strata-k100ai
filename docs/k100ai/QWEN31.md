@@ -50,6 +50,10 @@ K100AI_ASSETS_DIR=/data/k100ai-assets \
   /data/k100ai-assets/qwen3.8-flash-next-iq3-s
 ```
 
+脚本先确认 `.python-packages` 和固定版本的 `gguf-py`。发布包已经包含
+`third_party/llama.cpp/gguf-py`；源码检出缺少它时，脚本会在大模型下载前
+从固定 llama.cpp 提交 `3cf0325` 补齐并校验归档 SHA-256。
+
 脚本会恢复下载、检查文件大小和 SHA-256，并在 DTK 2604 容器中完成 pack
 和 MTP runtime 转换。目录结构如下：
 
