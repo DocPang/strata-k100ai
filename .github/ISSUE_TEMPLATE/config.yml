@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Troubleshooting and known issues
-    url: https://github.com/Niko1221/Strata/blob/main/docs/TROUBLESHOOTING.md
-    about: Symptom-to-fix table for crashes, out of memory, hangs, and port problems.
+  - name: K100AI 安装指南
+    url: https://github.com/DocPang/strata-k100ai/blob/v0.3.2/docs/k100ai/INSTALL.md
+    about: 检查运行环境、设备映射、模型资产和启动步骤。
+  - name: K100AI 运行指南
+    url: https://github.com/DocPang/strata-k100ai/blob/v0.3.2/docs/k100ai/RUNTIME.md
+    about: 查找运行参数、引擎切换和 API 验收步骤。

@@ -2,7 +2,7 @@
   "exe": "${K100AI_QWEN_ENGINE}",
   "cwd": "${K100AI_ROOT}",
   "tokenizer": "${K100AI_QWEN_TOKENIZER}",
-  "model_name": "k100ai-iq3s-research",
+  "model_name": "qwen3.8-flash-next",
   "backend": "hip",
   "gpu": 0,
   "args": [
@@ -28,7 +28,7 @@
     "--spec-min-p",
     "0.5",
     "--max-context",
-    "65536",
+    "262144",
     "--kv",
     "int8",
     "--pool-workers",

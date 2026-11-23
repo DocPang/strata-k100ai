@@ -2,7 +2,7 @@
 
 [返回首页](../../README.md) · [文档索引](README.md) · [来源与校验](PROVENANCE.md)
 
-本页以 v0.3.1 Qwen3.8-Flash-Next IQ3_S 为当前生产路径。旧 IQ3_XXS
+当前生产路径沿用 v0.3.1 的 Qwen3.8-Flash-Next IQ3_S R112 引擎。旧 IQ3_XXS
 快速档、0.1.55 对照档和 v0.2.3 API 记录保留在历史章节，不能与当前
 IQ3_S 成绩混用。详细安装、参数和逐轮数据见
 [Qwen v0.3.1 指南](QWEN31.md)。DeepSeek 三套生产配置仍对应 R179，
@@ -277,13 +277,18 @@ runtime 路径；本次 v0.2.3 没有连接 HCU，未重跑 GPU/API 验证，因
 先前最终二进制长请求已用 120,029 个独特 prompt tokens 完成，服务保持
 稳定。该结果只证明该深度可用，不证明 1,048,576-token 窗口已全部灌满。
 
+## v0.3.2 长上下文
+
+默认上下文为 262,144 tokens，KV 显存驻留量为 65,536 tokens。验收覆盖
+32,768 和 261,632 token 输入，各生成 256 tokens，并检查三处检索结果。
+命令见 [复现指南](REPRODUCIBILITY.md#qwen-长上下文复现)。
+
 ## 明确限制
 
 - 原生 NVIDIA/CUDA 编译未完成。当前 DTK/HIP 构建不能作为 nvcc 编译
   证据；发布包只声明并验证 gfx928 + DTK 2604。
-- Qwen v0.3.1 生产模板配置 65,536-token KV，已在 8,192 和 32,768-token
-  prompt 上实测，没有灌满完整 65,536-token 上下文，也不声称整个窗口的
-  语义质量。旧 0.1.47 的 262,144-token 上限只属于历史兼容路径。
+- 上面的 Qwen v0.3.1 性能表来自当时的 65,536-token 窗口。v0.3.2 的
+  261,632-token 请求验证只覆盖固定的长文检索任务。
 - 40K 数值对照使用快速 0.1.47 与本轮 0.1.55 F16，并非 canonical 0.1.55
   first-logits oracle；证据是同 top-1、各完整性统计和相同的 8-token 输出
   前缀。

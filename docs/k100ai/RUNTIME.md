@@ -2,7 +2,7 @@
 
 [返回首页](../../README.md) · [文档索引](README.md) · [安装指南](INSTALL.md) · [配置目录](../../configs/k100ai/README.md)
 
-适用版本：**v0.3.1**。同一时间只运行一套模型服务。
+适用版本：**v0.3.2**。同一时间只运行一套模型服务。
 
 ## 支持的模型
 
@@ -35,7 +35,7 @@ bash scripts/k100ai/preflight.sh
 
 ## Qwen3.8-Flash-Next
 
-v0.3.1 的 `qwen` 入口默认启动 IQ3_S 生产引擎。它使用完整路由 top-10、
+v0.3.2 的 `qwen` 入口默认启动 IQ3_S 生产引擎。它使用完整路由 top-10、
 QSA 精确 top-k 和目标模型验证的 MTP，关闭 prompt-lookup 后缀投机，
 不启用 Top-k 截断或其他近似 Prefill 算法：
 
@@ -58,7 +58,7 @@ PORT=18096 \
 --prefill 20480
 --spec 3
 --spec-min-p 0.5
---max-context 65536
+--max-context 262144
 --kv int8
 --kv-resident 65536
 --mtp-window 4096
@@ -192,6 +192,6 @@ OUT=api-dsv41 \
 - 只验证 K100AI/gfx928、Linux x86_64 和 DTK 2604。
 - 不自动停止其他服务或研究容器；切换模型前先停止当前服务。
 - DeepSeek DSpark 的输出速度会随内容、draft 命中率和负载波动。
-- Qwen v0.3.1 生产模板实测到 32K 输入，配置 65,536-token KV。完整
-  65,536-token 语义质量尚未验证。
+- Qwen IQ3_S 默认上下文 262,144 tokens，65,536 个 KV 位置驻留显存。
+  更长请求按需从主机内存读取 KV。发布验收覆盖 261,632 输入与 256 输出。
 - 完整 1M context 尚未完成质量评测。

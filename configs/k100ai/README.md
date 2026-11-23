@@ -1,88 +1,35 @@
-# K100AI 生产配置
+# K100AI 配置指南
 
-[返回首页](../../README.md) · [安装指南](../../docs/k100ai/INSTALL.md) · [运行指南](../../docs/k100ai/RUNTIME.md)
+[项目首页](../../README.md) · [安装指南](../../docs/k100ai/INSTALL.md) · [运行指南](../../docs/k100ai/RUNTIME.md)
 
-本目录收纳 v0.3.1 的 DeepSeek-V4.1-Flash 生产配置，以及 Qwen3.8-Flash-Next 的运行模板。三套 DeepSeek 配置共用同一个生产二进制：
+下表按每张 K100AI 64 GiB 列出 v0.3.2 发布包支持的配置。
 
-```text
-strata-dsv41
-SHA-256 4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6
-```
+| 卡数 | 配置 | 量化和解码 |
+| ---: | --- | --- |
+| 1 | [Qwen IQ3_S](qwen-iq3s-r112.template.json) | IQ3_S，目标模型验证 MTP |
+| 2 | [DeepSeek GGUF TP2](gguf-tp2-prod.json) | GGUF 2.00 bpw，DSpark |
+| 4 | [DeepSeek EXL3 TP1](exl3-tp1-prod.json) | EXL3 2.9 bpw，原生解码 |
+| 4 | [DeepSeek EXL3 TP4](exl3-tp4-prod.json) | EXL3 2.9 bpw，DSpark |
 
-## 生产配置
+## Qwen3.8-Flash-Next
 
-| 文件 | 模型格式 | 设备 | 用途 |
-| --- | --- | --- | --- |
-| `exl3-tp1-prod.json` | EXL3 2.9 bpw | 四卡 TP1 | 较低 4K 首 token 延迟；DSpark 关闭 |
-| `exl3-tp4-prod.json` | EXL3 2.9 bpw | 四卡 TP4 | DSpark 投机解码 |
-| `gguf-tp2-prod.json` | GGUF 2.00 bpw | 双卡 TP2 | DSpark 与自适应 Prefill |
+`bash scripts/k100ai/serve-k100ai.sh qwen` 使用 IQ3_S 模板，启动
+`bin/strata-qwen-iq3s-r112`。模板将上下文设为 262,144 tokens，KV 驻留设为 65,536 tokens，
+保留 top-10 专家路由，关闭 prompt-lookup 后缀投机。资产路径、参数和实测见
+[Qwen v0.3.1 指南](../../docs/k100ai/QWEN31.md)。
 
-配置中的 `description_zh`、`notes_zh`、`measured_zh`、`quality_zh`、`binary_sha256` 和 `provenance_zh` 是发布元数据。服务端只消费运行参数，不会把未知元数据传给引擎。
+仍在使用 IQ3_XXS 资产时，用 `qwen-iq3xxs` 启动
+[旧模板](qwen-server.template.json)。0.1.47 和 0.1.55 的切换方法见
+[安装指南](../../docs/k100ai/INSTALL.md#qwen38-flash-next)。
 
-## Qwen 配置
+## DeepSeek-V4.1-Flash
 
-`qwen-iq3s-r112.template.json` 是 v0.3.1 默认生产模板，对应
-`bin/strata-qwen-iq3s-r112`。准备 IQ3_S 资产后直接启动：
+三套配置沿用 v0.3.0 的 `bin/strata-dsv41`。启动前根据部署位置修改
+`tokenizer`、`log`、`--pack` 和配置中的 `--expert-profile`。EXL3 使用
+HCU0–3，GGUF TP2 使用 HCU0–1。配置顶层的中文说明和哈希字段供查阅，
+服务端只向引擎传递运行参数。
 
-```bash
-K100AI_ASSETS_DIR=/data/k100ai-assets \
-  bash scripts/k100ai/fetch-qwen-iq3s.sh \
-  /data/k100ai-assets/qwen3.8-flash-next-iq3-s
-
-K100AI_ASSETS_DIR=/data/k100ai-assets \
-PORT=18096 \
-  bash scripts/k100ai/serve-k100ai.sh qwen
-```
-
-模板固定 `--max-context 65536`、`--kv-resident 65536`、
-`--no-publish-kernel`、`--suffix-draft 0` 和
-`STRATA_PREFILL_TOPK=10`。它保留完整路由并关闭 prompt-lookup 后缀投机。
-资产和逐轮成绩见 [Qwen v0.3.1 指南](../../docs/k100ai/QWEN31.md)。
-
-`qwen-server.template.json` 只用于旧 IQ3_XXS 0.1.47 / 0.1.55
-兼容路径。启动器通过 `scripts/k100ai/render-config.py` 渲染模板：
-
-```bash
-K100AI_ASSETS_DIR=/data/k100ai-assets \
-PORT=18096 \
-  bash scripts/k100ai/serve-k100ai.sh qwen-iq3xxs
-```
-
-IQ3_S 生产配置在单张 K100AI、32K 输入和 256 输出下 Native Decode
-45.7–45.9 tok/s，MTP 68.4–71.7 tok/s，Prefill 2,846.4–2,869.4 tok/s。
-
-## 启动前
-
-1. 确认 `exe` 指向发布包内的 `bin/strata-dsv41`，`cwd` 位于发布根目录。
-2. 按实际机器修改 `tokenizer`、`log`、`--pack` 和 `--expert-profile`。
-3. 确认模型资产和冻结 profile 存在。
-4. EXL3 只使用 HCU0–3；GGUF TP2 使用 HCU0–1。
-5. 校验二进制：
-
-```bash
-printf '%s  %s\n' \
-  4fd967c1fa6769e60298357d55683c18e5522f6689441b12fe5a97489b3a35d6 \
-  bin/strata-dsv41 | sha256sum -c -
-```
-
-## 启动
-
-```bash
-bash scripts/k100ai/start-dsv41.sh configs/k100ai/exl3-tp4-prod.json
-```
-
-同一时间只启动一套配置。切换前停止当前服务并执行 `bash scripts/k100ai/preflight.sh`。
-
-## 实测摘要
-
-输入速度单位为 tok/s。DeepSeek 的 4K/32K 数字按标称输入长度除以记录的 TTFT 换算，是端到端等效吞吐约数；原始记录缺少精确 prompt token 数和引擎内部 Prefill 用时，不能当作精确引擎吞吐。
-
-| 配置 | 4K 输入速度约数 | 32K 输入速度约数 |
-| --- | ---: | ---: |
-| `exl3-tp1-prod.json` | 约 1,374 | 约 1,825 |
-| `exl3-tp4-prod.json` | 约 1,013 | 约 1,121 |
-| `gguf-tp2-prod.json` | 约 505 | 约 625 |
-
-投机解码开启时，EXL3 TP4 的 DSpark 为 **43.9 tok/s**，GGUF TP2 的 DSpark 四组样本中位数为 **42.05 tok/s**。TP1 关闭 DSpark，原生解码记录不与上述数值混列。
-
-原始时间、质量门和限制见 [DeepSeek-V4.1 指南](../../docs/k100ai/DEEPSEEK41.md)。
+按 [DeepSeek 安装步骤](../../docs/k100ai/INSTALL.md#deepseek-v41-flash)
+启动所选配置。切换前停止当前服务，并用 `bash scripts/k100ai/preflight.sh`
+检查设备占用。二进制哈希、计时和 PPL 见
+[DeepSeek 指南](../../docs/k100ai/DEEPSEEK41.md)。

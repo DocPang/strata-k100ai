@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "strata-k100ai",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "platform": "linux-x86_64-gfx928-dtk2604",
   "container_image": "harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59cc836efc77b251efbe4ca85de67171bc2c3aca68",
   "models": {
@@ -10,6 +10,8 @@
         "binary": "bin/strata-qwen-iq3s-r112",
         "version": "0.1.47",
         "revision": "R112",
+        "max_context": 262144,
+        "kv_resident": 65536,
         "model": "IQ3_S",
         "sha256": "102b4b412068a68588883c13a28103600d8b078785da9dcbbda34c440e9a5074",
         "config": "configs/k100ai/qwen-iq3s-r112.template.json",

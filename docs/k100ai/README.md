@@ -1,41 +1,25 @@
-# K100AI 文档
+# Strata for K100AI 文档
 
-[返回首页](../../README.md) · [配置目录](../../configs/k100ai/README.md)
+[项目首页](../../README.md) · [下载 v0.3.2](https://github.com/DocPang/strata-k100ai/releases/tag/v0.3.2)
 
-本目录面向 Hygon K100AI / gfx928。安装、运行、验证、来源和版本记录分别归档；文件名不带版本号，当前版本以 README 和发行记录为准。
+## 安装与运行
 
-## 从这里开始
+- [安装指南](INSTALL.md) — 校验发布包、准备模型文件、启动服务。
+- [配置指南](../../configs/k100ai/README.md) — 按卡数选配置，查看对应 JSON。
+- [运行指南](RUNTIME.md) — 切换引擎、设置资产路径、调用和验收 API。
 
-| 文档 | 内容 |
-| --- | --- |
-| [安装指南](INSTALL.md) | 运行环境、模型资产、下载校验和启动 |
-| [运行指南](RUNTIME.md) | 引擎切换、模型参数、API 验收和运行边界 |
-| [配置目录](../../configs/k100ai/README.md) | 三套 DeepSeek 配置与 Qwen IQ3_S / 旧兼容模板 |
+## 模型与实测
 
-## 模型
+- [Qwen3.8-Flash-Next IQ3_S](QWEN31.md) — v0.3.1 单卡配置、Prefill 和 Decode 实测、输出校验。
+- [DeepSeek-V4.1-Flash](DEEPSEEK41.md) — v0.3.0 双卡和四卡配置、首 token 时间、Decode 和 PPL。
+- [验证记录](VALIDATION.md) — 精度、性能、长输入、API 和发布包测试。
 
-| 模型 | 文档 |
-| --- | --- |
-| DeepSeek-V4.1-Flash | [三套生产配置、性能与 R001–R179](DEEPSEEK41.md) |
-| Qwen3.8-Flash-Next | [IQ3_S 安装、算法、完整成绩与来源](QWEN31.md) |
+## 构建与复现
 
-## 验证与复现
+- [复现指南](REPRODUCIBILITY.md) — 构建步骤、测试输入和验收门槛。
+- [来源与校验](PROVENANCE.md) — 二进制、源码和模型资产的来源与哈希。
+- [优化说明](OPTIMIZATION.md) — gfx928 内核、显存、MMAC、MTP 和 DSpark。
 
-| 文档 | 内容 |
-| --- | --- |
-| [验证记录](VALIDATION.md) | Qwen 精度、性能、DeepSeek 长输入、API 和发布包测试 |
-| [优化说明](OPTIMIZATION.md) | gfx928 内核、显存、MMAC、MTP 与 DSpark 路径 |
-| [复现指南](REPRODUCIBILITY.md) | 固定输入、构建步骤和验收门槛 |
-| [来源与校验](PROVENANCE.md) | 生产二进制、源码、模型和运行资产 |
+## 版本
 
-## 版本记录
-
-| 版本 | 发行记录 |
-| --- | --- |
-| [全部版本记录](release-notes/README.md) | 按版本查看功能和发布资产 |
-| v0.3.1 | [Qwen3.8-Flash-Next IQ3_S 精确引擎](release-notes/v0.3.1.md) |
-| v0.3.0 | [DeepSeek-V4.1 与 Qwen3.8-Flash-Next](release-notes/v0.3.0.md) |
-
-## 历史资料
-
-早期文档保留在 [v0.2.3 归档](archive/v0.2.3/README.md)，仅用于追溯当时的手动安装和来源记录。
+[版本记录](release-notes/README.md) · [v0.3.2 发布说明](release-notes/v0.3.2.md) · [v0.2.3 归档](archive/v0.2.3/README.md)

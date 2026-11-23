@@ -1,5 +1,7 @@
 # Strata guides
 
+**海光 K100AI 用户**请从 [K100AI 安装和运行文档](k100ai/README.md)开始。
+
 **New here? Start with [Install Strata](INSTALL.md).** Download the one installer for your system (Windows, Linux or Mac), or install the Terminal with one line. Both use released engine packages. This documentation is for version 0.2.5.
 
 ## Use Strata

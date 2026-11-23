@@ -2,7 +2,7 @@
 
 [返回首页](../../README.md) · [文档索引](README.md) · [运行指南](RUNTIME.md)
 
-适用版本：**v0.3.1**。本版同时提供：
+适用版本：**v0.3.2**。本版同时提供：
 
 - Qwen3.8-Flash-Next IQ3_S 默认生产引擎
 - Qwen3.8-Flash-Next IQ3_XXS 0.1.47 旧快速兼容引擎
@@ -32,12 +32,12 @@
 ## 安装
 
 ```bash
-BASE=https://github.com/DocPang/strata-k100ai/releases/download/v0.3.1
-curl -fLO "$BASE/strata-k100ai-v0.3.1.tar.gz"
-curl -fLO "$BASE/strata-k100ai-v0.3.1.tar.gz.sha256"
-sha256sum -c strata-k100ai-v0.3.1.tar.gz.sha256
-tar -xzf strata-k100ai-v0.3.1.tar.gz
-cd strata-k100ai-v0.3.1
+BASE=https://github.com/DocPang/strata-k100ai/releases/download/v0.3.2
+curl -fLO "$BASE/strata-k100ai-v0.3.2.tar.gz"
+curl -fLO "$BASE/strata-k100ai-v0.3.2.tar.gz.sha256"
+sha256sum -c strata-k100ai-v0.3.2.tar.gz.sha256
+tar -xzf strata-k100ai-v0.3.2.tar.gz
+cd strata-k100ai-v0.3.2
 sha256sum -c SHA256SUMS
 bash scripts/k100ai/setup-runtime.sh
 bash scripts/k100ai/preflight.sh
@@ -51,7 +51,7 @@ harbor.sourcefind.cn:5443/hcu/admin/base/sglang@sha256:878d317dfa18efae70516a59c
 
 ## Qwen3.8-Flash-Next
 
-v0.3.1 默认生产引擎为 IQ3_S。模型、pack 和 MTP runtime 需要准备，合计
+v0.3.2 默认生产引擎为 IQ3_S。模型、pack 和 MTP runtime 需要准备，合计
 约 140 GB 磁盘。建议先确认 `setup-runtime.sh` 已完成，再运行恢复下载
 和校验脚本：
 
@@ -75,7 +75,7 @@ $K100AI_ASSETS_DIR/qwen3.8-flash-next-iq3-s/
   mtp/rt/{experts.bin,dense.bin,dense.txt,draft_vocab.bin}
 ```
 
-启动 v0.3.1 默认生产引擎：
+启动 v0.3.2 默认生产引擎：
 
 ```bash
 printf '%s  %s\n' \
@@ -180,13 +180,13 @@ curl --fail http://127.0.0.1:18097/v1/chat/completions \
   -d '{"model":"deepseek-v4.1-flash","messages":[{"role":"user","content":"你好"}],"max_tokens":32,"temperature":0}'
 ```
 
-Qwen v0.3.1 API 验收：
+Qwen API 验收：
 
 ```bash
 BASE_URL=http://127.0.0.1:18096 \
 MODEL=qwen3.8-flash-next \
 EXPECT_DRAFT_METRICS=1 \
-OUT=api-qwen-v031 \
+OUT=api-qwen \
   bash scripts/k100ai/validate-api.sh
 ```
 
@@ -195,6 +195,6 @@ DeepSeek API 验收：
 ```bash
 BASE_URL=http://127.0.0.1:18097 \
 MODEL=deepseek-v4.1-flash \
-OUT=api-dsv41-v031 \
+OUT=api-dsv41 \
   bash scripts/k100ai/validate-api.sh
 ```

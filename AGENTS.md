@@ -1,7 +1,7 @@
 # AGENTS.md
 
 This repository is the `strata-k100ai` product branch for **Hygon K100AI / gfx928** on
-**Linux x86_64 with DTK 2604**. Product version is **v0.3.1**.
+**Linux x86_64 with DTK 2604**. Product version is **v0.3.2**.
 
 Read [docs/k100ai/README.md](docs/k100ai/README.md) first. It is the index for the
 current installation, runtime, model, validation, provenance and reproduction
@@ -72,8 +72,8 @@ python3 -m json.tool configs/k100ai/gguf-tp2-prod.json >/dev/null
 git diff --check
 ```
 
-Use [docs/k100ai/QWEN31.md](docs/k100ai/QWEN31.md) for the current Qwen
-installation, algorithm and score scope. Use
+Use [docs/k100ai/RUNTIME.md](docs/k100ai/RUNTIME.md) for current Qwen
+configuration and [docs/k100ai/QWEN31.md](docs/k100ai/QWEN31.md) for the R112 benchmark. Use
 [docs/k100ai/VALIDATION.md](docs/k100ai/VALIDATION.md) for verification evidence and
 [docs/k100ai/DEEPSEEK41.md](docs/k100ai/DEEPSEEK41.md) for DeepSeek production
 results. Do not mix v0.2.3 measurements with v0.3.0 configuration claims without

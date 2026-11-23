@@ -2,6 +2,9 @@
 
 [返回首页](../../README.md) · [文档索引](README.md) · [安装](INSTALL.md) · [运行](RUNTIME.md) · [成绩证据](../../data/k100ai/qwen-iq3s-r112-evidence/README.md)
 
+本页记录 v0.3.1 的 R112 成绩和原始配置。v0.3.2 的默认窗口见
+[运行指南](RUNTIME.md#qwen38-flash-next)。
+
 ## 结论
 
 v0.3.1 的 Qwen 生产引擎是 `bin/strata-qwen-iq3s-r112`。它在单张

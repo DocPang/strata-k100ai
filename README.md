@@ -1,297 +1,128 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="apps/host/public/brand/strata-lockup-dark.svg">
-    <img src="apps/host/public/brand/strata-lockup-light.svg" alt="Strata" width="340">
+    <img src="apps/host/public/brand/strata-lockup-light.svg" alt="Strata" width="300">
   </picture>
 </p>
 
-<h3 align="center">在海光 K100AI 上运行强大的 AI。</h3>
-<p align="center">面向 gfx928 的本地推理引擎、模型配置与可复现发布。</p>
+<h1 align="center">Strata for K100AI</h1>
 
 <p align="center">
   <a href="#模型">模型</a> ·
-  <a href="#安装"><b>安装</b></a> ·
+  <a href="#安装">安装</a> ·
+  <a href="#硬件与配置">硬件与配置</a> ·
   <a href="#性能">性能</a> ·
-  <a href="#配置">配置</a> ·
-  <a href="#文档">文档</a> ·
+  <a href="#工具">工具</a> ·
   <a href="#帮助">帮助</a>
 </p>
 
-<p align="center">
-  <a href="https://github.com/DocPang/strata-k100ai/releases/tag/v0.3.1"><img src="https://img.shields.io/badge/version-v0.3.1-0ab887" alt="v0.3.1"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/DocPang/strata-k100ai" alt="MIT license"></a>
-  <img src="https://img.shields.io/badge/platform-K100AI%20%2F%20gfx928-5b67ff" alt="K100AI / gfx928">
-  <img src="https://img.shields.io/badge/DTK-2604-3d6bff" alt="DTK 2604">
-</p>
+这是 Strata 的海光 K100AI 适配版，运行在 Linux x86_64 / gfx928 / DTK 2604，提供 OpenAI 和 Anthropic 兼容 API。
 
-**免费、开源，在你的 K100AI 集群上运行。** 提供 OpenAI 与 Anthropic 兼容 API，可直接连接现有客户端和编程工具。
-
-K100AI 版本 **v0.3.1** · **Linux x86_64 / gfx928 / DTK 2604** · [发布说明](docs/k100ai/release-notes/v0.3.1.md)
-
-**v0.3.1 新增** Qwen3.8-Flash-Next IQ3_S 精确引擎：32K 原生 Decode 45.7–45.9 tok/s，MTP 68.4–71.7 tok/s，Prefill 2,846–2,869 tok/s。
+[下载 v0.3.2](https://github.com/DocPang/strata-k100ai/releases/tag/v0.3.2) · [发布说明](docs/k100ai/release-notes/v0.3.2.md) · [文档](docs/k100ai/README.md)
 
 ## 模型
 
-本版提供两条生产模型线。二进制随发布包提供；模型权重、tokenizer 和运行资产需要另行准备。
+一张 64 GiB K100AI 可以跑 **Qwen3.8-Flash-Next IQ3_S**。这是默认 Qwen 配置，保留完整的 top-10 专家路由，MTP 候选由目标模型验证。单卡在 32K 输入下，原生解码中位 **45.8 tok/s**，开启 MTP 后为 **70.0 tok/s**，各测四次。详见 [Qwen 指南](docs/k100ai/QWEN31.md)。
 
-<details>
-<summary><img src="docs/media/models/deepseek.svg" width="22" alt="" align="middle"> &nbsp;<b>DeepSeek-V4.1-Flash</b></summary>
-
-DeepSeek-V4.1-Flash 提供三套冻结配置，分别面向四卡低首 token 延迟、四卡投机解码和双卡部署。
-
-| 配置 | 设备 | 模型格式 | Decode |
-| --- | ---: | --- | --- |
-| [EXL3 TP1](configs/k100ai/exl3-tp1-prod.json) | 4× K100AI 64 GiB | EXL3 2.9 bpw | 原生解码对照 |
-| [EXL3 TP4](configs/k100ai/exl3-tp4-prod.json) | 4× K100AI 64 GiB | EXL3 2.9 bpw | DSpark |
-| [GGUF TP2](configs/k100ai/gguf-tp2-prod.json) | 2× K100AI 64 GiB | GGUF 2.00 bpw | DSpark |
-
-三套配置均通过 PPL 相对基线不超过 `+2%` 和固定四项 API 测试。完整参数、质量结果和优化过程见 [DeepSeek-V4.1 指南](docs/k100ai/DEEPSEEK41.md)。
-
-</details>
-
-<details>
-<summary><img src="docs/media/models/qwen.svg" width="22" alt="" align="middle"> &nbsp;<b>Qwen3.8-Flash-Next</b></summary>
-
-Qwen3.8-Flash-Next 在单张 K100AI 64 GiB 上运行。v0.3.1 的生产入口是
-IQ3_S 精确引擎，旧 IQ3_XXS 快速档和 0.1.55 对照档继续保留用于兼容测试。
-
-| 引擎 | 二进制 | 用途 |
-| --- | --- | --- |
-| **IQ3_S 精确档** | `bin/strata-qwen-iq3s-r112` | v0.3.1 默认生产引擎，完整路由与目标模型验证 MTP |
-| 0.1.47 快速档 | `bin/strata-0.1.47` | 旧 IQ3_XXS 兼容，允许数值漂移 |
-| 0.1.55 对照档 | `bin/strata-0.1.55` | 旧 canonical / A-B 对照 |
-
-IQ3_S 精确档固定完整路由 top-10、65,536-token KV 驻留、目标模型验证的
-MTP，关闭 prompt-lookup 后缀投机。旧 0.1.47 快速档不保证与对照档逐位
-一致。完整参数和成绩见 [Qwen v0.3.1 指南](docs/k100ai/QWEN31.md)。
-
-</details>
+**DeepSeek-V4.1-Flash** 有双卡 GGUF 和四卡 EXL3 配置，沿用 v0.3.0 的引擎、参数和实测记录。选好配置后，按 [DeepSeek 安装步骤](docs/k100ai/INSTALL.md#deepseek-v41-flash) 准备对应的模型资产。
 
 ## 安装
 
-### 下载发布包
-
-**[下载 Strata for K100AI v0.3.1 →](https://github.com/DocPang/strata-k100ai/releases/tag/v0.3.1)**
+在 K100AI 主机上下载并校验发布包。主机需要 Docker 和可用的海光驱动。Qwen 的模型和运行资产约占 140 GB 磁盘，由安装脚本另行准备。
 
 ```bash
-BASE=https://github.com/DocPang/strata-k100ai/releases/download/v0.3.1
-
-curl -fLO "$BASE/strata-k100ai-v0.3.1.tar.gz"
-curl -fLO "$BASE/strata-k100ai-v0.3.1.tar.gz.sha256"
-sha256sum -c strata-k100ai-v0.3.1.tar.gz.sha256
-
-tar -xzf strata-k100ai-v0.3.1.tar.gz
-cd strata-k100ai-v0.3.1
-sha256sum -c SHA256SUMS
+BASE=https://github.com/DocPang/strata-k100ai/releases/download/v0.3.2
+curl -fLO "$BASE/strata-k100ai-v0.3.2.tar.gz"
+curl -fLO "$BASE/strata-k100ai-v0.3.2.tar.gz.sha256"
+sha256sum -c strata-k100ai-v0.3.2.tar.gz.sha256 &&
+  tar -xzf strata-k100ai-v0.3.2.tar.gz &&
+  cd strata-k100ai-v0.3.2 &&
+  sha256sum -c SHA256SUMS &&
+  bash scripts/k100ai/setup-runtime.sh &&
+  bash scripts/k100ai/preflight.sh
 ```
 
-也可以检出对应 tag：
+准备资产并启动 Qwen。
 
 ```bash
-git clone --branch v0.3.1 --depth 1 \
-  https://github.com/DocPang/strata-k100ai.git
-cd strata-k100ai
-sha256sum -c SHA256SUMS
+export K100AI_ASSETS_DIR=/data/k100ai-assets
+bash scripts/k100ai/fetch-qwen-iq3s.sh "$K100AI_ASSETS_DIR/qwen3.8-flash-next-iq3-s" &&
+  PORT=18096 bash scripts/k100ai/serve-k100ai.sh qwen
 ```
 
-### 安装运行环境
+DeepSeek、旧 IQ3_XXS 和自定义资产路径见 [安装指南](docs/k100ai/INSTALL.md)。
 
-```bash
-bash scripts/k100ai/setup-runtime.sh
-bash scripts/k100ai/preflight.sh
-```
+<a id="配置"></a>
 
-运行环境固定为 DTK 2604 镜像。完整镜像 digest、设备映射和模型资产步骤见 [安装指南](docs/k100ai/INSTALL.md)。
+## 硬件与配置
 
-### 启动 Qwen3.8-Flash-Next
+以下卡数按每张 K100AI 64 GiB 计算。
 
-安装运行时和 Qwen 外置资产：
+| 卡数 | 配置 | 用途 |
+| ---: | --- | --- |
+| 1 | [Qwen IQ3_S](configs/k100ai/qwen-iq3s-r112.template.json) | 256K 上下文，64K KV 驻留 |
+| 2 | [DeepSeek GGUF TP2](configs/k100ai/gguf-tp2-prod.json) | GGUF 2.00 bpw，开启 DSpark |
+| 4 | [DeepSeek EXL3 TP1](configs/k100ai/exl3-tp1-prod.json) | EXL3 2.9 bpw，优先首 token 延迟 |
+| 4 | [DeepSeek EXL3 TP4](configs/k100ai/exl3-tp4-prod.json) | EXL3 2.9 bpw，开启 DSpark |
 
-```bash
-bash scripts/k100ai/setup-runtime.sh
+Qwen IQ3_S 默认支持 262,144-token 上下文，其中 65,536 个 KV 位置驻留在显存。已用 261,632 token 输入和 256 token 输出验证长文检索。设备映射、配置字段和引擎切换见 [配置指南](configs/k100ai/README.md)和 [运行指南](docs/k100ai/RUNTIME.md)。
 
-K100AI_ASSETS_DIR=/data/k100ai-assets \
-  bash scripts/k100ai/fetch-qwen-iq3s.sh \
-  /data/k100ai-assets/qwen3.8-flash-next-iq3-s
-```
+<a id="how-fast-is-it"></a>
 
-启动 v0.3.1 默认生产引擎：
+## 性能
 
-```bash
-K100AI_ASSETS_DIR=/data/k100ai-assets \
-PORT=18096 \
-  bash scripts/k100ai/serve-k100ai.sh qwen
-```
+### Qwen3.8-Flash-Next IQ3_S · v0.3.1
 
-旧 IQ3_XXS 快速档通过独立入口启动：
+单张 K100AI 64 GiB，32,768-token 输入、256-token 输出，temperature 0，关闭 prompt cache。每种模式测四次，Prefill 和 Decode 均按引擎日志计时。
 
-```bash
-K100AI_ASSETS_DIR=/data/k100ai-assets \
-PORT=18096 \
-  bash scripts/k100ai/serve-k100ai.sh qwen-iq3xxs
-```
+| 解码模式 | Prefill（tok/s） | Decode（tok/s） | Decode 中位（tok/s） |
+| --- | ---: | ---: | ---: |
+| 原生 | 2,856.4–2,869.4 | 45.7–45.9 | 45.8 |
+| MTP | 2,837.3–2,851.3 | 68.4–71.7 | **70.0** |
 
-旧 0.1.55 对照引擎：
+四组原生和 MTP 输出的 SHA-256 逐组一致。另有一组独立 Prefill 测试，8K 和 32K 各用八个不同的 prompt，中位速度分别为 **2,715.9** 和 **2,851.65 tok/s**。[逐轮数据与参数](docs/k100ai/QWEN31.md)
 
-```bash
-K100AI_QWEN_ENGINE=bin/strata-0.1.55 \
-K100AI_QWEN_PACK=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/pack/iq3xxs \
-K100AI_QWEN_NATIVE=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/model/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf \
-K100AI_QWEN_PLE=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/model/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf \
-K100AI_QWEN_TOKENIZER=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/pack/iq3xxs/tokenizer \
-K100AI_QWEN_MTP_RT=/data/k100ai-assets/qwen3.8-flash-next-iq3-xxs/mtp/rt \
-K100AI_ASSETS_DIR=/data/k100ai-assets \
-PORT=18096 \
-  bash scripts/k100ai/serve-k100ai.sh qwen-iq3xxs
-```
+### DeepSeek-V4.1-Flash · v0.3.0
 
-### 启动 DeepSeek-V4.1-Flash
+沿用原发布成绩。4K 和 32K 输入速度由标称 token 数除以 API 首 token 时间换算，反映的是端到端等效吞吐。四卡 Decode 来自生产安装后的验收，双卡 DSpark 取四组样本中位数。
 
-先检查配置中的 `tokenizer`、`--pack` 和 `--expert-profile` 是否指向本机资产，再选择一套配置：
+| 配置 | 4K 输入约值（tok/s） | 32K 输入约值（tok/s） | Decode（tok/s） |
+| --- | ---: | ---: | ---: |
+| 四卡 EXL3 TP1 | 1,374 | 1,825 | 原生 18.7 |
+| 四卡 EXL3 TP4 | 1,013 | 1,121 | DSpark 43.9 |
+| 双卡 GGUF TP2 | 505 | 625 | DSpark 42.05（中位） |
 
-```bash
-bash scripts/k100ai/start-dsv41.sh configs/k100ai/exl3-tp4-prod.json
-```
+[首 token 时间、测试样本与 PPL](docs/k100ai/DEEPSEEK41.md)
 
-同一时间只启动一套模型服务。切换配置前，请停止当前服务并重新执行设备占用检查。
+## 工具
 
-### 发送第一条请求
+Codex CLI、Claude Code 等客户端可通过兼容 API 连接。表中是 OpenAI 兼容地址。Anthropic 兼容接口使用同一端口下的 `/v1/messages`。
 
-Qwen：
+| 模型 | OpenAI Base URL | 模型名 |
+| --- | --- | --- |
+| Qwen | `http://127.0.0.1:18096/v1` | `qwen3.8-flash-next` |
+| DeepSeek | `http://127.0.0.1:18097/v1` | `deepseek-v4.1-flash` |
+
+另开终端，用一条请求确认 Qwen 能生成回复。
 
 ```bash
 curl --fail http://127.0.0.1:18096/v1/chat/completions \
   -H 'Content-Type: application/json' \
-  -d '{
-    "model": "qwen3.8-flash-next",
-    "messages": [{"role": "user", "content": "你好"}],
-    "max_tokens": 64,
-    "temperature": 0
-  }'
+  -d '{"model":"qwen3.8-flash-next","messages":[{"role":"user","content":"你好"}],"max_tokens":32,"temperature":0}'
 ```
 
-DeepSeek：
+[API 示例与验收脚本](docs/k100ai/RUNTIME.md#api)
 
-```bash
-curl --fail http://127.0.0.1:18097/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "model": "deepseek-v4.1-flash",
-    "messages": [{"role": "user", "content": "你好"}],
-    "max_tokens": 64,
-    "temperature": 0
-  }'
-```
-
-Qwen 使用端口 `18096` 和模型名 `qwen3.8-flash-next`。服务同时提供 `/health`、`/v1/models`、`/v1/messages` 和 `/metrics`。
-
-## 性能
-
-### Qwen3.8-Flash-Next IQ3_S
-
-测试条件为单张 K100AI 64 GiB、IQ3_S、INT8 KV、24,576 expert slots、
-完整路由 top-10、prefill chunk 20,480。Decode 使用 32,768-token prompt
-和 256-token 输出，temperature 0、无 prompt cache。MTP 使用
-`spec 3`、`min-p 0.5`、`window 4096` 和 Q4 draft head。
-
-#### Prefill 详细成绩
-
-8K 和 32K 各使用 8 个内容不同、长度固定的 prompt。计时来自引擎
-`prompt ... read in ... ms`，不是端到端 TTFT 换算。
-
-| Prompt | 第 1 次 | 第 2 次 | 第 3 次 | 第 4 次 | 第 5 次 | 第 6 次 | 第 7 次 | 第 8 次 |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 8,192 tok/s | 2,665.1 | 2,718.1 | 2,719.3 | 2,716.2 | 2,714.9 | 2,713.3 | 2,715.6 | 2,716.4 |
-| 32,768 tok/s | 2,848.0 | 2,863.9 | 2,859.2 | 2,856.9 | 2,850.0 | 2,853.3 | 2,846.4 | 2,847.5 |
-
-8K 中位 **2,715.9 tok/s**，耗时 3.013–3.074 s。32K 中位
-**2,851.65 tok/s**，耗时 11.442–11.512 s。v0.3.1 发布时另行复测的
-32K Native 为 2,856.4–2,869.4 tok/s，MTP 为 2,837.3–2,851.3 tok/s。
-
-#### Decode 详细成绩
-
-| 轮次 | Prompt Prefill | Native Decode | MTP Decode | MTP Draft 接受 |
-| ---: | ---: | ---: | ---: | ---: |
-| 1 | 11,471.7 ms / 2,856.4 tok/s | **45.7 tok/s** | **70.8 tok/s** | 132 / 188 |
-| 2 | 11,420.0 ms / 2,869.4 tok/s | **45.8 tok/s** | **68.4 tok/s** | 128 / 193 |
-| 3 | 11,440.8 ms / 2,864.1 tok/s | **45.8 tok/s** | **71.7 tok/s** | 133 / 180 |
-| 4 | 11,443.9 ms / 2,863.4 tok/s | **45.9 tok/s** | **69.2 tok/s** | 128 / 185 |
-
-Native 中位 **45.8 tok/s**，MTP 中位 **70.0 tok/s**，对应约 **1.53×**
-输出加速。四组 Native / MTP 的 256-token 输出 SHA-256 逐轮相同，
-input exact、output exact 和 retrieval 均为 8/8 通过。
-
-### DeepSeek-V4.1-Flash
-
-DeepSeek 数字按标称输入长度除以记录的 API 首 token 时间换算，是端到端
-等效吞吐约数，不能与上面 Qwen 引擎 Prefill 直接比较。
-
-| 配置 | 4K 输入约数 | 32K 输入约数 | 投机 Decode |
-| --- | ---: | ---: | ---: |
-| EXL3 TP1 | 1,374 tok/s | 1,825 tok/s | Native 18.7 tok/s |
-| EXL3 TP4 | 1,013 tok/s | 1,121 tok/s | DSpark 43.9 tok/s |
-| GGUF TP2 | 505 tok/s | 625 tok/s | DSpark 中位 42.05 tok/s |
-
-Qwen 的完整运行参数、每轮耗时和输出哈希见
-[Qwen v0.3.1 指南](docs/k100ai/QWEN31.md)。DeepSeek 原始计时和 PPL 见
-[DeepSeek-V4.1 指南](docs/k100ai/DEEPSEEK41.md)。
-
-## 配置
-
-所有 K100AI 配置集中在 [configs/k100ai](configs/k100ai/)，JSON 可以直接审阅和修改。
-
-| 需求 | 建议 |
-| --- | --- |
-| 四卡，优先 4K 首 token 延迟 | [EXL3 TP1](configs/k100ai/exl3-tp1-prod.json) |
-| 四卡，优先持续输出速度 | [EXL3 TP4](configs/k100ai/exl3-tp4-prod.json) |
-| 两张卡，或已有 GGUF 2.00 bpw 资产 | [GGUF TP2](configs/k100ai/gguf-tp2-prod.json) |
-| 单卡 Qwen，生产、完整路由和无近似 Prefill 算法 | `scripts/k100ai/serve-k100ai.sh qwen` |
-| 单卡 Qwen，复现旧 IQ3_XXS 快速档 | `scripts/k100ai/serve-k100ai.sh qwen-iq3xxs` |
-
-配置字段、资产路径和生产参数说明见 [配置指南](configs/k100ai/README.md)。
-
-## 工具
-
-**Claude Code · Codex CLI · OpenCode · Hermes Agent · OpenClaw**，以及更多兼容 OpenAI 或 Anthropic API 的客户端。
-
-应用连接 API 时使用：
-
-| 模型 | 地址 | 模型名 |
-| --- | --- | --- |
-| Qwen3.8-Flash-Next | `http://127.0.0.1:18096/v1` | `qwen3.8-flash-next` |
-| DeepSeek-V4.1-Flash | `http://127.0.0.1:18097/v1` | `deepseek-v4.1-flash` |
-
-默认只监听本机。需要从其他机器访问时，通过 SSH 隧道或项目支持的访问控制方式暴露服务。
+<a id="how-does-it-work"></a>
 
 ## 文档
 
-| 文档 | 内容 |
-| --- | --- |
-| [K100AI 文档索引](docs/k100ai/README.md) | 安装、运行、验证、来源与版本记录 |
-| [安装指南](docs/k100ai/INSTALL.md) | 模型资产、运行环境和启动 |
-| [运行指南](docs/k100ai/RUNTIME.md) | 引擎切换、运行参数和 API |
-| [Qwen v0.3.1 指南](docs/k100ai/QWEN31.md) | IQ3_S 安装、算法边界、完整成绩和复现 |
-| [DeepSeek-V4.1](docs/k100ai/DEEPSEEK41.md) | 三套配置、R001–R179 和原始计时 |
-| [验证记录](docs/k100ai/VALIDATION.md) | 性能、精度、算子和 API 测试 |
-| [来源与校验](docs/k100ai/PROVENANCE.md) | 二进制、源码与运行资产 |
-| [复现指南](docs/k100ai/REPRODUCIBILITY.md) | 固定输入、构建与验收 |
+[文档索引](docs/k100ai/README.md)汇总了安装、配置和各版本说明。查性能和精度用 [验证记录](docs/k100ai/VALIDATION.md)，从源码构建或复跑测试用 [复现指南](docs/k100ai/REPRODUCIBILITY.md)。
+
+<a id="something-went-wrong"></a>
 
 ## 帮助
 
-<a id="how-does-it-work"></a>
-<a id="how-fast-is-it"></a>
-<a id="something-went-wrong"></a>
+遇到安装或启动问题，提交 Issue 时附上版本、卡数和相关日志。
 
-[报告问题](https://github.com/DocPang/strata-k100ai/issues/new/choose) · [讨论与提问](https://github.com/DocPang/strata-k100ai/issues) · [参与贡献](https://github.com/DocPang/strata-k100ai/blob/release/v0.3.1/CONTRIBUTING.md) · [上游 Strata](https://github.com/Niko1221/Strata)
-
-## 使用边界
-
-- 当前发布环境为 **K100AI/gfx928 + DTK 2604**，其他架构需要单独构建和验证。
-- DeepSeek 仅验证 EXL3 TP1、EXL3 TP4 和 GGUF TP2 三套拓扑。
-- Qwen v0.3.1 生产模板验证到 32K 输入并配置 65,536-token KV。旧引擎的
-  262K 上限属于历史兼容路径，完整窗口尚未完成质量评测。
-- DeepSeek 1M 是配置上限，完整窗口尚未完成质量评测。
-- TP1、TP4 的 32K 首 token 延迟没有达到既定目标。
-- 模型、量化 pack、MTP、Engram 和 DSpark 分别适用其上游许可证。
-
-[MIT 许可证](LICENSE) · [上游项目](https://github.com/Niko1221/Strata) · 由独立维护者适配和发布。
+[提交 Issue](https://github.com/DocPang/strata-k100ai/issues/new/choose) · [参与贡献](https://github.com/DocPang/strata-k100ai/blob/v0.3.2/CONTRIBUTING.md) · [上游 Strata](https://github.com/Niko1221/Strata) · [MIT 许可证](LICENSE)

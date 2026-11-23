@@ -2,7 +2,7 @@
 
 [返回首页](../../README.md) · [文档索引](README.md) · [来源与校验](PROVENANCE.md)
 
-本页说明如何从 v0.3.1 发布包验证二进制、准备模型输入、启动服务并重复
+本页说明如何从 v0.3.2 发布包验证二进制、准备模型输入、启动服务并重复
 质量与 API 验收。固定构建环境为 **K100AI/gfx928、Linux x86_64、
 DTK 2604**。
 
@@ -12,7 +12,7 @@ DTK 2604**。
 | --- | --- |
 | 运行镜像 | [安装指南](INSTALL.md#安装) |
 | DeepSeek 三套配置 | `configs/k100ai/*-prod.json` |
-| Qwen v0.3.1 生产模板 | `configs/k100ai/qwen-iq3s-r112.template.json` |
+| Qwen 默认模板 | `configs/k100ai/qwen-iq3s-r112.template.json` |
 | Qwen 旧引擎模板 | `configs/k100ai/qwen-server.template.json` |
 | 模型与资产来源 | [已固定的 revision 和 SHA-256](PROVENANCE.md) |
 | Qwen v0.3.1 完整方法 | [Qwen v0.3.1 指南](QWEN31.md) |
@@ -93,3 +93,31 @@ API 验收命令见[运行指南](RUNTIME.md#api-验收)。固定四项测试覆
 - 每次运行的原始 `/metrics` 和引擎日志摘要
 
 单次有利样本只作为观察，不写成稳定加速结论。
+
+## Qwen 长上下文复现
+
+从新的目录解压发布包，校验归档及内置 `SHA256SUMS`，按[安装指南](INSTALL.md)准备
+固定 revision 的 IQ3_S 资产并启动默认服务。然后在另一个终端执行：
+
+```bash
+python3 scripts/k100ai/verify-qwen-release.py --out qwen-release-check
+```
+
+脚本使用两个固定的合成请求，分别校验 32,768 和 261,632 token 输入、256 token
+输出、零 prompt cache 命中和三处检索。每个请求保存 Prefill、Decode、首 token 时间、
+MTP 接受数和输出 SHA-256。默认要求服务报告 262,144-token 上下文。
+
+对照测试可在同一张卡上依次启动两种配置，用不同的 `--out` 路径保存结果。两套
+服务均已启动时，可以额外传入 `--candidate-url`，用一条命令发送相同请求并比较输出
+哈希。性能对照使用同一张卡串行运行。
+
+## 重装发布归档
+
+在 Git 检出中运行：
+
+```bash
+bash scripts/k100ai/archive-published-engines.sh v0.3.2 /tmp/strata-release
+```
+
+此命令打包指定提交中已有的二进制，补齐并校验固定版本的 `gguf-py`，生成包内外
+校验文件。R112 的源码快照和构建记录见 [v0.3.1 原始源码资产](https://github.com/DocPang/strata-k100ai/releases/download/v0.3.1/strata-qwen-iq3s-r112-source.tar.gz)。
