@@ -36,7 +36,7 @@
 ## 性能总览
 
 <p align="center">
-  <img src="docs/k100ai/assets/benchmark-v0.4.0.svg" alt="Strata for K100AI v0.4.0 vs v0.3.2 性能对比" width="100%">
+  <img src="docs/k100ai/assets/benchmark-v0.4.1.svg" alt="Strata for K100AI v0.4.1 vs v0.3.2 性能对比" width="100%">
 </p>
 
 ### 1. 模型选型与核心成绩（v0.4.1 vs v0.3.2）
