@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 560" width="1120" height="560" role="img" aria-label="Strata for K100AI v0.4.0 vs v0.3.2 Benchmark Comparison">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#f1f5f9"/>
+    </linearGradient>
+    <linearGradient id="v040Blue" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="v040Teal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0d9488"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
+    <linearGradient id="v040Amber" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-2%" y="-2%" width="104%" height="106%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.06"/>
+    </filter>
+  </defs>
+
+  <style>
+    .title { font: 700 22px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif; fill: #0f172a; }
+    .subtitle { font: 400 13px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif; fill: #475569; }
+    .card-title { font: 700 16px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif; fill: #0f172a; }
+    .card-sub { font: 400 12px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif; fill: #64748b; }
+    .group-lbl { font: 600 12.5px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif; fill: #334155; }
+    .bar-lbl { font: 500 11.5px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif; fill: #475569; }
+    .val-old { font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #64748b; }
+    .val-new { font: 700 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #0f172a; }
+    .badge-txt { font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #ffffff; }
+    .legend { font: 500 12px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif; fill: #334155; }
+    .foot { font: 400 11px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif; fill: #64748b; }
+  </style>
+
+  <rect x="0" y="0" width="1120" height="560" rx="16" fill="url(#bgGrad)"/>
+
+  <text x="36" y="42" class="title">Strata for K100AI · v0.4.0 实测性能提升总览</text>
+  <text x="36" y="64" class="subtitle">海光 K100AI（gfx928 · 64 GiB HBM）统一冷启动口径对照（v0.3.2 vs v0.4.0，temperature=0，关闭缓存）</text>
+
+  <rect x="708" y="30" width="12" height="12" rx="3" fill="#cbd5e1"/>
+  <text x="726" y="40" class="legend">v0.3.2 基线</text>
+  <rect x="814" y="30" width="12" height="12" rx="3" fill="url(#v040Blue)"/>
+  <text x="832" y="40" class="legend">v0.4.0 默认无损</text>
+  <rect x="954" y="30" width="12" height="12" rx="3" fill="url(#v040Amber)"/>
+  <text x="972" y="40" class="legend">v0.4.0 极速档</text>
+
+  <!-- LEFT CARD: Qwen3.8-Flash-Next -->
+  <rect x="32" y="84" width="516" height="424" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" filter="url(#cardShadow)"/>
+  <text x="54" y="114" class="card-title">Qwen3.8-Flash-Next（IQ3_S · 单卡 64 GiB）</text>
+  <text x="54" y="133" class="card-sub">256K 上下文 · 64K KV 驻留 · 全专家驻留 VRAM · 检索全部 3/3</text>
+  <line x1="54" y1="146" x2="526" y2="146" stroke="#f1f5f9" stroke-width="1.5"/>
+
+  <text x="54" y="170" class="group-lbl">Decode 生成速度（tok/s，越高越好）</text>
+
+  <text x="54" y="196" class="bar-lbl">32K · v0.3.2</text>
+  <rect x="148" y="184" width="181" height="16" rx="4" fill="#cbd5e1"/>
+  <text x="337" y="196" class="val-old">69.8</text>
+
+  <text x="54" y="220" class="bar-lbl">32K · v0.4.0</text>
+  <rect x="148" y="208" width="220" height="18" rx="4" fill="url(#v040Blue)"/>
+  <text x="376" y="221" class="val-new">84.6 tok/s</text>
+  <rect x="464" y="208" width="58" height="18" rx="9" fill="#16a34a"/>
+  <text x="493" y="221" text-anchor="middle" class="badge-txt">+21.2%</text>
+
+  <text x="54" y="252" class="bar-lbl">256K · v0.3.2</text>
+  <rect x="148" y="240" width="167" height="16" rx="4" fill="#cbd5e1"/>
+  <text x="323" y="252" class="val-old">64.3</text>
+
+  <text x="54" y="276" class="bar-lbl">256K · v0.4.0</text>
+  <rect x="148" y="264" width="171" height="18" rx="4" fill="url(#v040Blue)"/>
+  <text x="327" y="277" class="val-new">65.9 tok/s</text>
+  <rect x="464" y="264" width="58" height="18" rx="9" fill="#0ea5e9"/>
+  <text x="493" y="277" text-anchor="middle" class="badge-txt">+2.5%</text>
+
+  <line x1="54" y1="302" x2="526" y2="302" stroke="#f1f5f9" stroke-width="1.5"/>
+
+  <text x="54" y="326" class="group-lbl">Prefill 首字吞吐（tok/s，越高越好）</text>
+
+  <text x="54" y="352" class="bar-lbl">32K · v0.3.2</text>
+  <rect x="148" y="340" width="194" height="16" rx="4" fill="#cbd5e1"/>
+  <text x="350" y="352" class="val-old">2,823.1</text>
+
+  <text x="54" y="376" class="bar-lbl">32K · v0.4.0</text>
+  <rect x="148" y="364" width="218" height="18" rx="4" fill="url(#v040Teal)"/>
+  <text x="374" y="377" class="val-new">3,177.4</text>
+  <rect x="464" y="364" width="58" height="18" rx="9" fill="#16a34a"/>
+  <text x="493" y="377" text-anchor="middle" class="badge-txt">+12.5%</text>
+
+  <text x="54" y="408" class="bar-lbl">256K · v0.3.2</text>
+  <rect x="148" y="396" width="162" height="16" rx="4" fill="#cbd5e1"/>
+  <text x="318" y="408" class="val-old">2,362.9</text>
+
+  <text x="54" y="432" class="bar-lbl">256K · v0.4.0</text>
+  <rect x="148" y="420" width="186" height="18" rx="4" fill="url(#v040Teal)"/>
+  <text x="342" y="433" class="val-new">2,713.1</text>
+  <rect x="464" y="420" width="58" height="18" rx="9" fill="#16a34a"/>
+  <text x="493" y="433" text-anchor="middle" class="badge-txt">+14.8%</text>
+
+  <rect x="54" y="458" width="472" height="34" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="68" y="479" class="card-sub">全功能实测（视觉+256K+缓存复用+双卡缓存池）：显存 61.1 / 65.5 GiB · 1080p 视觉零 OOM</text>
+
+  <!-- RIGHT CARD: DeepSeek-V4.1-Flash -->
+  <rect x="572" y="84" width="516" height="424" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" filter="url(#cardShadow)"/>
+  <text x="594" y="114" class="card-title">DeepSeek-V4.1-Flash（GGUF 2.00bpw · 双卡 128 GiB）</text>
+  <text x="594" y="133" class="card-sub">双卡交错 YOCO 流水线 · DSpark 投机解码 · 默认档 128 token 零差异</text>
+  <line x1="594" y1="146" x2="1066" y2="146" stroke="#f1f5f9" stroke-width="1.5"/>
+
+  <text x="594" y="170" class="group-lbl">32K Prefill 首字吞吐（tok/s，越高越好）</text>
+
+  <text x="594" y="196" class="bar-lbl">v0.3.2 基线</text>
+  <rect x="698" y="184" width="56" height="16" rx="4" fill="#cbd5e1"/>
+  <text x="762" y="196" class="val-old">512.0 (64.0s)</text>
+
+  <text x="594" y="220" class="bar-lbl">v0.4.0 无损</text>
+  <rect x="698" y="208" width="152" height="18" rx="4" fill="url(#v040Blue)"/>
+  <text x="858" y="221" class="val-new">1,393.3 (23.5s)</text>
+  <rect x="1004" y="208" width="58" height="18" rx="9" fill="#16a34a"/>
+  <text x="1033" y="221" text-anchor="middle" class="badge-txt">2.72×</text>
+
+  <text x="594" y="246" class="bar-lbl">v0.4.0 极速</text>
+  <rect x="698" y="234" width="177" height="18" rx="4" fill="url(#v040Amber)"/>
+  <text x="883" y="247" class="val-new">1,629.7 (20.1s)</text>
+  <rect x="1004" y="234" width="58" height="18" rx="9" fill="#d97706"/>
+  <text x="1033" y="247" text-anchor="middle" class="badge-txt">3.18×</text>
+
+  <line x1="594" y1="270" x2="1066" y2="270" stroke="#f1f5f9" stroke-width="1.5"/>
+
+  <text x="594" y="294" class="group-lbl">4K Prefill 首字吞吐（tok/s，越高越好）</text>
+
+  <text x="594" y="320" class="bar-lbl">v0.3.2 基线</text>
+  <rect x="698" y="308" width="85" height="16" rx="4" fill="#cbd5e1"/>
+  <text x="791" y="320" class="val-old">404.6</text>
+
+  <text x="594" y="344" class="bar-lbl">v0.4.0 无损</text>
+  <rect x="698" y="332" width="95" height="18" rx="4" fill="url(#v040Blue)"/>
+  <text x="801" y="345" class="val-new">451.8</text>
+  <rect x="1004" y="332" width="58" height="18" rx="9" fill="#0ea5e9"/>
+  <text x="1033" y="345" text-anchor="middle" class="badge-txt">+11.7%</text>
+
+  <text x="594" y="370" class="bar-lbl">v0.4.0 极速</text>
+  <rect x="698" y="358" width="175" height="18" rx="4" fill="url(#v040Amber)"/>
+  <text x="881" y="371" class="val-new">831.8 tok/s</text>
+  <rect x="1004" y="358" width="58" height="18" rx="9" fill="#d97706"/>
+  <text x="1033" y="371" text-anchor="middle" class="badge-txt">2.06×</text>
+
+  <line x1="594" y1="392" x2="1066" y2="392" stroke="#f1f5f9" stroke-width="1.5"/>
+
+  <text x="594" y="414" class="group-lbl">32K Decode 生成速度（tok/s，越高越好）</text>
+
+  <text x="594" y="438" class="bar-lbl">v0.3.2 基线</text>
+  <rect x="698" y="426" width="161" height="16" rx="4" fill="#cbd5e1"/>
+  <text x="867" y="438" class="val-old">43.99</text>
+
+  <text x="594" y="462" class="bar-lbl">v0.4.0 无损</text>
+  <rect x="698" y="450" width="188" height="18" rx="4" fill="url(#v040Teal)"/>
+  <text x="894" y="463" class="val-new">51.23 tok/s</text>
+  <rect x="1004" y="450" width="58" height="18" rx="9" fill="#16a34a"/>
+  <text x="1033" y="463" text-anchor="middle" class="badge-txt">+16.5%</text>
+
+  <text x="36" y="534" class="foot">测试硬件：海光 K100AI（gfx928 · 64 GiB/卡），Linux x86_64 + DTK 运行时。所有权重保持原盘只读未改动；完整复现步骤与校验和见 docs/k100ai/INSTALL.md。</text>
+  <text x="1084" y="534" text-anchor="end" class="foot">github.com/DocPang/strata-k100ai</text>
+</svg>
