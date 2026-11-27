@@ -1,25 +1,16 @@
-# Strata for K100AI 文档
+# Strata for K100AI 文档索引
 
-[项目首页](../../README.md) · [下载 v0.3.2](https://github.com/DocPang/strata-k100ai/releases/tag/v0.3.2)
+[返回首页](../../README.md)
 
-## 安装与运行
+## 核心指南（v0.4.0）
 
-- [安装指南](INSTALL.md) — 校验发布包、准备模型文件、启动服务。
-- [配置指南](../../configs/k100ai/README.md) — 按卡数选配置，查看对应 JSON。
-- [运行指南](RUNTIME.md) — 切换引擎、设置资产路径、调用和验收 API。
+- **[完整安装与从零复现指南](INSTALL.md)**：DTK 镜像选择、全部权重/视觉/MTP/DSpark 出处与校验和、原生 Docker 启动命令
+- **[运行、调优与多卡共享缓存池指南](RUNTIME.md)**：显存与速度参数调优、双卡共享缓存池部署、视觉与 API 调用示例
+- **[v0.4.0 更新说明](release-notes/v0.4.0.md)**：完整 `v0.3.2` → `v0.4.0` 同口径成绩对照、技术改动与升级指南
 
-## 模型与实测
+## 历史记录与归档
 
-- [Qwen3.8-Flash-Next IQ3_S](QWEN31.md) — v0.3.1 单卡配置、Prefill 和 Decode 实测、输出校验。
-- [DeepSeek-V4.1-Flash](DEEPSEEK41.md) — v0.3.0 双卡和四卡配置、首 token 时间、Decode 和 PPL。
-- [验证记录](VALIDATION.md) — 精度、性能、长输入、API 和发布包测试。
-
-## 构建与复现
-
-- [复现指南](REPRODUCIBILITY.md) — 构建步骤、测试输入和验收门槛。
-- [来源与校验](PROVENANCE.md) — 二进制、源码和模型资产的来源与哈希。
-- [优化说明](OPTIMIZATION.md) — gfx928 内核、显存、MMAC、MTP 和 DSpark。
-
-## 版本
-
-[版本记录](release-notes/README.md) · [v0.3.2 发布说明](release-notes/v0.3.2.md) · [v0.2.3 归档](archive/v0.2.3/README.md)
+- [v0.3.2 发布说明](release-notes/v0.3.2.md)
+- [Qwen 历史基准记录](QWEN31.md)
+- [DeepSeek 历史基准记录](DEEPSEEK41.md)
+- [源码复现指南](REPRODUCIBILITY.md) · [来源与校验](PROVENANCE.md) · [验证记录](VALIDATION.md)
